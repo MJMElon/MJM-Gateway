@@ -64,6 +64,8 @@ window.GW_LANG["en"] = {
   },
   home: {
     greeting: "Hello, {name}",
+    pendingTitle: "Waiting for access",
+    pendingBody: "Your account is ready, but an administrator has not added you to a group yet. Your apps will appear here once you are assigned.",
     adminSection: "Administration",
     adminSectionHint: "Visible to administrators only",
     userAccess: "User Access",
@@ -208,6 +210,23 @@ window.GW_LANG["en"] = {
       }
     },
   admin: {
+    userGroups: {
+      description: "Drag people from the left into a group. Each group decides which apps its members can see.",
+      pending: "Pending",
+      allUsers: "All users",
+      pendingHint: "People not in any group yet. They see nothing until you add them to a group.",
+      allUsersHint: "Everyone. Drag someone into another group to give them that group\u2019s apps as well. The number is how many groups they are in.",
+      pendingEmpty: "Everyone has been assigned to a group.",
+      noUsers: "No matching users.",
+      members: "Members",
+      dropHere: "Drag people here",
+      removeMember: "Remove from group",
+      access: "Group access",
+      noModules: "No apps yet. Add apps under Modules first.",
+      alreadyMember: "Already in this group.",
+      added: "{name} added to {group}",
+      addToGroup: "Add {name} to a group",
+    },
     title: "Admin",
     accessTitle: "User Access",
     groupAccess: "User Access",
@@ -219,7 +238,7 @@ window.GW_LANG["en"] = {
     tabs: {
       users: "Users",
       matrix: "Access matrix",
-      groups: "Groups",
+      groups: "User Group Manage",
       modules: "Modules",
       departments: "Departments",
       announcements: "Announcements",

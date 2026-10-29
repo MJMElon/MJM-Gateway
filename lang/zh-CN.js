@@ -64,6 +64,8 @@ window.GW_LANG["zh-CN"] = {
   },
   "home": {
     "greeting": "你好，{name}",
+    "pendingTitle": "等待开通",
+    "pendingBody": "你的帐号已经建立，但管理员还没把你加进群组。分配好之后，你的 App 就会出现在这里。",
     "adminSection": "管理",
     "adminSectionHint": "只有管理员看得到",
     "userAccess": "User Access",
@@ -208,6 +210,23 @@ window.GW_LANG["zh-CN"] = {
       }
     },
   "admin": {
+    "userGroups": {
+      "description": "把左边的人拖进群组。每个群组决定成员可以看到哪些 App。",
+      "pending": "待分配",
+      "allUsers": "全部用户",
+      "pendingHint": "还没有任何群组的人。加入群组之前，他们登录后什么都看不到。",
+      "allUsersHint": "所有人。把人拖进另一个群组，他就会多拿到那个群组的 App。数字是他所属的群组数量。",
+      "pendingEmpty": "每个人都已经分配到群组了。",
+      "noUsers": "没有符合的用户。",
+      "members": "成员",
+      "dropHere": "把人拖到这里",
+      "removeMember": "移出群组",
+      "access": "群组权限",
+      "noModules": "还没有 App，请先在 Modules 新增。",
+      "alreadyMember": "已经在这个群组里。",
+      "added": "已把 {name} 加进 {group}",
+      "addToGroup": "把 {name} 加进群组"
+    },
     "title": "权限后台",
     "accessTitle": "User Access",
     "groupAccess": "User Access",
@@ -219,7 +238,7 @@ window.GW_LANG["zh-CN"] = {
     "tabs": {
       "users": "用户",
       "matrix": "权限矩阵",
-      "groups": "群组",
+      "groups": "用户群组管理",
       "modules": "模块",
       "departments": "部门",
       "announcements": "公告",

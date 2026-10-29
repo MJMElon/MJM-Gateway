@@ -585,46 +585,167 @@
   }
 
   // ================================================================ 群组（只限 super_admin）
+  /* User Group Manage（只限 super_admin）
+     左边：还没有任何群组的人（Pending assignment），拖到右边的群组卡片就加入；手机可点名字选群组。
+     右边：每个群组一张卡片：成员（× 移出）＋ Group Access（这个群组能看到哪些 App）。 */
   async function groupsTab() {
     const seq = routeSeq;
     const tg = (k, v) => t("admin.groups." + k, v);
-    const [groups, departments, members, grantsRows] = await Promise.all([
+    const tu2 = (k, v) => t("admin.userGroups." + k, v);
+    const [groups, departments, users, members, modules, grantRows] = await Promise.all([
       sb.from("gw_groups").select("*").order("sort_order").order("name"),
       loadDepartments(),
-      sb.from("gw_group_members").select("group_id"),
-      sb.from("gw_group_modules").select("group_id"),
+      sb.from("gw_profiles").select("id, full_name, email, department_id, status, role").order("full_name"),
+      sb.from("gw_group_members").select("group_id, user_id"),
+      sb.from("gw_modules").select("id, code, name, icon, is_active").order("sort_order").order("name"),
+      sb.from("gw_group_modules").select("group_id, module_id"),
     ]).then((r) => r.map((x) => (Array.isArray(x) ? x : x.data || [])));
-    const count = (rows) => rows.reduce((acc, r) => ((acc[r.group_id] = (acc[r.group_id] || 0) + 1), acc), {});
-    const memberCount = count(members);
-    const moduleCount = count(grantsRows);
-    const deptName = new Map(departments.map((d) => [d.id, d.name]));
-
     if (stale(seq)) return;
-    view.innerHTML = `<div class="space-y-4">
-      <div class="flex items-center justify-between gap-2">
-        <p class="text-sm text-slate-500">${esc(tg("description"))}</p>
-        <button id="add" class="${btn("primary")}">${icon("plus")} ${esc(tg("add"))}</button>
-      </div>
-      ${
+
+    const deptName = new Map(departments.map((d) => [d.id, d.name]));
+    const userById = new Map(users.map((u) => [u.id, u]));
+    let memberSet = new Set(members.map((m) => m.group_id + ":" + m.user_id));
+    let grantSet = new Set(grantRows.map((g) => g.group_id + ":" + g.module_id));
+    let leftMode = "pending";
+    let query = "";
+    let sortables = [];
+    const groupsOf = (uid) => groups.filter((g) => memberSet.has(g.id + ":" + uid));
+    const membersOf = (gid) => users.filter((u) => memberSet.has(gid + ":" + u.id));
+
+    const chip = (u, extra) => `<div data-user="${u.id}" class="gw-user flex cursor-grab items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800 ${u.status === "disabled" ? "opacity-50" : ""}">
+        <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold dark:bg-slate-700">${esc(u.full_name.slice(0, 1))}</span>
+        <span class="min-w-0 flex-1"><span class="block truncate font-medium">${esc(u.full_name)}</span><span class="block truncate text-xs text-slate-500">${esc(u.email)}${u.department_id ? " · " + esc(deptName.get(u.department_id)) : ""}</span></span>
+        ${extra || ""}
+      </div>`;
+
+    function draw() {
+      sortables.forEach((s) => s.destroy());
+      sortables = [];
+      const pending = users.filter((u) => u.status === "active" && u.role !== "super_admin" && groupsOf(u.id).length === 0);
+      const q = query.trim().toLowerCase();
+      const leftList = (leftMode === "pending" ? pending : users).filter((u) => !q || (u.full_name + " " + u.email).toLowerCase().includes(q));
+
+      view.innerHTML = `<div class="grid gap-5 lg:grid-cols-[18rem_1fr]">
+        <aside class="space-y-3 lg:sticky lg:top-20 lg:self-start">
+          <div class="${cls.card} p-3">
+            <div class="mb-2 inline-flex w-full rounded-lg border border-slate-300 p-0.5 dark:border-slate-700">
+              <button data-left="pending" class="flex-1 rounded-md px-2 py-1 text-sm font-medium ${leftMode === "pending" ? "bg-amber-500 text-white" : "text-slate-600 dark:text-slate-300"}">${esc(tu2("pending"))} (${pending.length})</button>
+              <button data-left="all" class="flex-1 rounded-md px-2 py-1 text-sm font-medium ${leftMode === "all" ? "bg-slate-700 text-white" : "text-slate-600 dark:text-slate-300"}">${esc(tu2("allUsers"))}</button>
+            </div>
+            <p class="mb-2 text-xs text-slate-500">${esc(tu2(leftMode === "pending" ? "pendingHint" : "allUsersHint"))}</p>
+            <input id="ug-q" type="search" value="${esc(query)}" placeholder="${esc(t("admin.users.search"))}" class="${cls.input} mb-2 h-9">
+            <div id="ug-left" class="max-h-[60vh] space-y-2 overflow-y-auto">
+              ${
+                leftList.length
+                  ? leftList.map((u) => chip(u, leftMode === "all" ? `<span class="text-[11px] text-slate-400">${groupsOf(u.id).length}</span>` : "")).join("")
+                  : `<p class="py-6 text-center text-sm text-slate-400">${esc(tu2(leftMode === "pending" ? "pendingEmpty" : "noUsers"))}</p>`
+              }
+            </div>
+          </div>
+        </aside>
+        <section class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-slate-500">${esc(tu2("description"))}</p>
+            <button id="ug-add" class="${btn("primary")}">${icon("plus")} ${esc(tg("add"))}</button>
+          </div>
+          ${
+            groups.length
+              ? `<div class="grid gap-4 xl:grid-cols-2">${groups
+                  .map((g) => {
+                    const mems = membersOf(g.id);
+                    return `<div class="${cls.card} flex flex-col p-4">
+                      <div class="flex items-start gap-2">
+                        <div class="min-w-0 flex-1">
+                          <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">${esc(g.name)}</span>${badge(g.department_id ? deptName.get(g.department_id) : tg("companyWide"), g.department_id ? "blue" : "slate")}</div>
+                          ${g.description ? `<p class="mt-0.5 text-sm text-slate-500">${esc(g.description)}</p>` : ""}
+                        </div>
+                        <button data-edit="${g.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
+                        <button data-del="${g.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                      </div>
+                      <p class="mt-3 mb-1.5 text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(tu2("members"))} (${mems.length})</p>
+                      <div data-drop="${g.id}" class="gw-drop min-h-16 space-y-1.5 rounded-xl border-2 border-dashed border-slate-200 p-2 dark:border-slate-700">
+                        ${mems.length ? mems.map((u) => chip(u, `<button data-out="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>`)).join("") : `<p class="ug-empty py-3 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}
+                      </div>
+                      <p class="mt-3 mb-1.5 text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(tu2("access"))}</p>
+                      <div class="flex flex-wrap gap-1.5">
+                        ${
+                          modules.length
+                            ? modules
+                                .map((mod) => {
+                                  const on = grantSet.has(g.id + ":" + mod.id);
+                                  return `<button data-grant="${g.id}:${mod.id}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                                    on ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "border-slate-300 text-slate-500 dark:border-slate-700"
+                                  } ${mod.is_active ? "" : "opacity-50"}">${icon(on ? "check" : "plus", "size-3")}${esc(mod.name)}</button>`;
+                                })
+                                .join("")
+                            : `<span class="text-xs text-slate-400">${esc(tu2("noModules"))}</span>`
+                        }
+                      </div>
+                    </div>`;
+                  })
+                  .join("")}</div>`
+              : empty(tg("empty"))
+          }
+        </section>
+      </div>`;
+      refreshIcons();
+
+      // 拖拉：左边名单 → 群组卡片
+      const left = $("#ug-left");
+      sortables.push(window.Sortable.create(left, { group: { name: "ug", pull: "clone", put: false }, sort: false, delay: 200, delayOnTouchOnly: true, filter: ".no-drag", animation: 150 }));
+      $$(".gw-drop").forEach((zone) =>
+        sortables.push(
+          window.Sortable.create(zone, {
+            group: { name: "ug", pull: false, put: true },
+            sort: false,
+            animation: 150,
+            filter: ".no-drag",
+            onAdd: (evt) => {
+              const uid = evt.item.dataset.user;
+              evt.item.remove();
+              addMember(zone.dataset.drop, uid);
+            },
+          }),
+        ),
+      );
+      $("#ug-q").addEventListener("input", (e) => {
+        query = e.target.value;
+        const pos = e.target.selectionStart;
+        draw();
+        const input = $("#ug-q");
+        input.focus();
+        input.setSelectionRange(pos, pos);
+      });
+    }
+
+    async function addMember(gid, uid) {
+      if (memberSet.has(gid + ":" + uid)) return toast(tu2("alreadyMember"));
+      const { error } = await sb.from("gw_group_members").insert({ group_id: gid, user_id: uid });
+      if (error) return setMsg(tg("saveFailed"));
+      memberSet.add(gid + ":" + uid);
+      toast(tu2("added", { name: userById.get(uid).full_name, group: groups.find((g) => g.id === gid).name }));
+      draw();
+    }
+
+    // 手机：点名字选群组
+    function pickGroup(uid) {
+      const u = userById.get(uid);
+      const m = modal(
+        tu2("addToGroup", { name: u.full_name }),
         groups.length
-          ? `<div class="${cls.card} divide-y divide-slate-200 dark:divide-slate-800">${groups
-              .map(
-                (g) => `<div class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
-                  <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(g.name)}</span>${badge(g.department_id ? deptName.get(g.department_id) : tg("companyWide"), g.department_id ? "blue" : "slate")}</div>
-                    ${g.description ? `<p class="mt-0.5 text-sm text-slate-500">${esc(g.description)}</p>` : ""}
-                    <p class="mt-0.5 text-xs text-slate-400">${esc(tg("counts", { members: memberCount[g.id] || 0, modules: moduleCount[g.id] || 0 }))}</p>
-                  </div>
-                  <div class="flex gap-1.5">
-                    <button data-edit="${g.id}" class="${btn("ghost", "sm")}">${icon("pencil")} ${esc(tg("edit"))}</button>
-                    <button data-del="${g.id}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")} ${esc(tg("delete"))}</button>
-                  </div>
-                </div>`,
-              )
+          ? `<div class="space-y-2">${groups
+              .map((g) => {
+                const inIt = memberSet.has(g.id + ":" + uid);
+                return `<button data-pick="${g.id}" ${inIt ? "disabled" : ""} class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-left text-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"><span class="font-medium">${esc(g.name)}</span>${inIt ? icon("check", "size-4 text-emerald-600") : icon("plus", "size-4")}</button>`;
+              })
               .join("")}</div>`
-          : empty(tg("empty"))
-      }
-    </div>`;
+          : empty(tg("empty")),
+      );
+      m.el.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-pick]");
+        if (b) (m.close(), addMember(b.dataset.pick, uid));
+      });
+    }
 
     function dialog(g) {
       const m = modal(
@@ -653,18 +774,41 @@
       });
     }
 
-    $("#add").onclick = () => dialog(null);
     view.onclick = async (e) => {
-      const b = e.target.closest("[data-edit],[data-del]");
+      const b = e.target.closest("button, [data-user]");
       if (!b) return;
-      const g = groups.find((x) => x.id === (b.dataset.edit || b.dataset.del));
-      if (b.dataset.edit) return dialog(g);
-      if (!(await confirmDialog(tg("deleteTitle"), tg("deleteBody", { name: g.name }), tg("delete"), tg("cancel")))) return;
-      const { error } = await sb.from("gw_groups").delete().eq("id", g.id);
-      if (error) setMsg(tg("saveFailed"));
-      groupsTab();
+      const d = b.dataset;
+      if (b.id === "ug-add") return dialog(null);
+      if (d.left) return ((leftMode = d.left), draw());
+      if (d.edit) return dialog(groups.find((x) => x.id === d.edit));
+      if (d.del) {
+        const g = groups.find((x) => x.id === d.del);
+        if (!(await confirmDialog(tg("deleteTitle"), tg("deleteBody", { name: g.name }), tg("delete"), tg("cancel")))) return;
+        const { error } = await sb.from("gw_groups").delete().eq("id", g.id);
+        if (error) setMsg(tg("saveFailed"));
+        return groupsTab();
+      }
+      if (d.out) {
+        const [gid, uid] = d.out.split(":");
+        const { error } = await sb.from("gw_group_members").delete().eq("group_id", gid).eq("user_id", uid);
+        if (error) return setMsg(tg("saveFailed"));
+        memberSet.delete(gid + ":" + uid);
+        return draw();
+      }
+      if (d.grant) {
+        const [gid, mid] = d.grant.split(":");
+        const on = grantSet.has(d.grant);
+        const { error } = on
+          ? await sb.from("gw_group_modules").delete().eq("group_id", gid).eq("module_id", mid)
+          : await sb.from("gw_group_modules").insert({ group_id: gid, module_id: mid });
+        if (error) return setMsg(tg("saveFailed"));
+        on ? grantSet.delete(d.grant) : grantSet.add(d.grant);
+        return draw();
+      }
+      // 点左边名单里的名字：选群组（手机不方便拖拉时用）
+      if (d.user && b.closest("#ug-left")) return pickGroup(d.user);
     };
-    refreshIcons();
+    draw();
   }
 
   // ================================================================ 部门（只限 super_admin）

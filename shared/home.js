@@ -369,6 +369,16 @@ window.GWHome = (function () {
       sortables.forEach((s) => s.destroy());
       sortables = [];
       clearInterval(clockTimer);
+      // 还没被分配到任何群组：主画面什么都不显示，只显示等待分配
+      if (opts && opts.pending) {
+        root.innerHTML = `<div class="mx-auto mt-[12vh] max-w-md rounded-3xl border border-white/70 bg-white/80 p-8 text-center shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
+          <span class="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">${icon("hourglass", "size-7")}</span>
+          <h2 class="text-lg font-semibold">${esc(t("home.pendingTitle"))}</h2>
+          <p class="mt-2 text-sm text-slate-500">${esc(t("home.pendingBody"))}</p>
+          <p class="mt-4 text-xs text-slate-400">${esc(profile.email)}</p>
+        </div>`;
+        return refreshIcons();
+      }
       const items = rootItems();
       const announcements = data.announcements.filter((a) => !dismissed.includes(a.id));
       root.innerHTML = `

@@ -21,9 +21,10 @@
   const firstVisit = !profile.layout_initialized;
   // 第一次登录：按群组自动排好预设版面
   if (firstVisit) await GW.sb.rpc("gw_init_layout");
-  const [{ data, error }, widgetRes] = await Promise.all([
+  const [{ data, error }, widgetRes, memberRes] = await Promise.all([
     GW.sb.rpc("gw_get_home"),
     GW.sb.from("gw_user_widgets").select("*").order("sort_order"),
+    GW.sb.from("gw_group_members").select("group_id").eq("user_id", profile.id),
   ]);
   if (error) return (main.innerHTML = GW.alertBox(t("errors.description")));
 
@@ -51,8 +52,34 @@
     /* 忽略 */
   }
 
+  // 一般用户还没被分配到群组、也没有个人开放的 App：显示「等待分配」
+  const isAdmin = profile.role === "super_admin" || profile.role === "admin";
+  const pending = !isAdmin && !memberRes.error && (memberRes.data || []).length === 0 && data.modules.length === 0;
+  // 从「等待开通」变成有权限：主画面还是空的，就把有权限的 App 都放上去（每人一次）
+  const filledKey = "gw_home_filled_" + profile.id;
+  let filled = false;
+  try {
+    filled = !!localStorage.getItem(filledKey);
+  } catch (e) {
+    /* 忽略 */
+  }
+  if (!pending && !filled && data.layout.length === 0 && data.modules.length > 0) {
+    const items = data.modules.map((m, i) => ({ module_id: m.id, folder_id: null, sort_order: i + 1, card_size: "large" }));
+    const { error: fillError } = await GW.sb.rpc("gw_save_layout", { p_items: items });
+    if (!fillError) {
+      data.layout = items;
+      GW.sb.rpc("gw_mark_seen", { p_modules: data.modules.map((m) => m.id) });
+    }
+  }
+  if (data.layout.length > 0) {
+    try {
+      localStorage.setItem(filledKey, "1");
+    } catch (e) {
+      /* 忽略 */
+    }
+  }
   main.innerHTML = '<div id="board" class="mx-auto max-w-5xl"></div>';
-  GWHome.render(document.getElementById("board"), data, { widgets, profile });
+  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending });
 })();
 </script>
 </body>
