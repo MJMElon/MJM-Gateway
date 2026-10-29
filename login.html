@@ -5,12 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MJM Connect</title>
 <script src="shared/head.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
 <style>
-  /* 登录封面：白底，银白金属 / 玻璃感、方正硬朗的 MJM。
-     进页面时字母依序从上方落下，落定后一道光扫过，接着出现白色玻璃方框。 */
+  /* 登录封面：白底，MJM 字标（assets/mjm-logo）。
+     进页面时字标从上方落下，接着出现白色玻璃方框。 */
   :root { --frame: #1f2933; --frame-deep: #0f172a; }
   html, body { background: #ffffff !important; color: #0f172a; }
   body { overflow-x: hidden; }
@@ -19,32 +16,16 @@
     background: radial-gradient(ellipse 70% 45% at 50% 38%, #f3f5f8 0%, #ffffff 70%);
   }
 
-  .word { display: flex; justify-content: center; align-items: flex-end; line-height: .9; user-select: none; }
-  .letter {
-    font-family: "Russo One", "Arial Black", sans-serif; font-size: clamp(5.5rem, 27vw, 16rem);
-    margin: 0 -.012em; /* 字母靠近一点 */
-    /* 银白金属：上亮、中段一道暗带、下缘再亮，像打磨过的铝 */
-    background:
-      linear-gradient(110deg, transparent 0 40%, rgba(255, 255, 255, .95) 48%, transparent 56% 100%) no-repeat,
-      linear-gradient(180deg, #ffffff 0%, #eef1f4 22%, #c3cad2 46%, #f7f8fa 53%, #a7b0ba 74%, #dde2e7 100%);
-    background-size: 250% 100%, 100% 100%;
-    background-position: 160% 0, 0 0;
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    -webkit-text-stroke: 1px rgba(100, 112, 124, .55);
-    filter: drop-shadow(0 1px 0 #ffffff) drop-shadow(0 2px 1px rgba(15, 23, 42, .28)) drop-shadow(0 16px 22px rgba(15, 23, 42, .16));
-    opacity: 0; transform: translateY(-110vh);
-  }
+  /* MJM 字标图档（背景透明） */
+  .logo { display: block; width: min(92vw, 700px); margin: -24px 0 -30px; opacity: 0; transform: translateY(-110vh); }
+  .logo img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
   @keyframes drop {
     0% { opacity: 1; transform: translateY(-110vh); }
     72% { opacity: 1; transform: translateY(10px); }
     86% { transform: translateY(-4px); }
     100% { opacity: 1; transform: translateY(0); }
   }
-  /* 落定后一道光扫过 */
-  @keyframes shine { from { background-position: 160% 0, 0 0; } to { background-position: -60% 0, 0 0; } }
-  .ready .letter { animation: drop .85s cubic-bezier(.3, .7, .3, 1) forwards, shine 1.1s ease-in-out 1.35s forwards; }
-  .ready .letter:nth-child(2) { animation-delay: .16s, 1.45s; }
-  .ready .letter:nth-child(3) { animation-delay: .32s, 1.55s; }
+  .ready .logo { animation: drop .9s cubic-bezier(.3, .7, .3, 1) forwards; }
   .rule { width: clamp(120px, 28vw, 260px); height: 1px; margin: 18px 0 0; background: linear-gradient(90deg, transparent, #9aa4ae, transparent); opacity: 0; transition: opacity .6s 1.1s; }
   .ready .rule { opacity: 1; }
 
@@ -78,17 +59,18 @@
   .glass .link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
   @media (prefers-reduced-motion: reduce) {
-    .letter { opacity: 1; transform: none; }
-    .ready .letter { animation: none; }
+    .logo { opacity: 1; transform: none; }
+    .ready .logo { animation: none; }
     .glass, .rule { transition: none; }
   }
 </style>
 </head>
 <body>
 <main class="stage" id="stage">
-  <div class="word" role="img" aria-label="MJM">
-    <span class="letter" aria-hidden="true">M</span><span class="letter" aria-hidden="true">J</span><span class="letter" aria-hidden="true">M</span>
-  </div>
+  <picture class="logo">
+    <source srcset="assets/mjm-logo.webp" type="image/webp">
+    <img src="assets/mjm-logo.png" alt="MJM" width="1333" height="628" draggable="false">
+  </picture>
   <div class="rule"></div>
   <div class="glass" id="glass">
     <div class="brand">CONNECT</div>
@@ -97,7 +79,7 @@
 </main>
 
 <script>
-/* 字体载入后才开始落下（避免先显示替代字体）；载入失败也照常显示 */
+/* 字标图片载入后才开始落下；载入失败也照常显示 */
 (function () {
   const stage = document.getElementById("stage");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -105,7 +87,9 @@
     requestAnimationFrame(() => stage.classList.add("ready"));
     setTimeout(() => stage.classList.add("show-glass"), reduce ? 0 : 1200);
   };
-  Promise.race([document.fonts.load("100px 'Russo One'"), new Promise((r) => setTimeout(r, 1500))]).then(start, start);
+  const img = document.querySelector(".logo img");
+  const loaded = img.complete ? Promise.resolve() : new Promise((r) => img.addEventListener("load", r, { once: true }));
+  Promise.race([loaded, new Promise((r) => setTimeout(r, 1500))]).then(start, start);
 })();
 </script>
 
