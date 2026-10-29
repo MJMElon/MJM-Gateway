@@ -4,7 +4,7 @@
 Gateway 只管**认证、授权、导航**，不处理业务资料。
 
 - 前端：Next.js 16（App Router）+ TypeScript + Tailwind CSS 4
-- 后端：Supabase（项目 `machinery-system`）——Auth、PostgreSQL、RLS、Edge Functions
+- 后端：Supabase（项目 `MJM Gateway`（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`））——Auth、PostgreSQL、RLS、Edge Functions
 - 拖拉：dnd-kit（支持手机长按拖拉）
 - 界面文字：`messages/zh-CN.json`（以后加 `en.json`、`ms.json`）
 

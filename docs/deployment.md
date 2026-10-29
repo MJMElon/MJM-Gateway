@@ -1,7 +1,8 @@
 # 上线步骤
 
-> 线上 Supabase 项目 `machinery-system` 里已有在用的 `workrecords_*`、`machinery_*` 表。
-> 本 repo 的 migration **只新增 `gw_*` 对象**，不修改、不删除任何现有表、函数或资料，也不在 `auth.users` 上建立触发器。
+> 线上 Supabase 项目：**MJM Gateway**（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`）。
+> 项目里另有在用的 `ai_management_*` 表，以及挂在 `auth.users` 上的触发器 `ai_management_on_auth_user_created`（新建登录帐号会自动加进 AI 管理系统的用户表）。
+> 本 repo 的 migration **只新增 `gw_*` 对象**，不修改、不删除任何现有表、函数或资料。
 
 ## 1. 套用 migration（需先确认 SQL）
 
@@ -31,8 +32,8 @@ where email = 'you@example.com';
 
 ```bash
 node scripts/generate-token-key.mjs                    # 产生 ES256 私钥（JWK）
-npx supabase secrets set GW_TOKEN_PRIVATE_JWK='<输出>' --project-ref qcvbzzdbbqmnrljfnxjp
-npx supabase functions deploy gw-issue-token gw-check-access gw-jwks --project-ref qcvbzzdbbqmnrljfnxjp
+npx supabase secrets set GW_TOKEN_PRIVATE_JWK='<输出>' --project-ref briqzyxfxsvulyizzbiu
+npx supabase functions deploy gw-issue-token gw-check-access gw-jwks --project-ref briqzyxfxsvulyizzbiu
 ```
 
 可选：`GW_ALLOWED_ORIGIN=https://gateway.你的网域` 限制 CORS 来源（默认 `*`）。
@@ -50,7 +51,7 @@ npx supabase functions deploy gw-issue-token gw-check-access gw-jwks --project-r
 
 | 名称 | 说明 |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://qcvbzzdbbqmnrljfnxjp.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://briqzyxfxsvulyizzbiu.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | 只在服务端使用（建立用户、重设密码、登录锁定）|
 | `NEXT_PUBLIC_SITE_URL` | Gateway 网址（忘记密码邮件的回跳）|

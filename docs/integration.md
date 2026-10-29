@@ -20,7 +20,7 @@
 3. 目标系统**在服务端**用 API Key 兑换 Token：
 
    ```http
-   POST https://qcvbzzdbbqmnrljfnxjp.supabase.co/functions/v1/gw-check-access
+   POST https://briqzyxfxsvulyizzbiu.supabase.co/functions/v1/gw-check-access
    x-gw-api-key: gwk_...
    Content-Type: application/json
 
