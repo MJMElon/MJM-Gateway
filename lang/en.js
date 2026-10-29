@@ -151,6 +151,62 @@ window.GW_LANG["en"] = {
     cancel: "Cancel",
     confirm: "Reset",
   },
+  "fab": {
+      "menu": "Add or edit",
+      "addWidget": "Add Widget",
+      "addWidgetHint": "Pick a widget and a size. It is added to the end of your home screen; drag it to where you want it.",
+      "addApps": "Add Apps",
+      "addAppsHint": "Every app you can use. Drag an icon onto your home screen where you want it, or tap + to add it at the end.",
+      "newFolder": "New Folder",
+      "edit": "Edit Home Screen",
+      "editHint": "Drag to rearrange. Tap − to remove, or the resize button to change a widget’s size.",
+      "done": "Done",
+      "homeScreen": "Home screen (no folder)",
+      "moveOut": "Move to home screen",
+      "emptyFolder": "This folder is empty. Use an app’s … menu in Edit Home Screen to move it here.",
+      "emptyHome": "Your home screen is empty. Tap the + button to add apps and widgets."
+    },
+    "widgets": {
+      "unavailable": "Widgets will be available after the next system update.",
+      "added": "Widget added",
+      "remove": "Remove widget",
+      "resize": "Change size",
+      "greeting": {
+        "morning": "Good morning, {name}",
+        "afternoon": "Good afternoon, {name}",
+        "evening": "Good evening, {name}"
+      },
+      "appsOnHome": "Apps on your home screen: {count}",
+      "noRecent": "Apps you open will appear here.",
+      "noAnnouncements": "No announcements right now.",
+      "notesPlaceholder": "Write a note…",
+      "adminOnly": "For administrators only.",
+      "types": {
+        "greeting": "Greeting",
+        "clock": "Clock",
+        "search": "Search",
+        "recent": "Recently Opened",
+        "announcements": "Announcements",
+        "calendar": "Calendar",
+        "notes": "Notes",
+        "admin": "Administration"
+      },
+      "desc": {
+        "greeting": "Good morning with today’s date",
+        "clock": "Current time in Malaysia",
+        "search": "Find any app quickly",
+        "recent": "Apps you opened last",
+        "announcements": "Company and department notices",
+        "calendar": "This month at a glance",
+        "notes": "A private note only you can see",
+        "admin": "User Access and Super Admin shortcuts"
+      },
+      "sizes": {
+        "small": "S",
+        "medium": "M",
+        "large": "L"
+      }
+    },
   admin: {
     title: "Admin",
     accessTitle: "User Access",

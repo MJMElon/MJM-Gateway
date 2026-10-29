@@ -7,67 +7,89 @@
 <script src="shared/head.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
 <style>
-  /* 登录封面：白底，MJM 三个字有深绿粗框，字里填满绿、黄、白大小不一的圆（像大连那面贝壳字墙）。
-     进页面时字母依序从上方落下，接着出现白色玻璃方框（Email / Password / Sign in）。 */
-  :root { --frame: #1f5a3c; --frame-deep: #123826; }
+  /* 登录封面：白底，银白金属 / 玻璃感、方正硬朗的 MJM。
+     进页面时字母依序从上方落下，落定后一道光扫过，接着出现白色玻璃方框。 */
+  :root { --frame: #1f2933; --frame-deep: #0f172a; }
   html, body { background: #ffffff !important; color: #0f172a; }
   body { overflow-x: hidden; }
+  .stage {
+    min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6vh 16px;
+    background: radial-gradient(ellipse 70% 45% at 50% 38%, #f3f5f8 0%, #ffffff 70%);
+  }
 
-  .stage { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6vh 16px; }
-  .word { display: flex; align-items: flex-end; justify-content: center; gap: clamp(6px, 1.4vw, 18px); width: min(94vw, 980px); }
-  .letter { flex: 1 1 0; min-width: 0; opacity: 0; transform: translateY(-110vh); }
-  .letter svg { display: block; width: 100%; height: auto; overflow: visible; }
-  /* 落下：稍微弹一下再停住 */
+  .word { display: flex; justify-content: center; align-items: flex-end; line-height: .9; user-select: none; }
+  .letter {
+    font-family: "Russo One", "Arial Black", sans-serif; font-size: clamp(5.5rem, 27vw, 16rem);
+    margin: 0 -.012em; /* 字母靠近一点 */
+    /* 银白金属：上亮、中段一道暗带、下缘再亮，像打磨过的铝 */
+    background:
+      linear-gradient(110deg, transparent 0 40%, rgba(255, 255, 255, .95) 48%, transparent 56% 100%) no-repeat,
+      linear-gradient(180deg, #ffffff 0%, #eef1f4 22%, #c3cad2 46%, #f7f8fa 53%, #a7b0ba 74%, #dde2e7 100%);
+    background-size: 250% 100%, 100% 100%;
+    background-position: 160% 0, 0 0;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 1px rgba(100, 112, 124, .55);
+    filter: drop-shadow(0 1px 0 #ffffff) drop-shadow(0 2px 1px rgba(15, 23, 42, .28)) drop-shadow(0 16px 22px rgba(15, 23, 42, .16));
+    opacity: 0; transform: translateY(-110vh);
+  }
   @keyframes drop {
     0% { opacity: 1; transform: translateY(-110vh); }
-    70% { opacity: 1; transform: translateY(14px); }
-    85% { transform: translateY(-6px); }
+    72% { opacity: 1; transform: translateY(10px); }
+    86% { transform: translateY(-4px); }
     100% { opacity: 1; transform: translateY(0); }
   }
-  .ready .letter { animation: drop .9s cubic-bezier(.3, .7, .3, 1) forwards; }
-  .ready .letter:nth-child(2) { animation-delay: .18s; }
-  .ready .letter:nth-child(3) { animation-delay: .36s; }
+  /* 落定后一道光扫过 */
+  @keyframes shine { from { background-position: 160% 0, 0 0; } to { background-position: -60% 0, 0 0; } }
+  .ready .letter { animation: drop .85s cubic-bezier(.3, .7, .3, 1) forwards, shine 1.1s ease-in-out 1.35s forwards; }
+  .ready .letter:nth-child(2) { animation-delay: .16s, 1.45s; }
+  .ready .letter:nth-child(3) { animation-delay: .32s, 1.55s; }
+  .rule { width: clamp(120px, 28vw, 260px); height: 1px; margin: 18px 0 0; background: linear-gradient(90deg, transparent, #9aa4ae, transparent); opacity: 0; transition: opacity .6s 1.1s; }
+  .ready .rule { opacity: 1; }
 
-  /* 白色玻璃方框：压在字的下缘，后面的圆点会透出模糊 */
+  /* 白色玻璃方框 */
   .glass {
-    position: relative; z-index: 2; width: min(92vw, 360px); margin-top: clamp(-56px, -3.6vw, -14px);
-    padding: 26px 24px 20px; border-radius: 22px;
-    background: rgba(255, 255, 255, .62);
+    position: relative; z-index: 2; width: min(92vw, 360px); margin-top: 22px;
+    padding: 24px 24px 20px; border-radius: 22px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .78), rgba(255, 255, 255, .58));
     -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, .9);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 20px 50px rgba(18, 56, 38, .14), 0 2px 8px rgba(18, 56, 38, .06);
+    border: 1px solid rgba(255, 255, 255, .95);
+    box-shadow: 0 1px 0 #ffffff inset, 0 0 0 1px rgba(148, 160, 172, .25), 0 24px 50px rgba(15, 23, 42, .12);
     opacity: 0; transform: translateY(24px) scale(.97);
     transition: opacity .6s, transform .7s cubic-bezier(.2, .8, .2, 1);
   }
   .show-glass .glass { opacity: 1; transform: none; }
-  .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .5em; text-indent: .5em; color: var(--frame); margin-bottom: 18px; }
+  .brand { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .55em; text-indent: .55em; color: #64707c; margin-bottom: 18px; }
   .glass label > span { display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px; }
   .glass input {
-    width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(15, 23, 42, .14); background: rgba(255, 255, 255, .85);
+    width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(15, 23, 42, .14); background: rgba(255, 255, 255, .9);
     padding: 0 14px; font-size: 15px; color: #0f172a; outline: none; transition: border-color .2s, box-shadow .2s;
   }
-  .glass input:focus { border-color: var(--frame); box-shadow: 0 0 0 3px rgba(31, 90, 60, .15); }
+  .glass input:focus { border-color: #64707c; box-shadow: 0 0 0 3px rgba(100, 112, 124, .18); }
   .glass .go {
-    width: 100%; height: 46px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font-weight: 600; font-size: 15px;
-    background: var(--frame); transition: background .2s;
+    width: 100%; height: 46px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font-weight: 600; font-size: 15px; letter-spacing: .02em;
+    background: linear-gradient(180deg, #3a4651, #1f2933); box-shadow: 0 1px 0 rgba(255, 255, 255, .18) inset, 0 6px 14px rgba(15, 23, 42, .2);
+    transition: filter .2s;
   }
-  .glass .go:hover { background: var(--frame-deep); }
+  .glass .go:hover { filter: brightness(1.12); }
   .glass .go:disabled { opacity: .7; cursor: default; }
-  .glass .link { font-size: 13px; color: var(--frame); background: none; border: 0; cursor: pointer; }
+  .glass .link { font-size: 13px; color: #475569; background: none; border: 0; cursor: pointer; }
   .glass .link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
   @media (prefers-reduced-motion: reduce) {
     .letter { opacity: 1; transform: none; }
     .ready .letter { animation: none; }
-    .glass { transition: none; }
+    .glass, .rule { transition: none; }
   }
 </style>
 </head>
 <body>
 <main class="stage" id="stage">
-  <div class="word" id="word" role="img" aria-label="MJM"></div>
+  <div class="word" role="img" aria-label="MJM">
+    <span class="letter" aria-hidden="true">M</span><span class="letter" aria-hidden="true">J</span><span class="letter" aria-hidden="true">M</span>
+  </div>
+  <div class="rule"></div>
   <div class="glass" id="glass">
     <div class="brand">CONNECT</div>
     <div id="card"></div>
@@ -75,112 +97,15 @@
 </main>
 
 <script>
-/* ---------------------------------------------------------------- 字标
-   每个字母一个 SVG：深绿厚度 → 米白底 → 圆点（用字形裁切）→ 深绿粗框。
-   圆点用固定种子产生，每次看到的都一样。 */
+/* 字体载入后才开始落下（避免先显示替代字体）；载入失败也照常显示 */
 (function () {
-  const COLORS = [
-    ["#2f7d4f", 3], ["#4f9d69", 3], ["#8cc084", 2], // 绿
-    ["#f2c230", 3], ["#f7d774", 2], ["#e8a92e", 1], // 黄
-    ["#ffffff", 4], ["#f4efe2", 2], // 白
-  ];
-  const BAG = COLORS.flatMap(([c, w]) => Array(w).fill(c));
-  const NS = "http://www.w3.org/2000/svg";
-  const el = (tag, attrs) => {
-    const e = document.createElementNS(NS, tag);
-    Object.entries(attrs || {}).forEach(([k, v]) => e.setAttribute(k, v));
-    return e;
-  };
-  function random(seed) {
-    return () => {
-      seed |= 0;
-      seed = (seed + 0x6d2b79f5) | 0;
-      let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
-      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-  const textAttrs = { x: 0, y: 0, "font-family": "'Archivo Black', 'Arial Black', sans-serif", "font-size": 320 };
-
-  function buildLetter(ch, index) {
-    const wrap = document.createElement("div");
-    wrap.className = "letter";
-    const svg = el("svg", { "aria-hidden": "true" });
-    wrap.appendChild(svg);
-    document.getElementById("word").appendChild(wrap);
-
-    // 量字形实际墨迹范围（getBBox 会包含整个行高，下面会多出空白）
-    const ctx = document.createElement("canvas").getContext("2d");
-    ctx.font = `${textAttrs["font-size"]}px ${textAttrs["font-family"]}`;
-    const m = ctx.measureText(ch);
-    const b = {
-      x: -m.actualBoundingBoxLeft,
-      y: -m.actualBoundingBoxAscent,
-      width: m.actualBoundingBoxLeft + m.actualBoundingBoxRight,
-      height: m.actualBoundingBoxAscent + m.actualBoundingBoxDescent,
-    };
-    const pad = 8;
-    const depth = 9;
-    const vbWidth = b.width + pad * 2 + depth;
-    svg.setAttribute("viewBox", `${b.x - pad} ${b.y - pad} ${vbWidth} ${b.height + pad * 2 + depth}`);
-    // 宽度按字形比例分配，三个字母一样高
-    wrap.style.flex = `${vbWidth} 1 0`;
-
-    const clipId = "clip-" + index;
-    const defs = el("defs");
-    const clip = el("clipPath", { id: clipId });
-    const clipText = el("text", textAttrs);
-    clipText.textContent = ch;
-    clip.appendChild(clipText);
-    defs.appendChild(clip);
-    svg.appendChild(defs);
-
-    // 厚度（往右下）
-    const back = el("text", { ...textAttrs, fill: "#123826", stroke: "#123826", "stroke-width": 16, "stroke-linejoin": "round", transform: `translate(${depth} ${depth})` });
-    back.textContent = ch;
-    svg.appendChild(back);
-    // 米白底，圆点之间的缝看起来像墙里的填料
-    const base = el("text", { ...textAttrs, fill: "#faf7ef" });
-    base.textContent = ch;
-    svg.appendChild(base);
-
-    // 圆点：由大到小随机放，不重叠
-    const rnd = random(20261029 + index * 97);
-    const dots = el("g", { "clip-path": `url(#${clipId})` });
-    const placed = [];
-    const RADII = [18, 15, 12, 10, 8, 6.5, 5, 4, 3];
-    RADII.forEach((r, level) => {
-      const tries = 260 + level * 180;
-      for (let i = 0; i < tries; i++) {
-        const cx = b.x + rnd() * b.width;
-        const cy = b.y + rnd() * b.height;
-        const rr = r * (0.85 + rnd() * 0.3);
-        if (placed.some((p) => Math.hypot(p[0] - cx, p[1] - cy) < p[2] + rr + 1.4)) continue;
-        placed.push([cx, cy, rr]);
-        const color = BAG[Math.floor(rnd() * BAG.length)];
-        dots.appendChild(el("circle", { cx: cx.toFixed(1), cy: cy.toFixed(1), r: rr.toFixed(1), fill: color, stroke: "rgba(18,56,38,.18)", "stroke-width": 0.8 }));
-        // 大一点的圆加一点反光，像贝壳石子
-        if (rr > 7) dots.appendChild(el("circle", { cx: (cx - rr * 0.35).toFixed(1), cy: (cy - rr * 0.35).toFixed(1), r: (rr * 0.28).toFixed(1), fill: "#fff", opacity: 0.45 }));
-      }
-    });
-    svg.appendChild(dots);
-
-    // 深绿粗框
-    const frame = el("text", { ...textAttrs, fill: "none", stroke: "#1f5a3c", "stroke-width": 10, "stroke-linejoin": "round" });
-    frame.textContent = ch;
-    svg.appendChild(frame);
-  }
-
+  const stage = document.getElementById("stage");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const start = () => {
-    ["M", "J", "M"].forEach(buildLetter);
-    const stage = document.getElementById("stage");
     requestAnimationFrame(() => stage.classList.add("ready"));
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // 三个字母落定后出现玻璃方框
-    setTimeout(() => stage.classList.add("show-glass"), reduce ? 0 : 1300);
+    setTimeout(() => stage.classList.add("show-glass"), reduce ? 0 : 1200);
   };
-  // 等字体载入后再量字形；字体载入失败也照常显示
-  Promise.race([document.fonts.load("320px 'Archivo Black'"), new Promise((r) => setTimeout(r, 1500))]).then(start, start);
+  Promise.race([document.fonts.load("100px 'Russo One'"), new Promise((r) => setTimeout(r, 1500))]).then(start, start);
 })();
 </script>
 

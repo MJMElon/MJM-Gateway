@@ -120,10 +120,7 @@ window.GW = (function () {
     header.innerHTML = `
       <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
         <div class="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
-          <a href="index.html" class="flex items-center gap-2 font-semibold">
-            <span class="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">${icon("layout-grid")}</span>
-            <span class="hidden sm:inline">${esc(t("app.name"))}</span>
-          </a>
+          <a href="index.html" class="text-lg font-bold tracking-tight whitespace-nowrap">${esc(t("app.name"))}</a>
           <nav class="hidden items-center gap-1 sm:flex">
             ${items
               .map(

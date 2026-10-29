@@ -151,6 +151,62 @@ window.GW_LANG["zh-CN"] = {
     "cancel": "取消",
     "confirm": "确定重设"
   },
+  "fab": {
+      "menu": "新增或编辑",
+      "addWidget": "Add Widget",
+      "addWidgetHint": "选一个小工具和大小，会加在主画面最后面，再拖到你想放的位置。",
+      "addApps": "Add Apps",
+      "addAppsHint": "你可以使用的全部系统。把图标拖到主画面上想放的位置，或点 + 加在最后面。",
+      "newFolder": "新建文件夹",
+      "edit": "编辑主画面",
+      "editHint": "拖拉可以重新排列；点 − 移除，点缩放按钮可改变小工具大小。",
+      "done": "完成",
+      "homeScreen": "主画面（不放文件夹）",
+      "moveOut": "移回主画面",
+      "emptyFolder": "这个文件夹是空的。在「编辑主画面」用 App 的 … 选单把它移进来。",
+      "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。"
+    },
+    "widgets": {
+      "unavailable": "小工具要等下次系统更新后才能使用。",
+      "added": "已新增小工具",
+      "remove": "移除小工具",
+      "resize": "改变大小",
+      "greeting": {
+        "morning": "早安，{name}",
+        "afternoon": "午安，{name}",
+        "evening": "晚安，{name}"
+      },
+      "appsOnHome": "主画面上有 {count} 个 App",
+      "noRecent": "打开过的 App 会出现在这里。",
+      "noAnnouncements": "目前没有公告。",
+      "notesPlaceholder": "写点什么…",
+      "adminOnly": "只有管理员可以使用。",
+      "types": {
+        "greeting": "问候",
+        "clock": "时钟",
+        "search": "搜索",
+        "recent": "最近打开",
+        "announcements": "公告",
+        "calendar": "月历",
+        "notes": "便条",
+        "admin": "管理"
+      },
+      "desc": {
+        "greeting": "问候语和今天日期",
+        "clock": "马来西亚目前时间",
+        "search": "快速找到任何 App",
+        "recent": "最近打开过的 App",
+        "announcements": "公司和部门公告",
+        "calendar": "这个月的月历",
+        "notes": "只有自己看得到的便条",
+        "admin": "User Access 和 Super Admin 捷径"
+      },
+      "sizes": {
+        "small": "小",
+        "medium": "中",
+        "large": "大"
+      }
+    },
   "admin": {
     "title": "权限后台",
     "accessTitle": "User Access",

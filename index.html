@@ -8,57 +8,53 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <script src="shared/home.js"></script>
 </head>
-<body>
+<body class="gw-wallpaper">
 <main id="main"></main>
 <script>
-/* 我的首页：管理区（User Access / Super Admin，只有管理员看得到）＋ All Apps 区块 */
+/* 主画面（像 iPhone）：App、小工具、文件夹，拖拉排版；右下角浮动按钮新增小工具 / App */
 (async function () {
-  const { t, esc, icon } = GW;
+  const { t, esc } = GW;
   const profile = await GW.requireProfile("user");
   if (!profile) return;
   const main = GW.shell(profile, "home");
   main.innerHTML = GW.spinner();
+  const firstVisit = !profile.layout_initialized;
   // 第一次登录：按群组自动排好预设版面
-  if (!profile.layout_initialized) await GW.sb.rpc("gw_init_layout");
-  const { data, error } = await GW.sb.rpc("gw_get_home");
+  if (firstVisit) await GW.sb.rpc("gw_init_layout");
+  const [{ data, error }, widgetRes] = await Promise.all([
+    GW.sb.rpc("gw_get_home"),
+    GW.sb.from("gw_user_widgets").select("*").order("sort_order"),
+  ]);
   if (error) return (main.innerHTML = GW.alertBox(t("errors.description")));
 
-  const isSuper = profile.role === "super_admin";
-  const isAdmin = isSuper || profile.role === "admin";
-  const section = (title, hint, body) => `<section class="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900">
-      <div class="mb-4 flex items-baseline justify-between gap-3">
-        <h2 class="text-xs font-bold tracking-[.2em] text-slate-500 uppercase dark:text-slate-400">${esc(title)}</h2>
-        <span class="text-xs text-slate-400">${esc(hint)}</span>
-      </div>
-      ${body}
-    </section>`;
-  const adminCard = (href, ic, tone, title, desc) => `<a href="${href}" class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
-      <span class="flex size-12 shrink-0 items-center justify-center rounded-xl ${tone}">${icon(ic, "size-6")}</span>
-      <span class="min-w-0 flex-1">
-        <span class="block font-semibold">${esc(title)}</span>
-        <span class="block text-sm text-slate-500">${esc(desc)}</span>
-      </span>
-      <span class="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500">${icon("chevron-right", "size-5")}</span>
-    </a>`;
+  // 小工具资料表还没建立（资料库尚未更新）时，主画面照常运作，只是不能加小工具
+  let widgets = widgetRes.error ? null : widgetRes.data;
+  // 预设小工具：每位用户第一次看到主画面时加一次
+  const seededKey = "gw_widgets_seeded_" + profile.id;
+  let seeded = false;
+  try {
+    seeded = !!localStorage.getItem(seededKey);
+  } catch (e) {
+    /* 忽略 */
+  }
+  if (widgets && widgets.length === 0 && (firstVisit || !seeded)) {
+    const isAdmin = profile.role === "super_admin" || profile.role === "admin";
+    const rows = [
+      { widget_type: "greeting", size: "medium", sort_order: -3 },
+      ...(isAdmin ? [{ widget_type: "admin", size: "medium", sort_order: -2 }] : []),
+      { widget_type: "search", size: "medium", sort_order: -1 },
+    ].map((r) => ({ ...r, user_id: profile.id, config: {} }));
+    const res = await GW.sb.from("gw_user_widgets").insert(rows).select();
+    if (!res.error) widgets = res.data;
+  }
+  try {
+    localStorage.setItem(seededKey, "1");
+  } catch (e) {
+    /* 忽略 */
+  }
 
-  main.innerHTML = `<div class="space-y-5">
-    <h1 class="text-xl font-semibold sm:text-2xl">${esc(t("home.greeting", { name: data.profile.full_name }))}</h1>
-    ${
-      isAdmin
-        ? section(
-            t("home.adminSection"),
-            t("home.adminSectionHint"),
-            `<div class="grid gap-3 sm:grid-cols-2">
-              ${adminCard("admin.html?area=access", "user-cog", "bg-brand-50 text-brand-600 dark:bg-brand-700/20 dark:text-brand-100", t("home.userAccess"), t("home.userAccessDesc"))}
-              ${isSuper ? adminCard("admin.html?area=super", "crown", "bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300", t("home.superAdmin"), t("home.superAdminDesc")) : ""}
-            </div>`,
-          )
-        : ""
-    }
-    ${section(t("home.allApps"), t("home.allAppsDesc"), '<div id="board"></div>')}
-  </div>`;
-  GW.refreshIcons();
-  GWHome.render(document.getElementById("board"), data);
+  main.innerHTML = '<div id="board" class="mx-auto max-w-5xl"></div>';
+  GWHome.render(document.getElementById("board"), data, { widgets, profile });
 })();
 </script>
 </body>

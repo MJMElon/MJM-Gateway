@@ -37,6 +37,14 @@
 .sortable-ghost { opacity: .35; }
 .sortable-chosen { box-shadow: 0 10px 25px rgba(0,0,0,.15); }
 body.gw-dragging .gw-folder-body { display: block !important; min-height: 3rem; }
+/* 主画面背景 */
+body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #e0ecff 0%, transparent 60%), radial-gradient(900px 500px at 100% 0%, #eef2f7 0%, transparent 55%), #f6f8fb; background-attachment: fixed; }
+.dark body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #12233f 0%, transparent 60%), #020617; }
+/* 编辑主画面时轻轻抖动（像 iPhone） */
+@keyframes gw-jiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
+.gw-editing > .gw-item { animation: gw-jiggle .14s ease-in-out infinite alternate; }
+.gw-editing > .gw-item:nth-child(2n) { animation-delay: .07s; }
+@media (prefers-reduced-motion: reduce) { .gw-editing > .gw-item { animation: none; } }
 `;
   document.write('<style type="text/tailwindcss">' + theme + "</style>");
   libs.forEach((src) => document.write('<script src="' + src + '"><\/script>'));

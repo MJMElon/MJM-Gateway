@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(41);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -204,6 +204,26 @@ reset role;
 
 select public.gw_login_failed('Lock@Test.local') from generate_series(1, 5);
 select ok(public.gw_login_locked_until('lock@test.local') > now() + interval '14 minutes', '连续输错 5 次锁 15 分钟');
+
+-- ---------------------------------------------------------------------
+-- 6. 首页小工具：只能动自己的；重设首页会清掉
+-- ---------------------------------------------------------------------
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+select lives_ok(
+  $$ insert into public.gw_user_widgets (user_id, widget_type, size) values ('00000000-0000-0000-0000-0000000000a3', 'clock', 'small') $$,
+  '用户可以加自己的小工具'
+);
+select throws_ok(
+  $$ insert into public.gw_user_widgets (user_id, widget_type) values ('00000000-0000-0000-0000-0000000000a4', 'clock') $$,
+  '42501', null, '不能替别人加小工具'
+);
+select pg_temp.logout();
+insert into public.gw_user_widgets (user_id, widget_type) values ('00000000-0000-0000-0000-0000000000a4', 'notes');
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+select is((select count(*) from public.gw_user_widgets)::int, 1, '看不到别人的小工具');
+select public.gw_reset_layout();
+select is((select count(*) from public.gw_user_widgets)::int, 0, '重设首页会清掉自己的小工具');
+select pg_temp.logout();
 
 select * from finish();
 rollback;
