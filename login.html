@@ -1,58 +1,214 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>MJM Gateway</title>
+<title>MJM Connect</title>
 <script src="shared/head.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Playfair+Display:ital,wght@1,600;1,700&display=swap" rel="stylesheet">
+<style>
+  /* 登录封面：全白底、深绿青花瓷纹样、立体 MJM connect 字标。
+     滑鼠靠近（或手机点一下）字标 → 从中间上下分开，露出登录表单。 */
+  :root {
+    --jade: #0b4a36;
+    --jade-deep: #06291e;
+    /* 字面纹样：深绿祥云、莲瓣、点纹（白底） */
+    --porcelain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Crect width='56' height='56' fill='%23ffffff'/%3E%3Cg fill='none' stroke='%230b4a36' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M6 22c0-5 4-9 9-9s9 4 9 9c0 4-3 6-6 6s-5-2-5-5c0-2 2-4 4-4'/%3E%3Cpath d='M34 50c0-5 4-9 9-9s9 4 9 9c0 4-3 6-6 6s-5-2-5-5c0-2 2-4 4-4'/%3E%3Cpath d='M40 6c3 4 3 9 0 13c-3-4-3-9 0-13z'/%3E%3Cpath d='M12 40c4 1 7 4 8 8c-4-1-7-4-8-8z'/%3E%3C/g%3E%3Cg fill='%230b4a36'%3E%3Ccircle cx='30' cy='30' r='1.6'/%3E%3Ccircle cx='50' cy='26' r='1.2'/%3E%3Ccircle cx='24' cy='4' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
+    /* 回纹带 */
+    --fret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='16' viewBox='0 0 28 16'%3E%3Cpath d='M0 14h12V2H4v8h4V6' fill='none' stroke='%230b4a36' stroke-width='1.6'/%3E%3Cpath d='M14 14h12V2h-8v8h4V6' fill='none' stroke='%230b4a36' stroke-width='1.6'/%3E%3C/svg%3E");
+    /* 海水纹 */
+    --waves: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='14' viewBox='0 0 40 14'%3E%3Cg fill='none' stroke='%230b4a36' stroke-width='1.3'%3E%3Cpath d='M0 13c5 0 5-8 10-8s5 8 10 8 5-8 10-8 5 8 10 8'/%3E%3Cpath d='M0 13c3 0 4-4 7-4M20 13c3 0 4-4 7-4'/%3E%3C/g%3E%3C/svg%3E");
+  }
+  html, body { background: #ffffff !important; color: #0f172a; }
+  body { overflow: hidden; }
+  .band { position: fixed; left: 0; right: 0; height: 16px; background: var(--fret) repeat-x; opacity: .9; }
+  .band.top { top: 14px; }
+  .band.bottom { bottom: 14px; transform: scaleY(-1); }
+  .band-line { position: fixed; left: 0; right: 0; height: 1px; background: var(--jade); opacity: .55; }
+  .waves { position: fixed; left: 0; right: 0; height: 14px; background: var(--waves) repeat-x; opacity: .35; }
+
+  /* 舞台 */
+  .stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 100dvh; perspective: 1200px; }
+  .plate {
+    position: absolute; width: min(78vw, 640px); aspect-ratio: 1; border-radius: 50%;
+    border: 2px solid rgba(11, 74, 54, .14);
+    box-shadow: inset 0 0 0 10px #fff, inset 0 0 0 11px rgba(11, 74, 54, .12);
+    background: radial-gradient(circle, rgba(231, 241, 236, .6), rgba(255, 255, 255, 0) 70%);
+    transition: transform .9s cubic-bezier(.2, .8, .2, 1), opacity .6s;
+    pointer-events: none;
+  }
+  /* 盘缘一圈青花纹 */
+  .plate::before {
+    content: ""; position: absolute; inset: 5%; border-radius: 50%;
+    -webkit-mask: radial-gradient(circle, transparent 64%, #000 65%, #000 71%, transparent 72%);
+            mask: radial-gradient(circle, transparent 64%, #000 65%, #000 71%, transparent 72%);
+    background: var(--porcelain); opacity: .3;
+  }
+  .stage.open .plate { transform: scale(1.12); opacity: .55; }
+
+  /* 字标 */
+  .logo { position: relative; display: inline-block; line-height: .9; user-select: none; cursor: pointer; outline: none; }
+  .mjm { position: relative; font-family: "Cinzel", "Times New Roman", serif; font-weight: 900; font-size: clamp(6rem, 22vw, 15rem); letter-spacing: .02em; }
+  .mjm .depth, .mjm .face { display: block; }
+  /* 立体厚度：一层层深绿 */
+  .mjm .depth {
+    color: var(--jade);
+    text-shadow:
+      1px 1px 0 var(--jade), 2px 2px 0 var(--jade), 3px 3px 0 var(--jade), 4px 4px 0 var(--jade-deep),
+      5px 5px 0 var(--jade-deep), 6px 6px 0 var(--jade-deep), 7px 7px 0 var(--jade-deep), 8px 8px 0 var(--jade-deep),
+      9px 9px 0 rgba(6, 41, 30, .25), 10px 10px 0 rgba(6, 41, 30, .12);
+  }
+  /* 字面：白釉 + 深绿青花纹，深绿描边 */
+  .mjm .face {
+    position: absolute; inset: 0;
+    background: var(--porcelain) repeat, #fff;
+    background-size: 56px 56px;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 2px var(--jade);
+  }
+  /* connect：较小、叠在 MJM 前面一点 */
+  .connect {
+    position: absolute; right: -.4em; bottom: -.32em; z-index: 2;
+    font-family: "Playfair Display", Georgia, serif; font-style: italic; font-weight: 700;
+    font-size: clamp(2.2rem, 7.5vw, 5rem); letter-spacing: .01em;
+    color: #fff; -webkit-text-stroke: 1.5px var(--jade);
+    text-shadow:
+      1px 1px 0 var(--jade), 2px 2px 0 var(--jade), 3px 3px 0 var(--jade-deep), 4px 4px 0 var(--jade-deep),
+      5px 5px 0 rgba(6, 41, 30, .25);
+    transform: rotate(-4deg);
+  }
+
+  /* 上下两半：同一个字标各裁一半 */
+  .split { position: relative; display: grid; place-items: center; z-index: 3; }
+  .half { grid-area: 1 / 1; transition: transform .85s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
+  .half.top { clip-path: inset(-20% -30% 50% -30%); }
+  .half.bottom { clip-path: inset(50% -30% -40% -30%); }
+  .seam { position: absolute; left: 50%; top: 50%; width: 0; height: 2px; transform: translate(-50%, -50%); background: linear-gradient(90deg, transparent, var(--jade), transparent); transition: width .5s; pointer-events: none; }
+  .stage.near:not(.open) .seam { width: 70%; }
+
+  /* 登录表单：在中间露出 */
+  .gate {
+    position: absolute; left: 50%; top: 50%; z-index: 4; width: min(88vw, 340px);
+    transform: translate(-50%, -50%) scale(.92); opacity: 0; pointer-events: none;
+    transition: opacity .45s .25s, transform .6s .2s cubic-bezier(.2, .8, .2, 1);
+  }
+  .stage.open .gate { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+  .gate-card {
+    background: rgba(255, 255, 255, .97); border: 1px solid rgba(11, 74, 54, .25); border-radius: 18px;
+    padding: 22px 22px 18px; box-shadow: 0 18px 40px rgba(6, 41, 30, .12); position: relative;
+  }
+  .gate-card::before { content: ""; position: absolute; left: 14px; right: 14px; top: 6px; height: 8px; background: var(--fret) repeat-x; background-size: 14px 8px; opacity: .5; }
+  .gate input {
+    width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(11, 74, 54, .3); background: #fff;
+    padding: 0 14px; font-size: 15px; color: #0f172a; outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  .gate input:focus { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(11, 74, 54, .15); }
+  .gate label > span { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--jade); margin-bottom: 6px; }
+  .gate .go {
+    width: 100%; height: 46px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 13px;
+    background: linear-gradient(180deg, #11604a, var(--jade)); box-shadow: 0 6px 0 var(--jade-deep), 0 12px 20px rgba(6, 41, 30, .25);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .gate .go:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--jade-deep), 0 6px 12px rgba(6, 41, 30, .25); }
+  .gate .go:disabled { opacity: .7; cursor: default; }
+  .gate .link { font-size: 13px; color: var(--jade); text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; cursor: pointer; }
+  .hint { position: absolute; left: 50%; bottom: max(9vh, 64px); transform: translateX(-50%); font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: var(--jade); opacity: .7; transition: opacity .4s; white-space: nowrap; }
+  .stage.open .hint { opacity: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .half, .gate, .plate { transition: none; }
+  }
+</style>
 </head>
 <body>
-<main class="flex min-h-dvh items-center justify-center px-4 py-10">
-  <div class="w-full max-w-sm">
-    <div class="mb-8 flex flex-col items-center gap-3 text-center">
-      <div class="flex size-12 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-600/30">
-        <i data-lucide="layout-grid" class="size-6"></i>
-      </div>
-      <div>
-        <h1 class="text-xl font-semibold" data-t="app.name"></h1>
-        <p class="text-sm text-slate-500" data-t="app.tagline"></p>
-      </div>
-    </div>
-    <div id="card" class="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"></div>
+<div class="band-line" style="top:8px"></div>
+<div class="band top"></div>
+<div class="band-line" style="top:36px"></div>
+<div class="waves" style="bottom:40px"></div>
+<div class="band-line" style="bottom:36px"></div>
+<div class="band bottom"></div>
+<div class="band-line" style="bottom:8px"></div>
+
+<main class="stage" id="stage">
+  <div class="plate"></div>
+  <div class="split" id="split">
+    <div class="half top" id="top"></div>
+    <div class="half bottom" id="bottom"></div>
+    <div class="seam"></div>
   </div>
+  <div class="gate" id="gate"><div class="gate-card" id="card"></div></div>
+  <p class="hint" id="hint"></p>
 </main>
 
 <script>
-/* 登录页：登录 / 忘记密码 / 改密码（第一次登录强制、或从重设密码邮件回来） */
-const { sb, t, esc, $, cls, btn, alertBox, invoke, go, refreshIcons } = GW;
-document.querySelectorAll("[data-t]").forEach((el) => (el.textContent = t(el.dataset.t)));
+/* 登录封面：登录 / 忘记密码 / 改密码（第一次登录强制、或从重设密码邮件回来） */
+const { sb, t, esc, $, invoke, go } = GW;
+document.documentElement.classList.remove("dark"); // 封面固定全白
 const params = new URLSearchParams(location.search);
+const stage = $("#stage");
 const card = $("#card");
+let opened = false;
 
-const field = (label, input, hint) => `
-  <label class="block space-y-1.5">
-    <span class="${cls.label}">${esc(label)}</span>${input}
-    ${hint ? `<span class="block text-xs text-slate-500">${esc(hint)}</span>` : ""}
-  </label>`;
-const link = (href, text) =>
-  `<div class="text-center"><a href="${href}" class="text-sm text-brand-600 hover:underline dark:text-brand-100">${esc(text)}</a></div>`;
+// ---------------------------------------------------------------- 字标（上下两半各放一份）
+const LOGO = `<div class="logo" tabindex="0" role="button" aria-label="${esc(t("login.title"))}">
+  <div class="mjm"><span class="depth">MJM</span><span class="face" aria-hidden="true">MJM</span></div>
+  <div class="connect">connect</div>
+</div>`;
+$("#top").innerHTML = LOGO;
+$("#bottom").innerHTML = LOGO.replace('tabindex="0" role="button"', 'tabindex="-1" aria-hidden="true"');
+const isTouch = matchMedia("(hover: none)").matches;
+$("#hint").textContent = isTouch ? "Tap the logo to sign in" : "Move closer to sign in";
 
-// ---------------------------------------------------------------- 登录
-function showLogin(errorKey) {
+/* 打开：上下两半各移开表单高度的一半；表单内容改变高度时再算一次 */
+function openGate(focus) {
+  opened = true;
+  stage.classList.add("open");
+  const shift = $("#gate").offsetHeight / 2 + 28;
+  $("#top").style.transform = `translateY(${-shift}px) rotateX(8deg)`;
+  $("#bottom").style.transform = `translateY(${shift}px) rotateX(-8deg)`;
+  if (focus !== false) setTimeout(() => { const i = card.querySelector("input"); if (i) i.focus(); }, 650);
+}
+const relayout = () => opened && openGate(false);
+
+// 滑鼠靠近字标就打开
+document.addEventListener("mousemove", (e) => {
+  if (opened) return;
+  const r = $("#top .logo").getBoundingClientRect();
+  const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+  const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+  const d = Math.hypot(dx, dy);
+  stage.classList.toggle("near", d < 160);
+  if (d < 40) openGate();
+});
+$("#split").addEventListener("click", () => !opened && openGate());
+$("#top .logo").addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openGate()));
+window.addEventListener("resize", relayout);
+// 用键盘 Tab 进表单或密码管理器自动填入时，也打开
+card.addEventListener("focusin", () => !opened && openGate(false));
+
+// ---------------------------------------------------------------- 表单
+const field = (label, input) => `<label class="block"><span>${esc(label)}</span>${input}</label>`;
+const message = (text, ok) =>
+  text ? `<div class="rounded-lg border px-3 py-2 text-sm ${ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}">${esc(text)}</div>` : "";
+
+function showLogin(errorText) {
   card.innerHTML = `
-    <form id="f" class="space-y-4">
-      <h2 class="text-lg font-semibold">${esc(t("login.title"))}</h2>
-      <div id="msg">${errorKey ? alertBox(t(errorKey)) : ""}</div>
-      ${field(t("login.email"), `<input name="email" type="email" autocomplete="username" required inputmode="email" class="${cls.input}">`)}
-      ${field(t("login.password"), `<input name="password" type="password" autocomplete="current-password" required class="${cls.input}">`)}
-      <button type="submit" class="${btn("primary")} w-full">${esc(t("login.submit"))}</button>
-      ${link("login.html?mode=forgot", t("login.forgot"))}
+    <form id="f" class="space-y-4 pt-3">
+      <div id="msg">${message(errorText)}</div>
+      ${field(t("login.email"), `<input name="email" type="email" autocomplete="username" required inputmode="email">`)}
+      ${field(t("login.password"), `<input name="password" type="password" autocomplete="current-password" required>`)}
+      <button type="submit" class="go">${esc(t("login.submit"))}</button>
+      <div class="text-center"><button type="button" class="link" id="forgot">${esc(t("login.forgot"))}</button></div>
     </form>`;
+  $("#forgot").onclick = () => (showForgot(), relayout());
   $("#f").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = new FormData(e.target);
     const email = String(form.get("email") || "").trim().toLowerCase();
-    const submit = e.target.querySelector("button[type=submit]");
+    const submit = e.target.querySelector(".go");
     submit.disabled = true;
     submit.textContent = t("login.submitting");
     const r = await invoke("gw-auth", { action: "login", email, password: String(form.get("password") || "") });
@@ -68,79 +224,83 @@ function showLogin(errorKey) {
       : err === "disabled" ? t("login.errors.disabled")
       : err === "no_access" ? t("login.errors.noAccess")
       : t("login.errors.unknown");
-    $("#msg").innerHTML = alertBox(msg);
+    $("#msg").innerHTML = message(msg);
+    relayout();
     submit.disabled = false;
     submit.textContent = t("login.submit");
   });
 }
 
-// ---------------------------------------------------------------- 忘记密码
 function showForgot() {
   card.innerHTML = `
-    <form id="f" class="space-y-4">
+    <form id="f" class="space-y-4 pt-3">
       <div>
-        <h2 class="text-lg font-semibold">${esc(t("forgot.title"))}</h2>
+        <h2 class="text-base font-semibold" style="color:var(--jade)">${esc(t("forgot.title"))}</h2>
         <p class="mt-1 text-sm text-slate-500">${esc(t("forgot.description"))}</p>
       </div>
       <div id="msg"></div>
-      ${field(t("forgot.email"), `<input name="email" type="email" required inputmode="email" class="${cls.input}">`)}
-      <button type="submit" class="${btn("primary")} w-full">${esc(t("forgot.submit"))}</button>
-      ${link("login.html", t("forgot.back"))}
+      ${field(t("forgot.email"), `<input name="email" type="email" required inputmode="email">`)}
+      <button type="submit" class="go">${esc(t("forgot.submit"))}</button>
+      <div class="text-center"><button type="button" class="link" id="back">${esc(t("forgot.back"))}</button></div>
     </form>`;
+  $("#back").onclick = () => (showLogin(), relayout());
   $("#f").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = String(new FormData(e.target).get("email") || "").trim().toLowerCase();
-    e.target.querySelector("button").disabled = true;
+    e.target.querySelector(".go").disabled = true;
     const redirectTo = new URL("login.html?mode=reset", location.href).href;
     if (email) await sb.auth.resetPasswordForEmail(email, { redirectTo });
     // 不论 email 是否存在都显示相同结果，避免泄漏帐号
-    $("#msg").innerHTML = alertBox(t("forgot.sent"), "green");
+    $("#msg").innerHTML = message(t("forgot.sent"), true);
+    relayout();
   });
 }
 
-// ---------------------------------------------------------------- 改密码
 async function showChange(reset) {
   const { session, profile } = await GW.loadProfile();
-  if (!session) return showLogin(reset ? "login.errors.linkExpired" : null);
+  if (!session) return showLogin(reset ? t("login.errors.linkExpired") : "");
   if (!profile || profile.status !== "active") {
     await sb.auth.signOut();
-    return showLogin("login.errors.noAccess");
+    return showLogin(t("login.errors.noAccess"));
   }
   card.innerHTML = `
-    <h2 class="text-lg font-semibold">${esc(t(reset ? "password.resetTitle" : "password.forcedTitle"))}</h2>
-    <p class="mt-1 mb-4 text-sm text-slate-500">${esc(t(reset ? "password.resetDescription" : "password.forcedDescription"))}</p>
-    <form id="f" class="space-y-4">
+    <form id="f" class="space-y-4 pt-3">
+      <div>
+        <h2 class="text-base font-semibold" style="color:var(--jade)">${esc(t(reset ? "password.resetTitle" : "password.forcedTitle"))}</h2>
+        <p class="mt-1 text-sm text-slate-500">${esc(t(reset ? "password.resetDescription" : "password.forcedDescription"))}</p>
+      </div>
       <div id="msg"></div>
-      ${field(t("password.new"), `<input name="password" type="password" autocomplete="new-password" required minlength="8" class="${cls.input}">`, t("password.rule"))}
-      ${field(t("password.confirm"), `<input name="confirm" type="password" autocomplete="new-password" required minlength="8" class="${cls.input}">`)}
-      <button type="submit" class="${btn("primary")} w-full">${esc(t("password.submit"))}</button>
+      ${field(t("password.new"), `<input name="password" type="password" autocomplete="new-password" required minlength="8">`)}
+      <p class="-mt-2 text-xs text-slate-500">${esc(t("password.rule"))}</p>
+      ${field(t("password.confirm"), `<input name="confirm" type="password" autocomplete="new-password" required minlength="8">`)}
+      <button type="submit" class="go">${esc(t("password.submit"))}</button>
     </form>`;
   $("#f").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = new FormData(e.target);
     const error = await GW.changePassword(String(form.get("password") || ""), String(form.get("confirm") || ""));
-    if (error) return ($("#msg").innerHTML = alertBox(t("password.errors." + error)));
+    if (error) return ($("#msg").innerHTML = message(t("password.errors." + error))), relayout();
     go("index.html");
   });
 }
 
 (async function main() {
   const mode = params.get("mode");
-  if (mode === "forgot") showForgot();
-  else if (mode === "change" || mode === "reset") {
+  const error = params.get("error");
+  if (mode === "change" || mode === "reset") {
     // 从重设密码邮件回来：等 Supabase 用网址里的 code 换好 session
     if (mode === "reset") await new Promise((r) => setTimeout(r, 300));
     await showChange(mode === "reset");
-  } else {
-    // 已登录就直接进首页
-    const { session, profile } = await GW.loadProfile();
-    if (session && profile && profile.status === "active" && !params.get("error")) {
-      return go(profile.must_change_password ? "login.html?mode=change" : "index.html");
-    }
-    const error = params.get("error");
-    showLogin(error === "no_access" ? "login.errors.noAccess" : error === "link_expired" ? "login.errors.linkExpired" : null);
+    return openGate();
   }
-  refreshIcons();
+  if (mode === "forgot") return showForgot(), openGate();
+  // 已登录就直接进首页
+  const { session, profile } = await GW.loadProfile();
+  if (session && profile && profile.status === "active" && !error) {
+    return go(profile.must_change_password ? "login.html?mode=change" : "index.html");
+  }
+  showLogin(error === "no_access" ? t("login.errors.noAccess") : error === "link_expired" ? t("login.errors.linkExpired") : "");
+  if (error) openGate();
 })();
 </script>
 </body>

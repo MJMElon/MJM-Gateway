@@ -11,8 +11,18 @@ window.GW = (function () {
   });
 
   // ---------------------------------------------------------------- 多语言
-  const LOCALE = "zh-CN";
+  // 预设英文；个人设置可改语言（存在这台装置）
+  const LOCALE = (() => {
+    try {
+      const saved = localStorage.getItem("gw_locale");
+      if (saved && window.GW_LANG[saved]) return saved;
+    } catch (e) {
+      /* 忽略 */
+    }
+    return "en";
+  })();
   const LANG = window.GW_LANG[LOCALE];
+  document.documentElement.lang = LOCALE;
 
   function t(key, vars) {
     const value = key.split(".").reduce((o, k) => (o == null ? o : o[k]), LANG);
@@ -395,8 +405,18 @@ window.GW = (function () {
     return true;
   }
 
+  function setLocale(locale) {
+    try {
+      localStorage.setItem("gw_locale", locale);
+    } catch (e) {
+      /* 忽略 */
+    }
+  }
+
   return {
     sb,
+    LOCALE,
+    setLocale,
     t,
     esc,
     $,

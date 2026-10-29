@@ -2,7 +2,7 @@
 window.GW_LANG = window.GW_LANG || {};
 window.GW_LANG["zh-CN"] = {
   "app": {
-    "name": "MJM Gateway",
+    "name": "MJM Connect",
     "tagline": "公司系统统一入口"
   },
   "nav": {

@@ -1,4 +1,4 @@
-# MJM Gateway
+# MJM Connect（MJM Gateway）
 
 公司系统统一入口：员工登录一次，就能看到并打开自己有权限的所有系统。
 Gateway 只管**认证、授权、导航**，不处理业务资料。
@@ -7,13 +7,13 @@ Gateway 只管**认证、授权、导航**，不处理业务资料。
 - 前端：纯 HTML + JavaScript（跟 mjm-ai-system 一样），不需要建置；GitHub Pages「从分支发布」
 - 函式库（CDN）：Tailwind CSS（@tailwindcss/browser）、supabase-js、SortableJS（拖拉，支持手机长按）、Lucide 图示、ExcelJS（需要时才载入）
 - 后端：Supabase 项目 MJM Gateway（ref `briqzyxfxsvulyizzbiu`）：Auth、PostgreSQL、RLS、Edge Functions
-- 界面文字：`lang/zh-CN.js`（以后加 `en.js`、`ms.js`）
+- 界面文字：预设英文 `lang/en.js`，另有简体中文 `lang/zh-CN.js`（个人设置可切换）；以后加 `ms.js`
 
 ## 档案
 
 ```
 index.html               我的首页（拖拉、文件夹、卡片大小、最近打开、搜索、公告）
-login.html               登录、忘记密码、改密码（第一次登录强制 / 重设密码邮件）
+login.html               登录封面（滑鼠靠近 MJM connect 字标会上下分开露出登录表单）、忘记密码、改密码
 library.html             模块库
 settings.html            个人设置（语言、浅色/深色、重设首页、改密码）
 admin.html               权限后台（#users #matrix #groups #modules #departments #announcements #audit #preview=用户id）
@@ -22,7 +22,7 @@ shared/config.js         Supabase 网址与 anon key
 shared/core.js           登录检查、页面外框、对话框、Edge Function 调用、Excel
 shared/home.js           首页版面（首页与预览共用）
 shared/admin.js          权限后台
-lang/zh-CN.js            简体中文界面文字
+lang/en.js lang/zh-CN.js  界面文字（英文 / 简体中文）
 supabase/migrations/     数据库 migration（只新增 gw_* 对象）
 supabase/functions/      Edge Functions：gw-auth、gw-admin、gw-issue-token、gw-check-access、gw-jwks
 supabase/tests/          RLS 权限测试（pgTAP）
