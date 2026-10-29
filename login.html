@@ -7,203 +7,204 @@
 <script src="shared/head.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Playfair+Display:ital,wght@1,600;1,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 <style>
-  /* 登录封面：全白底、深绿青花瓷纹样、立体 MJM connect 字标。
-     滑鼠靠近（或手机点一下）字标 → 从中间上下分开，露出登录表单。 */
-  :root {
-    --jade: #0b4a36;
-    --jade-deep: #06291e;
-    /* 字面纹样：深绿祥云、莲瓣、点纹（白底） */
-    --porcelain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Crect width='56' height='56' fill='%23ffffff'/%3E%3Cg fill='none' stroke='%230b4a36' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M6 22c0-5 4-9 9-9s9 4 9 9c0 4-3 6-6 6s-5-2-5-5c0-2 2-4 4-4'/%3E%3Cpath d='M34 50c0-5 4-9 9-9s9 4 9 9c0 4-3 6-6 6s-5-2-5-5c0-2 2-4 4-4'/%3E%3Cpath d='M40 6c3 4 3 9 0 13c-3-4-3-9 0-13z'/%3E%3Cpath d='M12 40c4 1 7 4 8 8c-4-1-7-4-8-8z'/%3E%3C/g%3E%3Cg fill='%230b4a36'%3E%3Ccircle cx='30' cy='30' r='1.6'/%3E%3Ccircle cx='50' cy='26' r='1.2'/%3E%3Ccircle cx='24' cy='4' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
-    /* 回纹带 */
-    --fret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='16' viewBox='0 0 28 16'%3E%3Cpath d='M0 14h12V2H4v8h4V6' fill='none' stroke='%230b4a36' stroke-width='1.6'/%3E%3Cpath d='M14 14h12V2h-8v8h4V6' fill='none' stroke='%230b4a36' stroke-width='1.6'/%3E%3C/svg%3E");
-    /* 海水纹 */
-    --waves: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='14' viewBox='0 0 40 14'%3E%3Cg fill='none' stroke='%230b4a36' stroke-width='1.3'%3E%3Cpath d='M0 13c5 0 5-8 10-8s5 8 10 8 5-8 10-8 5 8 10 8'/%3E%3Cpath d='M0 13c3 0 4-4 7-4M20 13c3 0 4-4 7-4'/%3E%3C/g%3E%3C/svg%3E");
-  }
+  /* 登录封面：白底，MJM 三个字有深绿粗框，字里填满绿、黄、白大小不一的圆（像大连那面贝壳字墙）。
+     进页面时字母依序从上方落下，接着出现白色玻璃方框（Email / Password / Sign in）。 */
+  :root { --frame: #1f5a3c; --frame-deep: #123826; }
   html, body { background: #ffffff !important; color: #0f172a; }
-  body { overflow: hidden; }
-  .band { position: fixed; left: 0; right: 0; height: 16px; background: var(--fret) repeat-x; opacity: .9; }
-  .band.top { top: 14px; }
-  .band.bottom { bottom: 14px; transform: scaleY(-1); }
-  .band-line { position: fixed; left: 0; right: 0; height: 1px; background: var(--jade); opacity: .55; }
-  .waves { position: fixed; left: 0; right: 0; height: 14px; background: var(--waves) repeat-x; opacity: .35; }
+  body { overflow-x: hidden; }
 
-  /* 舞台 */
-  .stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 100dvh; perspective: 1200px; }
-  .plate {
-    position: absolute; width: min(78vw, 640px); aspect-ratio: 1; border-radius: 50%;
-    border: 2px solid rgba(11, 74, 54, .14);
-    box-shadow: inset 0 0 0 10px #fff, inset 0 0 0 11px rgba(11, 74, 54, .12);
-    background: radial-gradient(circle, rgba(231, 241, 236, .6), rgba(255, 255, 255, 0) 70%);
-    transition: transform .9s cubic-bezier(.2, .8, .2, 1), opacity .6s;
-    pointer-events: none;
+  .stage { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6vh 16px; }
+  .word { display: flex; align-items: flex-end; justify-content: center; gap: clamp(6px, 1.4vw, 18px); width: min(94vw, 980px); }
+  .letter { flex: 1 1 0; min-width: 0; opacity: 0; transform: translateY(-110vh); }
+  .letter svg { display: block; width: 100%; height: auto; overflow: visible; }
+  /* 落下：稍微弹一下再停住 */
+  @keyframes drop {
+    0% { opacity: 1; transform: translateY(-110vh); }
+    70% { opacity: 1; transform: translateY(14px); }
+    85% { transform: translateY(-6px); }
+    100% { opacity: 1; transform: translateY(0); }
   }
-  /* 盘缘一圈青花纹 */
-  .plate::before {
-    content: ""; position: absolute; inset: 5%; border-radius: 50%;
-    -webkit-mask: radial-gradient(circle, transparent 64%, #000 65%, #000 71%, transparent 72%);
-            mask: radial-gradient(circle, transparent 64%, #000 65%, #000 71%, transparent 72%);
-    background: var(--porcelain); opacity: .3;
-  }
-  .stage.open .plate { transform: scale(1.12); opacity: .55; }
+  .ready .letter { animation: drop .9s cubic-bezier(.3, .7, .3, 1) forwards; }
+  .ready .letter:nth-child(2) { animation-delay: .18s; }
+  .ready .letter:nth-child(3) { animation-delay: .36s; }
 
-  /* 字标 */
-  .logo { position: relative; display: inline-block; line-height: .9; user-select: none; cursor: pointer; outline: none; }
-  .mjm { position: relative; font-family: "Cinzel", "Times New Roman", serif; font-weight: 900; font-size: clamp(6rem, 22vw, 15rem); letter-spacing: .02em; }
-  .mjm .depth, .mjm .face { display: block; }
-  /* 立体厚度：一层层深绿 */
-  .mjm .depth {
-    color: var(--jade);
-    text-shadow:
-      1px 1px 0 var(--jade), 2px 2px 0 var(--jade), 3px 3px 0 var(--jade), 4px 4px 0 var(--jade-deep),
-      5px 5px 0 var(--jade-deep), 6px 6px 0 var(--jade-deep), 7px 7px 0 var(--jade-deep), 8px 8px 0 var(--jade-deep),
-      9px 9px 0 rgba(6, 41, 30, .25), 10px 10px 0 rgba(6, 41, 30, .12);
+  /* 白色玻璃方框：压在字的下缘，后面的圆点会透出模糊 */
+  .glass {
+    position: relative; z-index: 2; width: min(92vw, 360px); margin-top: clamp(-56px, -3.6vw, -14px);
+    padding: 26px 24px 20px; border-radius: 22px;
+    background: rgba(255, 255, 255, .62);
+    -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, .9);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 20px 50px rgba(18, 56, 38, .14), 0 2px 8px rgba(18, 56, 38, .06);
+    opacity: 0; transform: translateY(24px) scale(.97);
+    transition: opacity .6s, transform .7s cubic-bezier(.2, .8, .2, 1);
   }
-  /* 字面：白釉 + 深绿青花纹，深绿描边 */
-  .mjm .face {
-    position: absolute; inset: 0;
-    background: var(--porcelain) repeat, #fff;
-    background-size: 56px 56px;
-    -webkit-background-clip: text; background-clip: text;
-    color: transparent;
-    -webkit-text-stroke: 2px var(--jade);
-  }
-  /* connect：较小、叠在 MJM 前面一点 */
-  .connect {
-    position: absolute; right: -.4em; bottom: -.32em; z-index: 2;
-    font-family: "Playfair Display", Georgia, serif; font-style: italic; font-weight: 700;
-    font-size: clamp(2.2rem, 7.5vw, 5rem); letter-spacing: .01em;
-    color: #fff; -webkit-text-stroke: 1.5px var(--jade);
-    text-shadow:
-      1px 1px 0 var(--jade), 2px 2px 0 var(--jade), 3px 3px 0 var(--jade-deep), 4px 4px 0 var(--jade-deep),
-      5px 5px 0 rgba(6, 41, 30, .25);
-    transform: rotate(-4deg);
-  }
-
-  /* 上下两半：同一个字标各裁一半 */
-  .split { position: relative; display: grid; place-items: center; z-index: 3; }
-  .half { grid-area: 1 / 1; transition: transform .85s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
-  .half.top { clip-path: inset(-20% -30% 50% -30%); }
-  .half.bottom { clip-path: inset(50% -30% -40% -30%); }
-  .seam { position: absolute; left: 50%; top: 50%; width: 0; height: 2px; transform: translate(-50%, -50%); background: linear-gradient(90deg, transparent, var(--jade), transparent); transition: width .5s; pointer-events: none; }
-  .stage.near:not(.open) .seam { width: 70%; }
-
-  /* 登录表单：在中间露出 */
-  .gate {
-    position: absolute; left: 50%; top: 50%; z-index: 4; width: min(88vw, 340px);
-    transform: translate(-50%, -50%) scale(.92); opacity: 0; pointer-events: none;
-    transition: opacity .45s .25s, transform .6s .2s cubic-bezier(.2, .8, .2, 1);
-  }
-  .stage.open .gate { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
-  .gate-card {
-    background: rgba(255, 255, 255, .97); border: 1px solid rgba(11, 74, 54, .25); border-radius: 18px;
-    padding: 22px 22px 18px; box-shadow: 0 18px 40px rgba(6, 41, 30, .12); position: relative;
-  }
-  .gate-card::before { content: ""; position: absolute; left: 14px; right: 14px; top: 6px; height: 8px; background: var(--fret) repeat-x; background-size: 14px 8px; opacity: .5; }
-  .gate input {
-    width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(11, 74, 54, .3); background: #fff;
+  .show-glass .glass { opacity: 1; transform: none; }
+  .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .5em; text-indent: .5em; color: var(--frame); margin-bottom: 18px; }
+  .glass label > span { display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+  .glass input {
+    width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(15, 23, 42, .14); background: rgba(255, 255, 255, .85);
     padding: 0 14px; font-size: 15px; color: #0f172a; outline: none; transition: border-color .2s, box-shadow .2s;
   }
-  .gate input:focus { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(11, 74, 54, .15); }
-  .gate label > span { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--jade); margin-bottom: 6px; }
-  .gate .go {
-    width: 100%; height: 46px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 13px;
-    background: linear-gradient(180deg, #11604a, var(--jade)); box-shadow: 0 6px 0 var(--jade-deep), 0 12px 20px rgba(6, 41, 30, .25);
-    transition: transform .12s, box-shadow .12s;
+  .glass input:focus { border-color: var(--frame); box-shadow: 0 0 0 3px rgba(31, 90, 60, .15); }
+  .glass .go {
+    width: 100%; height: 46px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font-weight: 600; font-size: 15px;
+    background: var(--frame); transition: background .2s;
   }
-  .gate .go:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--jade-deep), 0 6px 12px rgba(6, 41, 30, .25); }
-  .gate .go:disabled { opacity: .7; cursor: default; }
-  .gate .link { font-size: 13px; color: var(--jade); text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; cursor: pointer; }
-  .hint { position: absolute; left: 50%; bottom: max(9vh, 64px); transform: translateX(-50%); font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: var(--jade); opacity: .7; transition: opacity .4s; white-space: nowrap; }
-  .stage.open .hint { opacity: 0; }
+  .glass .go:hover { background: var(--frame-deep); }
+  .glass .go:disabled { opacity: .7; cursor: default; }
+  .glass .link { font-size: 13px; color: var(--frame); background: none; border: 0; cursor: pointer; }
+  .glass .link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
   @media (prefers-reduced-motion: reduce) {
-    .half, .gate, .plate { transition: none; }
+    .letter { opacity: 1; transform: none; }
+    .ready .letter { animation: none; }
+    .glass { transition: none; }
   }
 </style>
 </head>
 <body>
-<div class="band-line" style="top:8px"></div>
-<div class="band top"></div>
-<div class="band-line" style="top:36px"></div>
-<div class="waves" style="bottom:40px"></div>
-<div class="band-line" style="bottom:36px"></div>
-<div class="band bottom"></div>
-<div class="band-line" style="bottom:8px"></div>
-
 <main class="stage" id="stage">
-  <div class="plate"></div>
-  <div class="split" id="split">
-    <div class="half top" id="top"></div>
-    <div class="half bottom" id="bottom"></div>
-    <div class="seam"></div>
+  <div class="word" id="word" role="img" aria-label="MJM"></div>
+  <div class="glass" id="glass">
+    <div class="brand">CONNECT</div>
+    <div id="card"></div>
   </div>
-  <div class="gate" id="gate"><div class="gate-card" id="card"></div></div>
-  <p class="hint" id="hint"></p>
 </main>
 
 <script>
-/* 登录封面：登录 / 忘记密码 / 改密码（第一次登录强制、或从重设密码邮件回来） */
+/* ---------------------------------------------------------------- 字标
+   每个字母一个 SVG：深绿厚度 → 米白底 → 圆点（用字形裁切）→ 深绿粗框。
+   圆点用固定种子产生，每次看到的都一样。 */
+(function () {
+  const COLORS = [
+    ["#2f7d4f", 3], ["#4f9d69", 3], ["#8cc084", 2], // 绿
+    ["#f2c230", 3], ["#f7d774", 2], ["#e8a92e", 1], // 黄
+    ["#ffffff", 4], ["#f4efe2", 2], // 白
+  ];
+  const BAG = COLORS.flatMap(([c, w]) => Array(w).fill(c));
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs) => {
+    const e = document.createElementNS(NS, tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => e.setAttribute(k, v));
+    return e;
+  };
+  function random(seed) {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const textAttrs = { x: 0, y: 0, "font-family": "'Archivo Black', 'Arial Black', sans-serif", "font-size": 320 };
+
+  function buildLetter(ch, index) {
+    const wrap = document.createElement("div");
+    wrap.className = "letter";
+    const svg = el("svg", { "aria-hidden": "true" });
+    wrap.appendChild(svg);
+    document.getElementById("word").appendChild(wrap);
+
+    // 量字形实际墨迹范围（getBBox 会包含整个行高，下面会多出空白）
+    const ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = `${textAttrs["font-size"]}px ${textAttrs["font-family"]}`;
+    const m = ctx.measureText(ch);
+    const b = {
+      x: -m.actualBoundingBoxLeft,
+      y: -m.actualBoundingBoxAscent,
+      width: m.actualBoundingBoxLeft + m.actualBoundingBoxRight,
+      height: m.actualBoundingBoxAscent + m.actualBoundingBoxDescent,
+    };
+    const pad = 8;
+    const depth = 9;
+    const vbWidth = b.width + pad * 2 + depth;
+    svg.setAttribute("viewBox", `${b.x - pad} ${b.y - pad} ${vbWidth} ${b.height + pad * 2 + depth}`);
+    // 宽度按字形比例分配，三个字母一样高
+    wrap.style.flex = `${vbWidth} 1 0`;
+
+    const clipId = "clip-" + index;
+    const defs = el("defs");
+    const clip = el("clipPath", { id: clipId });
+    const clipText = el("text", textAttrs);
+    clipText.textContent = ch;
+    clip.appendChild(clipText);
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+
+    // 厚度（往右下）
+    const back = el("text", { ...textAttrs, fill: "#123826", stroke: "#123826", "stroke-width": 16, "stroke-linejoin": "round", transform: `translate(${depth} ${depth})` });
+    back.textContent = ch;
+    svg.appendChild(back);
+    // 米白底，圆点之间的缝看起来像墙里的填料
+    const base = el("text", { ...textAttrs, fill: "#faf7ef" });
+    base.textContent = ch;
+    svg.appendChild(base);
+
+    // 圆点：由大到小随机放，不重叠
+    const rnd = random(20261029 + index * 97);
+    const dots = el("g", { "clip-path": `url(#${clipId})` });
+    const placed = [];
+    const RADII = [18, 15, 12, 10, 8, 6.5, 5, 4, 3];
+    RADII.forEach((r, level) => {
+      const tries = 260 + level * 180;
+      for (let i = 0; i < tries; i++) {
+        const cx = b.x + rnd() * b.width;
+        const cy = b.y + rnd() * b.height;
+        const rr = r * (0.85 + rnd() * 0.3);
+        if (placed.some((p) => Math.hypot(p[0] - cx, p[1] - cy) < p[2] + rr + 1.4)) continue;
+        placed.push([cx, cy, rr]);
+        const color = BAG[Math.floor(rnd() * BAG.length)];
+        dots.appendChild(el("circle", { cx: cx.toFixed(1), cy: cy.toFixed(1), r: rr.toFixed(1), fill: color, stroke: "rgba(18,56,38,.18)", "stroke-width": 0.8 }));
+        // 大一点的圆加一点反光，像贝壳石子
+        if (rr > 7) dots.appendChild(el("circle", { cx: (cx - rr * 0.35).toFixed(1), cy: (cy - rr * 0.35).toFixed(1), r: (rr * 0.28).toFixed(1), fill: "#fff", opacity: 0.45 }));
+      }
+    });
+    svg.appendChild(dots);
+
+    // 深绿粗框
+    const frame = el("text", { ...textAttrs, fill: "none", stroke: "#1f5a3c", "stroke-width": 10, "stroke-linejoin": "round" });
+    frame.textContent = ch;
+    svg.appendChild(frame);
+  }
+
+  const start = () => {
+    ["M", "J", "M"].forEach(buildLetter);
+    const stage = document.getElementById("stage");
+    requestAnimationFrame(() => stage.classList.add("ready"));
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // 三个字母落定后出现玻璃方框
+    setTimeout(() => stage.classList.add("show-glass"), reduce ? 0 : 1300);
+  };
+  // 等字体载入后再量字形；字体载入失败也照常显示
+  Promise.race([document.fonts.load("320px 'Archivo Black'"), new Promise((r) => setTimeout(r, 1500))]).then(start, start);
+})();
+</script>
+
+<script>
+/* ---------------------------------------------------------------- 登录 / 忘记密码 / 改密码 */
 const { sb, t, esc, $, invoke, go } = GW;
-document.documentElement.classList.remove("dark"); // 封面固定全白
+document.documentElement.classList.remove("dark"); // 封面固定白底
 const params = new URLSearchParams(location.search);
-const stage = $("#stage");
 const card = $("#card");
-let opened = false;
 
-// ---------------------------------------------------------------- 字标（上下两半各放一份）
-const LOGO = `<div class="logo" tabindex="0" role="button" aria-label="${esc(t("login.title"))}">
-  <div class="mjm"><span class="depth">MJM</span><span class="face" aria-hidden="true">MJM</span></div>
-  <div class="connect">connect</div>
-</div>`;
-$("#top").innerHTML = LOGO;
-$("#bottom").innerHTML = LOGO.replace('tabindex="0" role="button"', 'tabindex="-1" aria-hidden="true"');
-const isTouch = matchMedia("(hover: none)").matches;
-$("#hint").textContent = isTouch ? "Tap the logo to sign in" : "Move closer to sign in";
-
-/* 打开：上下两半各移开表单高度的一半；表单内容改变高度时再算一次 */
-function openGate(focus) {
-  opened = true;
-  stage.classList.add("open");
-  const shift = $("#gate").offsetHeight / 2 + 28;
-  $("#top").style.transform = `translateY(${-shift}px) rotateX(8deg)`;
-  $("#bottom").style.transform = `translateY(${shift}px) rotateX(-8deg)`;
-  if (focus !== false) setTimeout(() => { const i = card.querySelector("input"); if (i) i.focus(); }, 650);
-}
-const relayout = () => opened && openGate(false);
-
-// 滑鼠靠近字标就打开
-document.addEventListener("mousemove", (e) => {
-  if (opened) return;
-  const r = $("#top .logo").getBoundingClientRect();
-  const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
-  const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
-  const d = Math.hypot(dx, dy);
-  stage.classList.toggle("near", d < 160);
-  if (d < 40) openGate();
-});
-$("#split").addEventListener("click", () => !opened && openGate());
-$("#top .logo").addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openGate()));
-window.addEventListener("resize", relayout);
-// 用键盘 Tab 进表单或密码管理器自动填入时，也打开
-card.addEventListener("focusin", () => !opened && openGate(false));
-
-// ---------------------------------------------------------------- 表单
 const field = (label, input) => `<label class="block"><span>${esc(label)}</span>${input}</label>`;
 const message = (text, ok) =>
   text ? `<div class="rounded-lg border px-3 py-2 text-sm ${ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}">${esc(text)}</div>` : "";
 
 function showLogin(errorText) {
   card.innerHTML = `
-    <form id="f" class="space-y-4 pt-3">
+    <form id="f" class="space-y-4">
       <div id="msg">${message(errorText)}</div>
       ${field(t("login.email"), `<input name="email" type="email" autocomplete="username" required inputmode="email">`)}
       ${field(t("login.password"), `<input name="password" type="password" autocomplete="current-password" required>`)}
       <button type="submit" class="go">${esc(t("login.submit"))}</button>
       <div class="text-center"><button type="button" class="link" id="forgot">${esc(t("login.forgot"))}</button></div>
     </form>`;
-  $("#forgot").onclick = () => (showForgot(), relayout());
+  $("#forgot").onclick = showForgot;
   $("#f").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = new FormData(e.target);
@@ -225,7 +226,6 @@ function showLogin(errorText) {
       : err === "no_access" ? t("login.errors.noAccess")
       : t("login.errors.unknown");
     $("#msg").innerHTML = message(msg);
-    relayout();
     submit.disabled = false;
     submit.textContent = t("login.submit");
   });
@@ -233,9 +233,9 @@ function showLogin(errorText) {
 
 function showForgot() {
   card.innerHTML = `
-    <form id="f" class="space-y-4 pt-3">
+    <form id="f" class="space-y-4">
       <div>
-        <h2 class="text-base font-semibold" style="color:var(--jade)">${esc(t("forgot.title"))}</h2>
+        <h2 class="text-base font-semibold" style="color:var(--frame)">${esc(t("forgot.title"))}</h2>
         <p class="mt-1 text-sm text-slate-500">${esc(t("forgot.description"))}</p>
       </div>
       <div id="msg"></div>
@@ -243,7 +243,7 @@ function showForgot() {
       <button type="submit" class="go">${esc(t("forgot.submit"))}</button>
       <div class="text-center"><button type="button" class="link" id="back">${esc(t("forgot.back"))}</button></div>
     </form>`;
-  $("#back").onclick = () => (showLogin(), relayout());
+  $("#back").onclick = () => showLogin();
   $("#f").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = String(new FormData(e.target).get("email") || "").trim().toLowerCase();
@@ -252,7 +252,6 @@ function showForgot() {
     if (email) await sb.auth.resetPasswordForEmail(email, { redirectTo });
     // 不论 email 是否存在都显示相同结果，避免泄漏帐号
     $("#msg").innerHTML = message(t("forgot.sent"), true);
-    relayout();
   });
 }
 
@@ -264,9 +263,9 @@ async function showChange(reset) {
     return showLogin(t("login.errors.noAccess"));
   }
   card.innerHTML = `
-    <form id="f" class="space-y-4 pt-3">
+    <form id="f" class="space-y-4">
       <div>
-        <h2 class="text-base font-semibold" style="color:var(--jade)">${esc(t(reset ? "password.resetTitle" : "password.forcedTitle"))}</h2>
+        <h2 class="text-base font-semibold" style="color:var(--frame)">${esc(t(reset ? "password.resetTitle" : "password.forcedTitle"))}</h2>
         <p class="mt-1 text-sm text-slate-500">${esc(t(reset ? "password.resetDescription" : "password.forcedDescription"))}</p>
       </div>
       <div id="msg"></div>
@@ -279,7 +278,7 @@ async function showChange(reset) {
     e.preventDefault();
     const form = new FormData(e.target);
     const error = await GW.changePassword(String(form.get("password") || ""), String(form.get("confirm") || ""));
-    if (error) return ($("#msg").innerHTML = message(t("password.errors." + error))), relayout();
+    if (error) return ($("#msg").innerHTML = message(t("password.errors." + error)));
     go("index.html");
   });
 }
@@ -290,17 +289,15 @@ async function showChange(reset) {
   if (mode === "change" || mode === "reset") {
     // 从重设密码邮件回来：等 Supabase 用网址里的 code 换好 session
     if (mode === "reset") await new Promise((r) => setTimeout(r, 300));
-    await showChange(mode === "reset");
-    return openGate();
+    return showChange(mode === "reset");
   }
-  if (mode === "forgot") return showForgot(), openGate();
+  if (mode === "forgot") return showForgot();
   // 已登录就直接进首页
   const { session, profile } = await GW.loadProfile();
   if (session && profile && profile.status === "active" && !error) {
     return go(profile.must_change_password ? "login.html?mode=change" : "index.html");
   }
   showLogin(error === "no_access" ? t("login.errors.noAccess") : error === "link_expired" ? t("login.errors.linkExpired") : "");
-  if (error) openGate();
 })();
 </script>
 </body>

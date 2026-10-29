@@ -13,7 +13,7 @@ Gateway 只管**认证、授权、导航**，不处理业务资料。
 
 ```
 index.html               我的首页（拖拉、文件夹、卡片大小、最近打开、搜索、公告）
-login.html               登录封面（滑鼠靠近 MJM connect 字标会上下分开露出登录表单）、忘记密码、改密码
+login.html               登录封面（MJM 字母落下，字里是绿/黄/白圆点；接着出现白色玻璃登录框）、忘记密码、改密码
 library.html             模块库
 settings.html            个人设置（语言、浅色/深色、重设首页、改密码）
 admin.html               权限后台（#users #matrix #groups #modules #departments #announcements #audit #preview=用户id）
