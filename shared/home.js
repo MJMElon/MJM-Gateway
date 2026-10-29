@@ -334,7 +334,7 @@ window.GWHome = (function () {
     function fabHtml() {
       if (readOnly) return "";
       if (editing) {
-        return `<button type="button" data-done class="fixed right-5 bottom-24 z-40 flex h-12 items-center gap-2 rounded-full bg-slate-900 px-5 font-semibold text-white shadow-xl sm:bottom-8 dark:bg-white dark:text-slate-900">${icon("check")} ${esc(t("fab.done"))}</button>`;
+        return `<button type="button" data-done class="fixed right-5 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-40 flex h-12 items-center gap-2 rounded-full bg-slate-900 px-5 font-semibold text-white shadow-xl sm:bottom-8 dark:bg-white dark:text-slate-900">${icon("check")} ${esc(t("fab.done"))}</button>`;
       }
       const items = [
         ["add-widget", "layout-dashboard", t("fab.addWidget")],
@@ -342,7 +342,7 @@ window.GWHome = (function () {
         ["new-folder", "folder-plus", t("fab.newFolder")],
         ["edit", "move", t("fab.edit")],
       ];
-      return `<div class="fixed right-5 bottom-24 z-40 flex flex-col items-end gap-2 sm:bottom-8">
+      return `<div class="fixed right-5 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-40 flex flex-col items-end gap-2 sm:bottom-8">
         ${
           fabOpen
             ? items

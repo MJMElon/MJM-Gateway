@@ -139,32 +139,22 @@ window.GW = (function () {
                   }">${icon("settings", "size-5")}</a>`
                 : ""
             }
-            <div class="hidden text-right leading-tight md:block">
-              <div class="text-sm font-medium">${esc(profile.full_name)}</div>
-              <div class="text-xs text-slate-500">${esc(profile.email)}</div>
-            </div>
-            <span class="flex size-8 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold dark:bg-slate-800">${esc(
-              profile.full_name.slice(0, 1),
-            )}</span>
+            <a href="settings.html" title="${esc(t("nav.settings"))}" class="flex items-center gap-3">
+              <div class="hidden text-right leading-tight md:block">
+                <div class="text-sm font-medium">${esc(profile.full_name)}</div>
+                <div class="text-xs text-slate-500">${esc(profile.email)}</div>
+              </div>
+              <span class="flex size-8 items-center justify-center rounded-full text-sm font-semibold ${
+                active === "settings" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-slate-200 dark:bg-slate-800"
+              }">${esc(profile.full_name.slice(0, 1))}</span>
+            </a>
             <button id="gw-logout" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="${esc(
               t("nav.logout"),
             )}" aria-label="${esc(t("nav.logout"))}">${icon("log-out")}</button>
           </div>
         </div>
-      </header>
-      <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden dark:border-slate-800 dark:bg-slate-950/95">
-        <div class="flex">
-          ${items
-            .map(
-              (i) => `<a href="${i.href}" class="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${
-                i.key === active ? "text-brand-600 dark:text-brand-100" : "text-slate-500"
-              }">${icon(i.icon, "size-5")}${esc(i.label)}</a>`,
-            )
-            .join("")}
-        </div>
-      </nav>`;
+      </header>`;
     document.body.prepend(...header.children);
-    document.body.classList.add("pb-20", "sm:pb-0");
     $("#gw-logout").addEventListener("click", logout);
     const main = $("#main");
     main.classList.add("mx-auto", "max-w-7xl", "px-4", "py-5", "sm:py-8");
