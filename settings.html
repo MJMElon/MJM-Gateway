@@ -85,7 +85,15 @@
   document.getElementById("reset").addEventListener("click", async () => {
     const ok = await GW.confirmDialog(t("settings.resetHome"), t("settings.resetHomeConfirm"), t("settings.confirm"), t("settings.cancel"));
     if (!ok) return;
+    // 小工具先在前端清掉（RLS 只允许删自己的），旧版 gw_reset_layout 不会删小工具
+    await sb.from("gw_user_widgets").delete().eq("user_id", profile.id);
     await sb.rpc("gw_reset_layout");
+    try {
+      localStorage.removeItem("gw_widgets_seeded_" + profile.id);
+      localStorage.removeItem("gw_home_filled_" + profile.id);
+    } catch (e) {
+      /* 忽略 */
+    }
     document.getElementById("done").innerHTML = alertBox(t("settings.resetHomeDone"), "green");
   });
   document.getElementById("pw").addEventListener("submit", async (e) => {

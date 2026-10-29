@@ -147,8 +147,8 @@ window.GW_LANG["zh-CN"] = {
     },
     "changePassword": "修改密码",
     "resetHome": "重设首页",
-    "resetHomeDescription": "删除你自己建立的文件夹和排序，按目前所属群组重新排好首页。",
-    "resetHomeConfirm": "确定要重设首页吗？你的文件夹和排序都会被清除。",
+    "resetHomeDescription": "删除你自己的小工具、文件夹和排序，按目前所属群组重新排好首页。",
+    "resetHomeConfirm": "确定要重设首页吗？你的小工具、文件夹和排序都会被清除。",
     "resetHomeDone": "首页已重设。",
     "cancel": "取消",
     "confirm": "确定重设"
