@@ -11,24 +11,21 @@
   const isSuper = me.role === "super_admin";
   const main = GW.shell(me, "admin");
 
-  const TABS = [
-    ["users", t("admin.tabs.users")],
-    ["matrix", t("admin.tabs.matrix")],
-    ...(isSuper
-      ? [
-          ["groups", t("admin.tabs.groups")],
-          ["modules", t("admin.tabs.modules")],
-          ["departments", t("admin.tabs.departments")],
-        ]
-      : []),
-    ["announcements", t("admin.tabs.announcements")],
-    ["audit", t("admin.tabs.audit")],
-  ];
+  /* 两个入口（首页的两张卡片）：
+     ?area=access → User Access：用户、权限矩阵（部门 admin 另外有公告、操作记录）
+     ?area=super  → Super Admin：模块、群组、部门、公告、操作记录（只限 super_admin） */
+  const area = new URLSearchParams(location.search).get("area") === "super" && isSuper ? "super" : "access";
+  const tab = (k) => [k, t("admin.tabs." + k)];
+  const TABS =
+    area === "super"
+      ? ["modules", "groups", "departments", "announcements", "audit"].map(tab)
+      : ["users", "matrix", ...(isSuper ? [] : ["announcements", "audit"])].map(tab);
 
   main.innerHTML = `<div class="space-y-5">
     <div>
-      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t("admin.title"))}</h1>
-      <p class="mt-1 text-sm text-slate-500">${esc(isSuper ? t("admin.roleSuper") : t("admin.roleAdmin"))}</p>
+      <a href="index.html" class="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">${icon("arrow-left")} ${esc(t("nav.home"))}</a>
+      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t(area === "super" ? "admin.superTitle" : "admin.accessTitle"))}</h1>
+      <p class="mt-1 text-sm text-slate-500">${esc(area === "super" ? t("admin.superDescription") : isSuper ? t("admin.roleSuper") : t("admin.roleAdmin"))}</p>
     </div>
     <div class="-mx-4 overflow-x-auto px-4">
       <nav id="tabs" class="flex min-w-max gap-1 border-b border-slate-200 dark:border-slate-800"></nav>
@@ -1064,9 +1061,9 @@
   // ---------------------------------------------------------------- 分页切换（#users、#matrix、#preview=id …）
   const HANDLERS = { users: usersTab, matrix: matrixTab, groups: groupsTab, modules: modulesTab, departments: departmentsTab, announcements: announcementsTab, audit: auditTab };
   async function route() {
-    const hash = location.hash.slice(1) || "users";
+    const hash = location.hash.slice(1) || TABS[0][0];
     const [name, arg] = hash.split("=");
-    const active = name === "preview" ? "users" : HANDLERS[name] && TABS.some(([k]) => k === name) ? name : "users";
+    const active = name === "preview" ? "users" : HANDLERS[name] && TABS.some(([k]) => k === name) ? name : TABS[0][0];
     $("#tabs").innerHTML = TABS.map(
       ([k, label]) => `<a href="#${k}" class="-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap ${
         k === active ? "border-brand-600 text-brand-700 dark:text-brand-100" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"

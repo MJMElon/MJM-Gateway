@@ -64,6 +64,14 @@ window.GW_LANG["zh-CN"] = {
   },
   "home": {
     "greeting": "你好，{name}",
+    "adminSection": "管理",
+    "adminSectionHint": "只有管理员看得到",
+    "userAccess": "User Access",
+    "userAccessDesc": "用户、群组，以及谁能打开哪些系统",
+    "superAdmin": "Super Admin",
+    "superAdminDesc": "系统模块、群组、部门、公告和操作记录",
+    "allApps": "All Apps",
+    "allAppsDesc": "你可以打开的全部系统",
     "searchPlaceholder": "搜索模块…",
     "searchResults": "找到 {count} 个模块",
     "noResults": "没有符合的模块。",
@@ -145,6 +153,9 @@ window.GW_LANG["zh-CN"] = {
   },
   "admin": {
     "title": "权限后台",
+    "accessTitle": "User Access",
+    "superTitle": "Super Admin",
+    "superDescription": "管理全公司的系统模块、群组、部门、公告和操作记录。",
     "roleSuper": "超级管理员：可管理全部用户、群组和模块。",
     "roleAdmin": "部门管理员：可管理本部门的用户和本部门模块的权限。",
     "tabs": {

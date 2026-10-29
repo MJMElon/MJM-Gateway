@@ -85,7 +85,7 @@ window.GW = (function () {
     if (profile.must_change_password) return go("login.html?mode=change"), null;
     const isAdmin = profile.role === "super_admin" || profile.role === "admin";
     if ((need === "admin" && !isAdmin) || (need === "super" && profile.role !== "super_admin")) {
-      return go(need === "super" && isAdmin ? "admin.html" : "index.html"), null;
+      return go(need === "super" && isAdmin ? "admin.html?area=access" : "index.html"), null;
     }
     applyTheme(profile.theme);
     return profile;
@@ -113,7 +113,7 @@ window.GW = (function () {
     const items = [
       { href: "index.html", key: "home", label: t("nav.home"), icon: "house" },
       { href: "library.html", key: "library", label: t("nav.library"), icon: "library" },
-      ...(isAdmin ? [{ href: "admin.html", key: "admin", label: t("nav.admin"), icon: "shield-check" }] : []),
+      ...(isAdmin ? [{ href: "admin.html?area=access", key: "admin", label: t("nav.admin"), icon: "shield-check" }] : []),
       { href: "settings.html", key: "settings", label: t("nav.settings"), icon: "settings" },
     ];
     const header = document.createElement("div");

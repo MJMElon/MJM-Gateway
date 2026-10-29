@@ -64,6 +64,14 @@ window.GW_LANG["en"] = {
   },
   home: {
     greeting: "Hello, {name}",
+    adminSection: "Administration",
+    adminSectionHint: "Visible to administrators only",
+    userAccess: "User Access",
+    userAccessDesc: "Users, groups and who can open which apps",
+    superAdmin: "Super Admin",
+    superAdminDesc: "Apps, groups, departments, announcements and audit log",
+    allApps: "All Apps",
+    allAppsDesc: "Every system you can open",
     searchPlaceholder: "Search modules…",
     searchResults: "{count} modules found",
     noResults: "No matching modules.",
@@ -145,6 +153,9 @@ window.GW_LANG["en"] = {
   },
   admin: {
     title: "Admin",
+    accessTitle: "User Access",
+    superTitle: "Super Admin",
+    superDescription: "Manage apps, groups, departments, announcements and the audit log for the whole company.",
     roleSuper: "Super admin: manage every user, group and module.",
     roleAdmin: "Department admin: manage users in your department and access to your department’s modules.",
     tabs: {
