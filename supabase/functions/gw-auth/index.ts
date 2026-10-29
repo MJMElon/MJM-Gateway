@@ -1,4 +1,4 @@
-// 登录与密码（原本在 Next.js 服务端执行，改为 Edge Function 以支持静态网站）
+// 登录与密码（网站是静态网页，需要 service_role 的部分放在这里执行）
 // POST { action: "login", email, password }
 //   → { session, must_change_password, locale } 或 { error, remaining?, minutes? }
 //   连续输错 5 次锁 15 分钟；帐号必须有启用中的 Gateway 资料

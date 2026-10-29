@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MJM Gateway</title>
+<script src="shared/head.js"></script>
+</head>
+<body>
+<main id="main"></main>
+<script>
+/* 模块库：有权限的全部模块；已在首页的打勾；可选文件夹加入；新开权限的标 NEW */
+(async function () {
+  const { sb, t, esc, cls, btn, badge, icon, moduleIcon, refreshIcons } = GW;
+  const profile = await GW.requireProfile("user");
+  if (!profile) return;
+  const main = GW.shell(profile, "library");
+  main.innerHTML = GW.spinner();
+  const { data, error } = await sb.rpc("gw_get_home");
+  if (error) return (main.innerHTML = GW.alertBox(t("errors.description")));
+
+  const onHome = new Set(data.layout.map((l) => l.module_id));
+  let query = "";
+  // 打开模块库 = 已看过新模块；本次画面仍显示 NEW，下次就不显示
+  const fresh = data.modules.filter((m) => m.is_new).map((m) => m.id);
+  if (fresh.length) sb.rpc("gw_mark_seen", { p_modules: fresh });
+
+  function draw() {
+    const q = query.trim().toLowerCase();
+    const list = data.modules.filter((m) => !q || [m.name, m.code, m.description, m.category].some((v) => v && v.toLowerCase().includes(q)));
+    const groups = new Map();
+    list.forEach((m) => {
+      const k = m.category || t("library.otherCategory");
+      groups.set(k, [...(groups.get(k) || []), m]);
+    });
+    document.getElementById("list").innerHTML =
+      (data.modules.length === 0 ? `<div class="${cls.empty}">${esc(t("library.empty"))}</div>` : "") +
+      [...groups.entries()]
+        .map(
+          ([cat, mods]) => `<section>
+            <h2 class="mb-2 text-sm font-medium text-slate-500">${esc(cat)}</h2>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              ${mods
+                .map(
+                  (m) => `<div class="${cls.card} flex flex-col gap-3 p-4">
+                    <div class="flex items-start gap-3">
+                      <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-700/20 dark:text-brand-100">${moduleIcon(m.icon, "size-5")}</span>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5"><span class="truncate font-medium">${esc(m.name)}</span>${m.is_new ? badge(t("library.new"), "red") : ""}</div>
+                        ${m.description ? `<p class="mt-0.5 line-clamp-2 text-xs text-slate-500">${esc(m.description)}</p>` : ""}
+                      </div>
+                    </div>
+                    ${
+                      onHome.has(m.id)
+                        ? `<div class="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">${icon("check")} ${esc(t("library.onHome"))}</div>`
+                        : `<div class="flex gap-2">
+                            ${
+                              data.folders.length
+                                ? `<select data-folder="${m.id}" aria-label="${esc(t("library.folder"))}" class="${cls.input} h-8 flex-1 text-xs">
+                                    <option value="">${esc(t("library.uncategorized"))}</option>
+                                    ${data.folders.map((f) => `<option value="${f.id}">${esc(f.name)}</option>`).join("")}
+                                  </select>`
+                                : ""
+                            }
+                            <button data-add="${m.id}" class="${btn("primary", "sm")}">${icon("plus")} ${esc(t("library.add"))}</button>
+                          </div>`
+                    }
+                  </div>`,
+                )
+                .join("")}
+            </div>
+          </section>`,
+        )
+        .join("");
+    refreshIcons();
+  }
+
+  main.innerHTML = `<div class="space-y-5">
+    <div>
+      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t("library.title"))}</h1>
+      <p class="mt-1 text-sm text-slate-500">${esc(t("library.description"))}</p>
+    </div>
+    <div class="relative">
+      <span class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400">${icon("search")}</span>
+      <input id="q" type="search" placeholder="${esc(t("library.searchPlaceholder"))}" class="${cls.input} pl-9">
+    </div>
+    <div id="list" class="space-y-5"></div>
+  </div>`;
+  document.getElementById("q").addEventListener("input", (e) => ((query = e.target.value), draw()));
+  main.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-add]");
+    if (!b) return;
+    const id = b.dataset.add;
+    const sel = main.querySelector(`[data-folder="${id}"]`);
+    const folderId = sel && sel.value ? sel.value : null;
+    // 放在最后面
+    const sortOrder = Math.max(0, ...data.layout.map((l) => l.sort_order)) + onHome.size + 1;
+    b.disabled = true;
+    const { error } = await sb.rpc("gw_save_layout", {
+      p_items: [{ module_id: id, folder_id: folderId, sort_order: sortOrder, card_size: "large" }],
+    });
+    if (error) return ((b.disabled = false), GW.toast(t("home.saveFailed")));
+    onHome.add(id);
+    draw();
+  });
+  draw();
+})();
+</script>
+</body>
+</html>

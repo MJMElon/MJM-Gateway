@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MJM Gateway</title>
+<script src="shared/head.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="shared/home.js"></script>
+</head>
+<body>
+<main id="main"></main>
+<script>
+/* 我的首页 */
+(async function () {
+  const profile = await GW.requireProfile("user");
+  if (!profile) return;
+  const main = GW.shell(profile, "home");
+  main.innerHTML = GW.spinner();
+  // 第一次登录：按群组自动排好预设版面
+  if (!profile.layout_initialized) await GW.sb.rpc("gw_init_layout");
+  const { data, error } = await GW.sb.rpc("gw_get_home");
+  if (error) return (main.innerHTML = GW.alertBox(GW.t("errors.description")));
+  main.innerHTML = `<h1 class="mb-5 text-xl font-semibold sm:text-2xl">${GW.esc(GW.t("home.greeting", { name: data.profile.full_name }))}</h1><div id="board"></div>`;
+  GWHome.render(document.getElementById("board"), data);
+})();
+</script>
+</body>
+</html>

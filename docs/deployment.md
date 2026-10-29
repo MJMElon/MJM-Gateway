@@ -1,11 +1,11 @@
 # 上线步骤
 
 线上 Supabase 项目：**MJM Gateway**（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`）。
-网站发布在 **GitHub Pages**：`https://mjmelon.github.io/MJM-Gateway/`（推送到 `main` 后自动发布）。
+网站发布在 **GitHub Pages**：`https://mjmelon.github.io/MJM-Gateway/`（纯 HTML，不需要建置）。
 
 ## 架构
 
-- 网站是纯静态网页（Next.js `output: "export"`），浏览器直接向 Supabase 读写资料，**所有权限都由数据库 RLS 检查**。
+- 网站是纯 HTML + JavaScript（跟 mjm-ai-system 同样做法），浏览器直接向 Supabase 读写资料，**所有权限都由数据库 RLS 检查**。
 - 需要 service_role 的动作在 Supabase Edge Functions 执行：
 
 | Function | 用途 |
@@ -48,8 +48,11 @@ node scripts/generate-token-key.mjs
 
 ## 4. GitHub Pages
 
-1. GitHub repo → Settings → Pages → Build and deployment → Source 选 **GitHub Actions**。
-2. 推送到 `main`，`.github/workflows/deploy.yml` 会自动 build 并发布。进度在 repo 的 Actions 分页。
+GitHub repo → Settings → Pages → Build and deployment：
+- Source：**Deploy from a branch**
+- Branch：**main**，资料夹 **/ (root)**
+
+之后每次推送到 `main`，1–2 分钟后网站就会更新（repo 根目录的 `index.html` 就是首页）。
 
 ## 5. Supabase Auth 设定（忘记密码需要）
 

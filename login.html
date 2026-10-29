@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MJM Gateway</title>
+<script src="shared/head.js"></script>
+</head>
+<body>
+<main class="flex min-h-dvh items-center justify-center px-4 py-10">
+  <div class="w-full max-w-sm">
+    <div class="mb-8 flex flex-col items-center gap-3 text-center">
+      <div class="flex size-12 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-600/30">
+        <i data-lucide="layout-grid" class="size-6"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-semibold" data-t="app.name"></h1>
+        <p class="text-sm text-slate-500" data-t="app.tagline"></p>
+      </div>
+    </div>
+    <div id="card" class="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"></div>
+  </div>
+</main>
+
+<script>
+/* 登录页：登录 / 忘记密码 / 改密码（第一次登录强制、或从重设密码邮件回来） */
+const { sb, t, esc, $, cls, btn, alertBox, invoke, go, refreshIcons } = GW;
+document.querySelectorAll("[data-t]").forEach((el) => (el.textContent = t(el.dataset.t)));
+const params = new URLSearchParams(location.search);
+const card = $("#card");
+
+const field = (label, input, hint) => `
+  <label class="block space-y-1.5">
+    <span class="${cls.label}">${esc(label)}</span>${input}
+    ${hint ? `<span class="block text-xs text-slate-500">${esc(hint)}</span>` : ""}
+  </label>`;
+const link = (href, text) =>
+  `<div class="text-center"><a href="${href}" class="text-sm text-brand-600 hover:underline dark:text-brand-100">${esc(text)}</a></div>`;
+
+// ---------------------------------------------------------------- 登录
+function showLogin(errorKey) {
+  card.innerHTML = `
+    <form id="f" class="space-y-4">
+      <h2 class="text-lg font-semibold">${esc(t("login.title"))}</h2>
+      <div id="msg">${errorKey ? alertBox(t(errorKey)) : ""}</div>
+      ${field(t("login.email"), `<input name="email" type="email" autocomplete="username" required inputmode="email" class="${cls.input}">`)}
+      ${field(t("login.password"), `<input name="password" type="password" autocomplete="current-password" required class="${cls.input}">`)}
+      <button type="submit" class="${btn("primary")} w-full">${esc(t("login.submit"))}</button>
+      ${link("login.html?mode=forgot", t("login.forgot"))}
+    </form>`;
+  $("#f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    const email = String(form.get("email") || "").trim().toLowerCase();
+    const submit = e.target.querySelector("button[type=submit]");
+    submit.disabled = true;
+    submit.textContent = t("login.submitting");
+    const r = await invoke("gw-auth", { action: "login", email, password: String(form.get("password") || "") });
+    if (r && r.session) {
+      const { error } = await sb.auth.setSession(r.session);
+      if (!error) return go(r.must_change_password ? "login.html?mode=change" : "index.html");
+    }
+    const err = (r && r.error) || "unknown";
+    const msg =
+      err === "invalid" && r.remaining != null ? t("login.errors.invalidRemaining", { remaining: r.remaining })
+      : err === "invalid" ? t("login.errors.invalid")
+      : err === "locked" ? t("login.errors.locked", { minutes: r.minutes || 15 })
+      : err === "disabled" ? t("login.errors.disabled")
+      : err === "no_access" ? t("login.errors.noAccess")
+      : t("login.errors.unknown");
+    $("#msg").innerHTML = alertBox(msg);
+    submit.disabled = false;
+    submit.textContent = t("login.submit");
+  });
+}
+
+// ---------------------------------------------------------------- 忘记密码
+function showForgot() {
+  card.innerHTML = `
+    <form id="f" class="space-y-4">
+      <div>
+        <h2 class="text-lg font-semibold">${esc(t("forgot.title"))}</h2>
+        <p class="mt-1 text-sm text-slate-500">${esc(t("forgot.description"))}</p>
+      </div>
+      <div id="msg"></div>
+      ${field(t("forgot.email"), `<input name="email" type="email" required inputmode="email" class="${cls.input}">`)}
+      <button type="submit" class="${btn("primary")} w-full">${esc(t("forgot.submit"))}</button>
+      ${link("login.html", t("forgot.back"))}
+    </form>`;
+  $("#f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = String(new FormData(e.target).get("email") || "").trim().toLowerCase();
+    e.target.querySelector("button").disabled = true;
+    const redirectTo = new URL("login.html?mode=reset", location.href).href;
+    if (email) await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    // 不论 email 是否存在都显示相同结果，避免泄漏帐号
+    $("#msg").innerHTML = alertBox(t("forgot.sent"), "green");
+  });
+}
+
+// ---------------------------------------------------------------- 改密码
+async function showChange(reset) {
+  const { session, profile } = await GW.loadProfile();
+  if (!session) return showLogin(reset ? "login.errors.linkExpired" : null);
+  if (!profile || profile.status !== "active") {
+    await sb.auth.signOut();
+    return showLogin("login.errors.noAccess");
+  }
+  card.innerHTML = `
+    <h2 class="text-lg font-semibold">${esc(t(reset ? "password.resetTitle" : "password.forcedTitle"))}</h2>
+    <p class="mt-1 mb-4 text-sm text-slate-500">${esc(t(reset ? "password.resetDescription" : "password.forcedDescription"))}</p>
+    <form id="f" class="space-y-4">
+      <div id="msg"></div>
+      ${field(t("password.new"), `<input name="password" type="password" autocomplete="new-password" required minlength="8" class="${cls.input}">`, t("password.rule"))}
+      ${field(t("password.confirm"), `<input name="confirm" type="password" autocomplete="new-password" required minlength="8" class="${cls.input}">`)}
+      <button type="submit" class="${btn("primary")} w-full">${esc(t("password.submit"))}</button>
+    </form>`;
+  $("#f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    const error = await GW.changePassword(String(form.get("password") || ""), String(form.get("confirm") || ""));
+    if (error) return ($("#msg").innerHTML = alertBox(t("password.errors." + error)));
+    go("index.html");
+  });
+}
+
+(async function main() {
+  const mode = params.get("mode");
+  if (mode === "forgot") showForgot();
+  else if (mode === "change" || mode === "reset") {
+    // 从重设密码邮件回来：等 Supabase 用网址里的 code 换好 session
+    if (mode === "reset") await new Promise((r) => setTimeout(r, 300));
+    await showChange(mode === "reset");
+  } else {
+    // 已登录就直接进首页
+    const { session, profile } = await GW.loadProfile();
+    if (session && profile && profile.status === "active" && !params.get("error")) {
+      return go(profile.must_change_password ? "login.html?mode=change" : "index.html");
+    }
+    const error = params.get("error");
+    showLogin(error === "no_access" ? "login.errors.noAccess" : error === "link_expired" ? "login.errors.linkExpired" : null);
+  }
+  refreshIcons();
+})();
+</script>
+</body>
+</html>

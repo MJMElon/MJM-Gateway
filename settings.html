@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MJM Gateway</title>
+<script src="shared/head.js"></script>
+</head>
+<body>
+<main id="main"></main>
+<script>
+/* 个人设置：语言、浅色/深色、一键重设首页、改密码 */
+(async function () {
+  const { sb, t, esc, cls, btn, icon, alertBox, refreshIcons } = GW;
+  const profile = await GW.requireProfile("user");
+  if (!profile) return;
+  const main = GW.shell(profile, "settings");
+  const LOCALES = ["zh-CN", "en", "ms"];
+  const AVAILABLE = Object.keys(window.GW_LANG);
+  const save = (patch) => sb.from("gw_profiles").update(patch).eq("id", profile.id);
+
+  main.innerHTML = `<div class="mx-auto max-w-2xl space-y-5">
+    <h1 class="text-xl font-semibold sm:text-2xl">${esc(t("settings.title"))}</h1>
+    <div class="${cls.card} space-y-5 p-5">
+      <h2 class="font-semibold">${esc(t("settings.preferences"))}</h2>
+      <div id="done"></div>
+      <label class="block space-y-1.5">
+        <span class="${cls.label}">${esc(t("settings.language"))}</span>
+        <select id="locale" class="${cls.input}">
+          ${LOCALES.map((l) => `<option value="${l}" ${profile.locale === l ? "selected" : ""} ${AVAILABLE.includes(l) ? "" : "disabled"}>${esc(t("settings.locales." + l))}${AVAILABLE.includes(l) ? "" : ` (${esc(t("settings.comingSoon"))})`}</option>`).join("")}
+        </select>
+      </label>
+      <div>
+        <p class="mb-1.5 ${cls.label}">${esc(t("settings.theme"))}</p>
+        <div class="grid grid-cols-3 gap-2" id="themes">
+          ${[["light", "sun"], ["dark", "moon"], ["system", "monitor"]]
+            .map(([v, ic]) => `<button data-theme="${v}" class="flex flex-col items-center gap-1 rounded-lg border p-3 text-sm">${icon(ic, "size-5")}${esc(t("settings.themes." + v))}</button>`)
+            .join("")}
+        </div>
+      </div>
+      <div class="border-t border-slate-200 pt-5 dark:border-slate-800">
+        <p class="text-sm font-medium">${esc(t("settings.resetHome"))}</p>
+        <p class="mt-1 mb-3 text-xs text-slate-500">${esc(t("settings.resetHomeDescription"))}</p>
+        <button id="reset" class="${btn("secondary")}">${icon("rotate-ccw")} ${esc(t("settings.resetHome"))}</button>
+      </div>
+    </div>
+    <div class="${cls.card} p-5">
+      <h2 class="mb-4 font-semibold">${esc(t("settings.changePassword"))}</h2>
+      <form id="pw" class="space-y-4">
+        <div id="pw-msg"></div>
+        <label class="block space-y-1.5"><span class="${cls.label}">${esc(t("password.new"))}</span>
+          <input name="password" type="password" autocomplete="new-password" required minlength="8" class="${cls.input}">
+          <span class="block text-xs text-slate-500">${esc(t("password.rule"))}</span></label>
+        <label class="block space-y-1.5"><span class="${cls.label}">${esc(t("password.confirm"))}</span>
+          <input name="confirm" type="password" autocomplete="new-password" required minlength="8" class="${cls.input}"></label>
+        <button type="submit" class="${btn("primary")}">${esc(t("password.submit"))}</button>
+      </form>
+    </div>
+  </div>`;
+
+  let theme = profile.theme;
+  const paintThemes = () =>
+    document.querySelectorAll("[data-theme]").forEach((b) => {
+      const on = b.dataset.theme === theme;
+      b.className = `flex flex-col items-center gap-1 rounded-lg border p-3 text-sm ${
+        on ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-700/20 dark:text-brand-100" : "border-slate-200 dark:border-slate-700"
+      }`;
+    });
+  paintThemes();
+  refreshIcons();
+
+  document.getElementById("themes").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-theme]");
+    if (!b) return;
+    theme = b.dataset.theme;
+    GW.applyTheme(theme);
+    paintThemes();
+    save({ theme });
+  });
+  document.getElementById("locale").addEventListener("change", (e) => save({ locale: e.target.value }));
+  document.getElementById("reset").addEventListener("click", async () => {
+    const ok = await GW.confirmDialog(t("settings.resetHome"), t("settings.resetHomeConfirm"), t("settings.confirm"), t("settings.cancel"));
+    if (!ok) return;
+    await sb.rpc("gw_reset_layout");
+    document.getElementById("done").innerHTML = alertBox(t("settings.resetHomeDone"), "green");
+  });
+  document.getElementById("pw").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    const error = await GW.changePassword(String(form.get("password") || ""), String(form.get("confirm") || ""));
+    document.getElementById("pw-msg").innerHTML = error ? alertBox(t("password.errors." + error)) : alertBox(t("password.changed"), "green");
+    if (!error) e.target.reset();
+  });
+})();
+</script>
+</body>
+</html>
