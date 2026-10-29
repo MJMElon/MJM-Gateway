@@ -1,10 +1,14 @@
 import type { NextConfig } from "next";
-import createNextIntlPlugin from "next-intl/plugin";
 
-const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+// 静态网站（GitHub Pages）。所有资料由浏览器直接向 Supabase 读取，权限由数据库 RLS 检查；
+// 需要 service_role 的动作在 Supabase Edge Functions（gw-auth、gw-admin）执行。
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const nextConfig: NextConfig = {
-  // 所有页面都依登录状态动态产生，使用传统缓存模式（不开 Cache Components）
+  output: "export",
+  basePath,
+  trailingSlash: true,
+  images: { unoptimized: true },
   turbopack: {
     rules: {
       "*.css": {
@@ -13,10 +17,6 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  experimental: {
-    // Excel 批量导入
-    serverActions: { bodySizeLimit: "5mb" },
-  },
 };
 
-export default withNextIntl(nextConfig);
+export default nextConfig;

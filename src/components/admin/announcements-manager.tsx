@@ -2,7 +2,6 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Department, Profile } from "@/lib/types";
@@ -29,14 +28,15 @@ export function AnnouncementsManager({
   me,
   announcements,
   departments,
+  onChange,
 }: {
   me: Profile;
   announcements: Announcement[];
   departments: Department[];
+  onChange: () => void;
 }) {
   const t = useTranslations("admin.announcements");
   const format = useFormatter();
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const isSuper = me.role === "super_admin";
   const [open, setOpen] = useState(false);
@@ -62,17 +62,17 @@ export function AnnouncementsManager({
     if (error) return setError(t("saveFailed"));
     setOpen(false);
     setMessage("");
-    router.refresh();
+    onChange();
   }
 
   async function toggle(a: Announcement) {
     await supabase.from("gw_announcements").update({ is_active: !a.is_active }).eq("id", a.id);
-    router.refresh();
+    onChange();
   }
 
   async function remove(a: Announcement) {
     await supabase.from("gw_announcements").delete().eq("id", a.id);
-    router.refresh();
+    onChange();
   }
 
   const status = (a: Announcement) => {

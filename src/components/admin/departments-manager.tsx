@@ -2,15 +2,13 @@
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Department } from "@/lib/types";
 import { Alert, Button, Card, EmptyState, Field, Input, Modal } from "@/components/ui";
 
-export function DepartmentsManager({ departments }: { departments: Department[] }) {
+export function DepartmentsManager({ departments, onChange }: { departments: Department[]; onChange: () => void }) {
   const t = useTranslations("admin.departments");
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [editing, setEditing] = useState<Department | "new" | null>(null);
   const [deleting, setDeleting] = useState<Department | null>(null);
@@ -34,14 +32,14 @@ export function DepartmentsManager({ departments }: { departments: Department[] 
         : await supabase.from("gw_departments").insert(row);
     if (error) return setError(error.code === "23505" ? t("duplicate") : error.code === "23514" ? t("badCode") : t("saveFailed"));
     setEditing(null);
-    router.refresh();
+    onChange();
   }
 
   async function remove(d: Department) {
     const { error } = await supabase.from("gw_departments").delete().eq("id", d.id);
     setDeleting(null);
     if (error) setError(t("saveFailed"));
-    router.refresh();
+    onChange();
   }
 
   return (

@@ -1,26 +1,25 @@
-import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import type { Department } from "@/lib/types";
+"use client";
+
+import { useAuth } from "@/components/auth-provider";
+import { Spinner } from "@/components/guards";
 import { AnnouncementsManager, type Announcement } from "@/components/admin/announcements-manager";
+import { createClient } from "@/lib/supabase/client";
+import type { Department } from "@/lib/types";
+import { useLoad } from "@/lib/use-load";
 
-export async function generateMetadata() {
-  const t = await getTranslations("admin.tabs");
-  return { title: t("announcements") };
-}
-
-export default async function AnnouncementsPage() {
-  const me = await requireAdmin();
-  const supabase = await createClient();
-  const [{ data: announcements }, { data: departments }] = await Promise.all([
-    supabase.from("gw_announcements").select("*").order("created_at", { ascending: false }),
-    supabase.from("gw_departments").select("id, code, name").order("code"),
-  ]);
-  return (
-    <AnnouncementsManager
-      me={me}
-      announcements={(announcements ?? []) as Announcement[]}
-      departments={(departments ?? []) as Department[]}
-    />
-  );
+export default function AnnouncementsPage() {
+  const { profile } = useAuth();
+  const { data, reload } = useLoad(async () => {
+    const supabase = createClient();
+    const [announcements, departments] = await Promise.all([
+      supabase.from("gw_announcements").select("*").order("created_at", { ascending: false }),
+      supabase.from("gw_departments").select("id, code, name").order("code"),
+    ]);
+    return {
+      announcements: (announcements.data ?? []) as Announcement[],
+      departments: (departments.data ?? []) as Department[],
+    };
+  });
+  if (!data || !profile) return <Spinner />;
+  return <AnnouncementsManager me={profile} {...data} onChange={reload} />;
 }

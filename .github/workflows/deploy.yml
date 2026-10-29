@@ -1,0 +1,47 @@
+# 推送到 main 后自动 build 静态网站并发布到 GitHub Pages
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx eslint .
+      - run: npm run build
+        env:
+          # 公开资讯（anon key 本来就会出现在浏览器里，权限由 RLS 控制）
+          NEXT_PUBLIC_SUPABASE_URL: https://briqzyxfxsvulyizzbiu.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyaXF6eXhmeHN2dWx5aXp6Yml1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDc3ODksImV4cCI6MjA4OTUyMzc4OX0.LGs2Jd3jiAQsfgtzBU_yfTIjEEVWsWgd0n_mOyrAl1Q
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

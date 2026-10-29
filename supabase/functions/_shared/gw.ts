@@ -55,3 +55,49 @@ export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+// 记录 Auth 相关事件到 gw_audit_logs（service_role）
+export async function logEvent(
+  actorId: string | null,
+  action: string,
+  targetType: string,
+  targetId: string | null = null,
+  targetLabel: string | null = null,
+  after: Record<string, unknown> | null = null,
+) {
+  const { error } = await serviceClient().rpc("gw_log_event", {
+    p_actor: actorId,
+    p_action: action,
+    p_target_type: targetType,
+    p_target_id: targetId,
+    p_target_label: targetLabel,
+    p_after: after,
+  });
+  if (error) console.error("gw_log_event failed", error.message);
+}
+
+// 从 Authorization header 取得当前用户与其 Gateway 资料
+export async function getCaller(req: Request) {
+  const authorization = req.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) return null;
+  const supabase = userClient(authorization);
+  const { data: { user } } = await supabase.auth.getUser(authorization.slice(7));
+  if (!user) return null;
+  const { data: profile } = await supabase.from("gw_profiles").select("*").eq("id", user.id).maybeSingle();
+  return { user, profile, supabase };
+}
+
+// 临时密码（至少含一个字母和一个数字；排除容易看错的字元）
+export function generatePassword(length = 12): string {
+  const letters = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const all = letters + digits;
+  const pick = (set: string) => set[crypto.getRandomValues(new Uint32Array(1))[0] % set.length];
+  const chars = [pick(letters), pick(digits)];
+  while (chars.length < length) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}

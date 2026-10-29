@@ -1,57 +1,59 @@
 # 上线步骤
 
-> 线上 Supabase 项目：**MJM Gateway**（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`）。
-> 项目里另有在用的 `ai_management_*` 表，以及挂在 `auth.users` 上的触发器 `ai_management_on_auth_user_created`（新建登录帐号会自动加进 AI 管理系统的用户表）。
-> 本 repo 的 migration **只新增 `gw_*` 对象**，不修改、不删除任何现有表、函数或资料。
+线上 Supabase 项目：**MJM Gateway**（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`）。
+网站发布在 **GitHub Pages**：`https://mjmelon.github.io/MJM-Gateway/`（推送到 `main` 后自动发布）。
 
-## 1. 套用 migration（需先确认 SQL）
+## 架构
 
-依序套用 `supabase/migrations/` 里的 5 个档案：
+- 网站是纯静态网页（Next.js `output: "export"`），浏览器直接向 Supabase 读写资料，**所有权限都由数据库 RLS 检查**。
+- 需要 service_role 的动作在 Supabase Edge Functions 执行：
 
-1. `20261029100000_gw_schema.sql`：建表
-2. `20261029100100_gw_security.sql`：权限函数 + RLS
-3. `20261029100200_gw_audit.sql`：操作记录
-4. `20261029100300_gw_rpc.sql`：首页、版面、登录锁定、后台用函数
-5. `20261029100400_gw_token_redemptions.sql`：Token 一次性使用记录
+| Function | 用途 |
+| --- | --- |
+| `gw-auth` | 登录（含连续输错 5 次锁 15 分钟）、改密码后清除强制改密码标记 |
+| `gw-admin` | 建立用户、Excel 批量导入、停用/启用、重设密码、模块 API Key |
+| `gw-issue-token` | 第 2 级接入：签发 60 秒 Token |
+| `gw-check-access` | 目标系统兑换 Token / 查询权限 |
+| `gw-jwks` | Token 公钥 |
 
-## 2. 指定第一位超级管理员
+## 1. 数据库 migration
 
-Gateway 帐号只能由管理员建立，所以第一位 super_admin 要用 SQL 建立（Supabase SQL Editor）。
-如果这个 email 在 Supabase Auth 里已经有帐号，直接连结：
+依序套用 `supabase/migrations/` 里的档案（只新增 `gw_*` 对象）。
+`20261029120000_drop_ai_management.sql` 是移除项目里原本不再使用的「AI 管理」表的记录。
+
+## 2. 第一位超级管理员
 
 ```sql
 insert into public.gw_profiles (id, email, full_name, role, must_change_password)
-select id, email, '你的名字', 'super_admin', false
+select id, email, '名字', 'super_admin', false
 from auth.users
 where email = 'you@example.com';
 ```
 
-还没有帐号的话，先到 Supabase Dashboard → Authentication → Users → Add user 建立，再执行上面的 SQL。
+（目前是 coco.lau@puigroups.com）
 
 ## 3. Edge Functions
 
 ```bash
-node scripts/generate-token-key.mjs                    # 产生 ES256 私钥（JWK）
-npx supabase secrets set GW_TOKEN_PRIVATE_JWK='<输出>' --project-ref briqzyxfxsvulyizzbiu
-npx supabase functions deploy gw-issue-token gw-check-access gw-jwks --project-ref briqzyxfxsvulyizzbiu
+npx supabase functions deploy gw-auth gw-admin gw-issue-token gw-check-access gw-jwks --project-ref briqzyxfxsvulyizzbiu
 ```
 
-可选：`GW_ALLOWED_ORIGIN=https://gateway.你的网域` 限制 CORS 来源（默认 `*`）。
+第 2 级 Token 需要签名私钥：
 
-## 4. Supabase Auth 设定
+```bash
+node scripts/generate-token-key.mjs
+```
+
+把输出贴到 Supabase → Edge Functions → Secrets，名称 `GW_TOKEN_PRIVATE_JWK`。
+
+## 4. GitHub Pages
+
+1. GitHub repo → Settings → Pages → Build and deployment → Source 选 **GitHub Actions**。
+2. 推送到 `main`，`.github/workflows/deploy.yml` 会自动 build 并发布。进度在 repo 的 Actions 分页。
+
+## 5. Supabase Auth 设定（忘记密码需要）
 
 - Authentication → URL Configuration
-  - Site URL：Gateway 的网址
-  - Redirect URLs：加入 `https://<gateway 网址>/auth/callback`
-- Authentication → Emails：设定 SMTP（Supabase 内建邮件每小时只能寄很少封，忘记密码功能需要正式 SMTP）
-
-## 5. 部署 Next.js（例如 Vercel）
-
-环境变量：
-
-| 名称 | 说明 |
-| --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://briqzyxfxsvulyizzbiu.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | 只在服务端使用（建立用户、重设密码、登录锁定）|
-| `NEXT_PUBLIC_SITE_URL` | Gateway 网址（忘记密码邮件的回跳）|
+  - Site URL：`https://mjmelon.github.io/MJM-Gateway/`
+  - Redirect URLs：加入 `https://mjmelon.github.io/MJM-Gateway/**`
+- Authentication → Emails：设定 SMTP（内建邮件每小时只能寄很少封）

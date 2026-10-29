@@ -1,16 +1,18 @@
-import { getTranslations } from "next-intl/server";
+"use client";
+
+import { useTranslations } from "next-intl";
 
 const HIDDEN = new Set(["updated_at", "created_at"]);
 
 // 显示改动前后的差异（只列有变化的栏位）
-export async function AuditDiff({
+export function AuditDiff({
   before,
   after,
 }: {
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
 }) {
-  const t = await getTranslations("admin.audit");
+  const t = useTranslations("admin.audit");
   const keys = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])].filter(
     (k) => !HIDDEN.has(k) && JSON.stringify(before?.[k]) !== JSON.stringify(after?.[k]),
   );

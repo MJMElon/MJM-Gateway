@@ -10,14 +10,16 @@ function useItems(isAdmin: boolean) {
   const t = useTranslations("nav");
   return [
     { href: "/", label: t("home"), icon: House },
-    { href: "/library", label: t("library"), icon: Library },
-    ...(isAdmin ? [{ href: "/admin", label: t("admin"), icon: ShieldCheck }] : []),
-    { href: "/settings", label: t("settings"), icon: Settings },
+    { href: "/library/", label: t("library"), icon: Library },
+    ...(isAdmin ? [{ href: "/admin/", label: t("admin"), icon: ShieldCheck }] : []),
+    { href: "/settings/", label: t("settings"), icon: Settings },
   ];
 }
 
 function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const path = pathname.replace(/\/$/, "") || "/";
+  const target = href.replace(/\/$/, "") || "/";
+  return target === "/" ? path === "/" : path.startsWith(target);
 }
 
 export function AppNav({ isAdmin }: { isAdmin: boolean }) {

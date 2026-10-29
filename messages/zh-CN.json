@@ -340,7 +340,8 @@
     },
     "preview": {
       "banner": "正在以 {name}（{email}）的身份预览首页（只读）",
-      "back": "返回用户列表"
+      "back": "返回用户列表",
+      "notAllowed": "找不到这个用户，或你没有权限预览。"
     },
     "announcements": {
       "descriptionSuper": "公告会显示在首页顶部。",

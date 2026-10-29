@@ -3,23 +3,24 @@
 import { Monitor, Moon, RotateCcw, Sun } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
-import { resetHome, updatePreferences } from "@/app/(app)/settings/actions";
+import { useState, useTransition } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { createClient } from "@/lib/supabase/client";
 import { AVAILABLE_LOCALES, LOCALES } from "@/i18n/config";
 import { Alert, Button, cn, Field, Modal, Select } from "@/components/ui";
 
-export function PreferencesForm({ locale, theme }: { locale: string; theme: string }) {
+export function PreferencesForm({ profileId, locale, theme }: { profileId: string; locale: string; theme: string }) {
   const t = useTranslations("settings");
-  const router = useRouter();
+  const supabase = createClient();
+  const updatePreferences = async (patch: { locale?: string; theme?: string }) => {
+    await supabase.from("gw_profiles").update(patch).eq("id", profileId);
+  };
   const { setTheme } = useTheme();
+  const { refreshProfile } = useAuth();
   const [pending, startTransition] = useTransition();
   const [currentTheme, setCurrentTheme] = useState(theme);
   const [confirmReset, setConfirmReset] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-
-  // 以资料库里的设定为准（换装置时也一致）
-  useEffect(() => setTheme(theme), [theme, setTheme]);
 
   return (
     <div className="space-y-5">
@@ -31,7 +32,7 @@ export function PreferencesForm({ locale, theme }: { locale: string; theme: stri
           onChange={(e) =>
             startTransition(async () => {
               await updatePreferences({ locale: e.target.value });
-              router.refresh();
+              await refreshProfile();
             })
           }
         >
@@ -59,7 +60,10 @@ export function PreferencesForm({ locale, theme }: { locale: string; theme: stri
               onClick={() => {
                 setCurrentTheme(value);
                 setTheme(value);
-                startTransition(() => updatePreferences({ theme: value }));
+                startTransition(async () => {
+                  await updatePreferences({ theme: value });
+                  await refreshProfile();
+                });
               }}
               className={cn(
                 "flex flex-col items-center gap-1 rounded-lg border p-3 text-sm",
@@ -94,7 +98,7 @@ export function PreferencesForm({ locale, theme }: { locale: string; theme: stri
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await resetHome();
+                await supabase.rpc("gw_reset_layout");
                 setConfirmReset(false);
                 setDone(t("resetHomeDone"));
               })

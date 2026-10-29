@@ -425,3 +425,9 @@ verify_jwt = false
 
 [functions.gw-jwks]
 verify_jwt = false
+
+[functions.gw-auth]
+verify_jwt = false
+
+[functions.gw-admin]
+verify_jwt = false

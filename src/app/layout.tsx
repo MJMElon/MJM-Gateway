@@ -1,13 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getTranslations } from "next-intl/server";
 import { Providers } from "@/components/providers";
+import zhCN from "../../messages/zh-CN.json";
 import "./globals.css";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("app");
-  return { title: { default: t("name"), template: `%s · ${t("name")}` }, description: t("tagline") };
-}
+export const metadata: Metadata = {
+  title: zhCN.app.name,
+  description: zhCN.app.tagline,
+};
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -18,14 +17,11 @@ export const viewport: Viewport = {
   ],
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const locale = await getLocale();
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang={locale} suppressHydrationWarning className="h-full antialiased">
+    <html lang="zh-CN" suppressHydrationWarning className="h-full antialiased">
       <body className="min-h-full">
-        <NextIntlClientProvider>
-          <Providers>{children}</Providers>
-        </NextIntlClientProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

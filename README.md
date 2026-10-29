@@ -3,8 +3,8 @@
 公司系统统一入口：员工登录一次，就能看到并打开自己有权限的所有系统。
 Gateway 只管**认证、授权、导航**，不处理业务资料。
 
-- 前端：Next.js 16（App Router）+ TypeScript + Tailwind CSS 4
-- 后端：Supabase（项目 `MJM Gateway`（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`））——Auth、PostgreSQL、RLS、Edge Functions
+- 前端：Next.js 16（App Router，静态输出）+ TypeScript + Tailwind CSS 4，发布在 GitHub Pages
+- 后端：Supabase 项目 MJM Gateway（ref `briqzyxfxsvulyizzbiu`）：Auth、PostgreSQL、RLS、Edge Functions
 - 拖拉：dnd-kit（支持手机长按拖拉）
 - 界面文字：`messages/zh-CN.json`（以后加 `en.json`、`ms.json`）
 
@@ -17,7 +17,7 @@ src/app/(app)/admin/     权限后台（用户、权限矩阵、群组、模块�
 src/components/home/     首页拖拉版面
 src/i18n/  messages/     多语言
 supabase/migrations/     数据库 migration（只新增 gw_* 对象）
-supabase/functions/      Edge Functions：gw-issue-token、gw-check-access、gw-jwks
+supabase/functions/      Edge Functions：gw-auth、gw-admin、gw-issue-token、gw-check-access、gw-jwks
 supabase/tests/          RLS 权限测试（pgTAP）
 scripts/                 产生签名金钥、本地测试资料
 docs/                    目标系统接入说明、上线步骤
@@ -46,7 +46,8 @@ npx supabase test db                    # 执行 RLS 权限测试
 node scripts/generate-token-key.mjs     # 产生 Token 签名金钥，存成 supabase/functions/.env：
                                         #   GW_TOKEN_PRIVATE_JWK=<输出>
 npx supabase functions serve --env-file supabase/functions/.env
-cp .env.example .env.local              # 填入 npx supabase status 显示的本地网址和金钥
+cp .env.example .env.local              # 填入 npx supabase status 显示的本地网址和 anon key，
+                                        # 另外加一行 SUPABASE_SERVICE_ROLE_KEY=...（只给 seed 脚本用）
 node --env-file=.env.local scripts/seed-local.mjs   # 本地测试帐号（密码 Passw0rd123）
 npm run dev
 ```
@@ -55,8 +56,9 @@ npm run dev
 
 ## 已知限制（MVP）
 
-- **登录锁定**（连续输错 5 次锁 15 分钟）在 Gateway 的服务端登录流程里执行。Supabase 的 anon key 是公开的，如果有人绕过 Gateway、直接调用 Supabase Auth API，只会受到 Supabase 本身的频率限制。要完全堵住，需要 Supabase 的 Password Verification Hook（部分付费方案才有）。
+- **登录锁定**（连续输错 5 次锁 15 分钟）在 `gw-auth` Edge Function 里执行。Supabase 的 anon key 是公开的，如果有人绕过 Gateway、直接调用 Supabase Auth API，只会受到 Supabase 本身的频率限制。要完全堵住，需要 Supabase 的 Password Verification Hook（部分付费方案才有）。
 - **第一次登录强制改密码**是导航层面的限制（未改密码前所有页面都会被导向改密码页）。
+- 网站是静态网页，页面导航保护在浏览器执行；真正的资料权限一律由数据库 RLS 决定，绕过前端也拿不到没权限的资料。
 - **第 3 级（SSO）** 目前和第 1 级一样直接打开网址，由目标系统自己做 SSO。
 - 模块名称、说明目前只有一种语言（资料库栏位），界面文字已全部走语言文件。
 

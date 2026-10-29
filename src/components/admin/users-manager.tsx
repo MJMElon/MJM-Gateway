@@ -3,11 +3,10 @@
 import { Download, Eye, KeyRound, Pencil, Search, Upload, UserPlus } from "lucide-react";
 import { useTranslations, type Messages } from "next-intl";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
-  createUser, importUsers, resetUserPassword, setUserStatus, updateUser, type CreateUserResult,
-} from "@/app/(app)/admin/users/actions";
+  createUser, downloadXlsx, importUsers, readXlsxRows, resetUserPassword, setUserStatus, updateUser, type CreateUserResult,
+} from "@/lib/api";
 import type { Department, Group, Profile, Role } from "@/lib/types";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "@/components/ui";
 
@@ -21,15 +20,16 @@ export function UsersManager({
   departments,
   groups,
   members,
+  onChange,
 }: {
   me: Profile;
   users: Profile[];
   departments: Department[];
   groups: Group[];
   members: Member[];
+  onChange: () => void;
 }) {
   const t = useTranslations("admin.users");
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -58,7 +58,7 @@ export function UsersManager({
     startTransition(async () => {
       const result = await action();
       setMessage(result.ok ? { tone: "green", text: okText } : { tone: "red", text: t(`errors.${(result.error ?? "forbidden") as UserError}`) });
-      router.refresh();
+      onChange();
     });
   }
 
@@ -123,7 +123,7 @@ export function UsersManager({
                 )}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <Link href={`/admin/preview/${u.id}`}>
+                <Link href={`/admin/preview/?user=${u.id}`}>
                   <Button size="sm" variant="ghost">
                     <Eye className="size-4" /> {t("preview")}
                   </Button>
@@ -183,17 +183,17 @@ export function UsersManager({
             setEditing(null);
             if (r.password) setSecret({ email: r.email, password: r.password });
             else setMessage({ tone: "green", text: r.linked ? t("linkedOk") : t("createdOk") });
-            router.refresh();
+            onChange();
           }}
           onSaved={() => {
             setEditing(null);
             setMessage({ tone: "green", text: t("savedOk") });
-            router.refresh();
+            onChange();
           }}
         />
       )}
 
-      {importOpen && <ImportDialog onClose={() => { setImportOpen(false); router.refresh(); }} />}
+      {importOpen && <ImportDialog onClose={() => { setImportOpen(false); onChange(); }} />}
 
       {secret && (
         <Modal open onClose={() => setSecret(null)} title={t("tempPasswordTitle")}>
@@ -351,18 +351,51 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
       {!results ? (
         <form
           className="space-y-4"
-          action={(fd) =>
+          onSubmit={(e) => {
+            e.preventDefault();
+            const file = new FormData(e.currentTarget).get("file");
             startTransition(async () => {
-              const r = await importUsers(fd);
+              if (!(file instanceof File) || file.size === 0) return setError(t("errors.no_file"));
+              const rows = await readXlsxRows(file);
+              if (!rows) return setError(t("errors.bad_file"));
+              if (rows.length > 500) return setError(t("errors.too_many"));
+              const r = await importUsers(
+                rows
+                  .filter((c) => c[0])
+                  .map(([email, full_name, department_code, groups, role]) => ({
+                    email,
+                    full_name,
+                    department_code,
+                    groups: groups.split(/[,，]/).map((g) => g.trim()).filter(Boolean),
+                    role,
+                  })),
+              );
               if (r.error) setError(t(`errors.${r.error as ImportError}`));
               else setResults(r.results);
-            })
-          }
+            });
+          }}
         >
           <p className="text-sm text-slate-600 dark:text-slate-300">{t("description")}</p>
-          <a href="/admin/users/template" className="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:underline dark:text-brand-100">
+          <button
+            type="button"
+            onClick={() =>
+              downloadXlsx("gateway-users-template.xlsx", (workbook) => {
+                const sheet = workbook.addWorksheet("users");
+                sheet.columns = [
+                  { header: "email", width: 30 },
+                  { header: t("colName"), width: 16 },
+                  { header: t("colDepartment"), width: 14 },
+                  { header: t("colGroups"), width: 30 },
+                  { header: t("colRole"), width: 12 },
+                ];
+                sheet.addRow(["someone@example.com", "张三", "HQ", "全体员工, 总部车队", "user"]);
+                sheet.getRow(1).font = { bold: true };
+              })
+            }
+            className="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:underline dark:text-brand-100"
+          >
             <Download className="size-4" /> {t("template")}
-          </a>
+          </button>
           {error && <Alert>{error}</Alert>}
           <Input type="file" name="file" accept=".xlsx" required className="h-auto py-2" />
           <div className="flex justify-end gap-2">

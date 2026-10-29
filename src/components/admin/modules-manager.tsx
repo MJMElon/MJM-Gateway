@@ -2,9 +2,8 @@
 
 import { KeyRound, Pencil, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { generateApiKey } from "@/app/(app)/admin/modules/actions";
+import { generateApiKey } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import type { Department, Module } from "@/lib/types";
 import { MODULE_ICONS, ModuleIcon } from "@/components/module-icon";
@@ -29,14 +28,15 @@ export function ModulesManager({
   departments,
   keys,
   functionsUrl,
+  onChange,
 }: {
   modules: Module[];
   departments: Department[];
   keys: Record<string, string>;
   functionsUrl: string;
+  onChange: () => void;
 }) {
   const t = useTranslations("admin.modules");
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [editing, setEditing] = useState<Module | "new" | null>(null);
   const [apiKey, setApiKey] = useState<{ module: Module; key: string } | null>(null);
@@ -47,7 +47,7 @@ export function ModulesManager({
   async function toggleActive(m: Module) {
     const { error } = await supabase.from("gw_modules").update({ is_active: !m.is_active }).eq("id", m.id);
     if (error) setError(t("saveFailed"));
-    router.refresh();
+    onChange();
   }
 
   return (
@@ -93,7 +93,10 @@ export function ModulesManager({
                     onClick={() =>
                       startTransition(async () => {
                         const r = await generateApiKey(m.id);
-                        if (r.ok) setApiKey({ module: m, key: r.key });
+                        if (r.ok) {
+                          setApiKey({ module: m, key: r.key });
+                          onChange();
+                        }
                         else setError(t("saveFailed"));
                       })
                     }
@@ -120,7 +123,7 @@ export function ModulesManager({
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            router.refresh();
+            onChange();
           }}
         />
       )}

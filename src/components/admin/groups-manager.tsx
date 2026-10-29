@@ -2,7 +2,6 @@
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Department, Group } from "@/lib/types";
@@ -13,14 +12,15 @@ export function GroupsManager({
   departments,
   memberCount,
   moduleCount,
+  onChange,
 }: {
   groups: Group[];
   departments: Department[];
   memberCount: Record<string, number>;
   moduleCount: Record<string, number>;
+  onChange: () => void;
 }) {
   const t = useTranslations("admin.groups");
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [editing, setEditing] = useState<Group | "new" | null>(null);
   const [deleting, setDeleting] = useState<Group | null>(null);
@@ -31,7 +31,7 @@ export function GroupsManager({
     const { error } = await supabase.from("gw_groups").delete().eq("id", group.id);
     setDeleting(null);
     if (error) setError(t("saveFailed"));
-    router.refresh();
+    onChange();
   }
 
   return (
@@ -81,7 +81,7 @@ export function GroupsManager({
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            router.refresh();
+            onChange();
           }}
         />
       )}

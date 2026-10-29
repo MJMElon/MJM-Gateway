@@ -1,30 +1,34 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
-import { changePassword, type PasswordState } from "@/app/(auth)/actions";
+import { useRef, useState } from "react";
 import { Alert, Button, Field, Input } from "@/components/ui";
+import { changePassword, type PasswordError } from "@/lib/api";
 
-export function ChangePasswordForm({ redirectTo }: { redirectTo?: string }) {
+export function ChangePasswordForm({ onChanged }: { onChanged?: () => void }) {
   const t = useTranslations("password");
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, action, pending] = useActionState<PasswordState, FormData>(changePassword, {});
+  const [error, setError] = useState<PasswordError | null>(null);
+  const [ok, setOk] = useState(false);
+  const [pending, setPending] = useState(false);
 
-  useEffect(() => {
-    if (!state.ok) return;
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    setPending(true);
+    const result = await changePassword(String(form.get("password") ?? ""), String(form.get("confirm") ?? ""));
+    setPending(false);
+    setError(result.error ?? null);
+    if (result.error) return;
     formRef.current?.reset();
-    if (redirectTo) {
-      router.replace(redirectTo);
-      router.refresh();
-    }
-  }, [state, redirectTo, router]);
+    setOk(true);
+    onChanged?.();
+  }
 
   return (
-    <form ref={formRef} action={action} className="space-y-4">
-      {state.error && <Alert>{t(`errors.${state.error}`)}</Alert>}
-      {state.ok && !redirectTo && <Alert tone="green">{t("changed")}</Alert>}
+    <form ref={formRef} onSubmit={submit} className="space-y-4">
+      {error && <Alert>{t(`errors.${error}`)}</Alert>}
+      {ok && !onChanged && <Alert tone="green">{t("changed")}</Alert>}
       <Field label={t("new")} hint={t("rule")}>
         <Input name="password" type="password" autoComplete="new-password" required minLength={8} />
       </Field>

@@ -9,17 +9,17 @@ export function AdminTabs({ isSuper }: { isSuper: boolean }) {
   const t = useTranslations("admin.tabs");
   const pathname = usePathname();
   const tabs = [
-    { href: "/admin/users", label: t("users") },
-    { href: "/admin/matrix", label: t("matrix") },
+    { href: "/admin/users/", label: t("users") },
+    { href: "/admin/matrix/", label: t("matrix") },
     ...(isSuper
       ? [
-          { href: "/admin/groups", label: t("groups") },
-          { href: "/admin/modules", label: t("modules") },
-          { href: "/admin/departments", label: t("departments") },
+          { href: "/admin/groups/", label: t("groups") },
+          { href: "/admin/modules/", label: t("modules") },
+          { href: "/admin/departments/", label: t("departments") },
         ]
       : []),
-    { href: "/admin/announcements", label: t("announcements") },
-    { href: "/admin/audit", label: t("audit") },
+    { href: "/admin/announcements/", label: t("announcements") },
+    { href: "/admin/audit/", label: t("audit") },
   ];
   return (
     <div className="-mx-4 overflow-x-auto px-4">
@@ -30,7 +30,7 @@ export function AdminTabs({ isSuper }: { isSuper: boolean }) {
             href={tab.href}
             className={cn(
               "-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap",
-              pathname.startsWith(tab.href)
+              `${pathname.replace(/\/$/, "")}/`.startsWith(tab.href)
                 ? "border-brand-600 text-brand-700 dark:text-brand-100"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
             )}
