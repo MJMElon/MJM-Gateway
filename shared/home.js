@@ -30,7 +30,8 @@ window.GWHome = (function () {
     announcements: { sizes: ["medium", "large"], icon: "megaphone" },
     calendar: { sizes: ["small", "medium"], icon: "calendar" },
     notes: { sizes: ["small", "medium", "large"], icon: "sticky-note" },
-    admin: { sizes: ["medium"], icon: "shield-check", adminOnly: true },
+    // 管理入口已改为右上角齿轮；旧的管理小工具仍照常显示，但不再提供新增
+    admin: { sizes: ["medium"], icon: "shield-check", hidden: true },
   };
   // 格子大小：App 1×1；小 2×2；中 4×2；大 4×4
   const SPAN = { small: "col-span-2 row-span-2", medium: "col-span-4 row-span-2", large: "col-span-4 row-span-4" };
@@ -46,8 +47,6 @@ window.GWHome = (function () {
     const modules = new Map(data.modules.map((m) => [m.id, m]));
     let folders = data.folders.map((f) => ({ ...f }));
     let widgets = widgetsEnabled ? opts.widgets.map((w) => ({ ...w })) : [];
-    // 资料库还没有小工具表时：管理员仍显示管理捷径（不存档、不能移除）
-    if (!widgetsEnabled && !readOnly && isAdmin) widgets = [{ id: "virtual-admin", widget_type: "admin", size: "medium", sort_order: -1, config: {}, virtual: true }];
     // App 位置（只记录目前有权限的）
     let layout = new Map(data.layout.map((l) => [l.module_id, { folder_id: l.folder_id, sort_order: l.sort_order }]));
     if (uninitialized) data.modules.forEach((m, i) => layout.set(m.id, { folder_id: null, sort_order: i + 1 }));
@@ -100,7 +99,7 @@ window.GWHome = (function () {
           const w = widgets.find((x) => x.id === id);
           if (w) {
             w.sort_order = order;
-            if (!w.virtual) widgetRows.push(w);
+            widgetRows.push(w);
           }
         }
       });
@@ -273,8 +272,8 @@ window.GWHome = (function () {
         case "admin":
           return `${wTitle("shield-check", t("home.adminSection"))}
             <div class="grid content-start gap-2 ${isSuper ? "grid-cols-2" : "grid-cols-1"}">
-              ${isAdmin ? `<a href="admin.html?area=access" class="no-drag flex items-center gap-2 rounded-2xl bg-sky-50 px-3 py-4 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-200">${icon("user-cog", "size-6 shrink-0")}<span class="text-sm font-semibold">${esc(t("home.userAccess"))}</span></a>` : `<p class="text-sm text-slate-400">${esc(t("widgets.adminOnly"))}</p>`}
-              ${isSuper ? `<a href="admin.html?area=super" class="no-drag flex items-center gap-2 rounded-2xl bg-amber-50 px-3 py-4 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-200">${icon("crown", "size-6 shrink-0")}<span class="text-sm font-semibold">${esc(t("home.superAdmin"))}</span></a>` : ""}
+              ${isAdmin ? `<a href="admin.html#users" class="no-drag flex items-center gap-2 rounded-2xl bg-sky-50 px-3 py-4 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-200">${icon("user-cog", "size-6 shrink-0")}<span class="text-sm font-semibold">${esc(t("home.userAccess"))}</span></a>` : `<p class="text-sm text-slate-400">${esc(t("widgets.adminOnly"))}</p>`}
+              ${isSuper ? `<a href="admin.html#modules" class="no-drag flex items-center gap-2 rounded-2xl bg-amber-50 px-3 py-4 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-200">${icon("crown", "size-6 shrink-0")}<span class="text-sm font-semibold">${esc(t("home.superAdmin"))}</span></a>` : ""}
             </div>`;
       }
       return "";
@@ -283,7 +282,7 @@ window.GWHome = (function () {
     function widgetTile(w) {
       return `<div data-kind="widget" data-id="${w.id}" class="gw-item relative ${SPAN[w.size]}">
         <div class="${glass}">${widgetBody(w)}</div>
-        ${editing && !w.virtual ? badge(`data-remove-widget="${w.id}"`, "minus", t("widgets.remove"), "-top-2 -left-2") : ""}
+        ${editing ? badge(`data-remove-widget="${w.id}"`, "minus", t("widgets.remove"), "-top-2 -left-2") : ""}
         ${editing && WIDGETS[w.widget_type].sizes.length > 1 ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
       </div>`;
     }
@@ -311,7 +310,7 @@ window.GWHome = (function () {
     }
 
     function widgetsSheet() {
-      const types = Object.entries(WIDGETS).filter(([, d]) => !d.adminOnly || isAdmin);
+      const types = Object.entries(WIDGETS).filter(([, d]) => !d.hidden);
       return `<div class="mb-3 flex items-center justify-between"><h3 class="font-semibold">${esc(t("fab.addWidget"))}</h3>${iconBtn("data-close-sheet", t("home.close"), "x")}</div>
         <p class="mb-3 text-xs text-slate-500">${esc(t("fab.addWidgetHint"))}</p>
         <div class="space-y-2">${types

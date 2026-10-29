@@ -12,11 +12,11 @@ Gateway 只管**认证、授权、导航**，不处理业务资料。
 ## 档案
 
 ```
-index.html               主画面（像 iPhone）：App、小工具、文件夹拖拉排版；右下角浮动按钮 Add Widget / Add Apps / New Folder / Edit Home Screen
+index.html               主画面（像 iPhone）：App、小工具、文件夹拖拉排版；右下角浮动按钮 Add Widget / Add Apps / New Folder / Edit Home Screen；管理员右上角有齿轮进设置页
 login.html               登录封面（银白金属 MJM 字母落下、光扫过，接着出现白色玻璃登录框）、忘记密码、改密码
 library.html             模块库
 settings.html            个人设置（语言、浅色/深色、重设首页、改密码）
-admin.html               ?area=access → User Access（用户、权限矩阵）；?area=super → Super Admin（模块、群组、部门、公告、操作记录）
+admin.html               设置页（右上角齿轮）：User Access（用户、个人 App 权限、权限矩阵）＋ Master Data（模块、群组、部门、公告、操作记录，只限 super admin）
 shared/head.js           每页第一个载入：主题、Tailwind、共用函式库（版本在这里统一改）
 shared/config.js         Supabase 网址与 anon key
 shared/core.js           登录检查、页面外框、对话框、Edge Function 调用、Excel

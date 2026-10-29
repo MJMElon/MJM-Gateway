@@ -38,10 +38,8 @@
     /* 忽略 */
   }
   if (widgets && widgets.length === 0 && (firstVisit || !seeded)) {
-    const isAdmin = profile.role === "super_admin" || profile.role === "admin";
     const rows = [
-      { widget_type: "greeting", size: "medium", sort_order: -3 },
-      ...(isAdmin ? [{ widget_type: "admin", size: "medium", sort_order: -2 }] : []),
+      { widget_type: "greeting", size: "medium", sort_order: -2 },
       { widget_type: "search", size: "medium", sort_order: -1 },
     ].map((r) => ({ ...r, user_id: profile.id, config: {} }));
     const res = await GW.sb.from("gw_user_widgets").insert(rows).select();

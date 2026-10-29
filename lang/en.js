@@ -8,7 +8,7 @@ window.GW_LANG["en"] = {
   nav: {
     home: "Home",
     library: "Library",
-    admin: "Admin",
+    admin: "Admin settings",
     settings: "Settings",
     logout: "Sign out",
   },
@@ -210,8 +210,10 @@ window.GW_LANG["en"] = {
   admin: {
     title: "Admin",
     accessTitle: "User Access",
+    groupAccess: "User Access",
+    groupMaster: "Master Data",
     superTitle: "Super Admin",
-    superDescription: "Manage apps, groups, departments, announcements and the audit log for the whole company.",
+    superDescription: "Decide who can open which apps, and set up the master data: apps, groups, departments and announcements.",
     roleSuper: "Super admin: manage every user, group and module.",
     roleAdmin: "Department admin: manage users in your department and access to your department’s modules.",
     tabs: {
@@ -237,6 +239,13 @@ window.GW_LANG["en"] = {
         user: "User",
       },
       add: "Add user",
+      access: "Access",
+      accessDialog: {
+        title: "App access \u2014 {name}",
+        hint: "Group default follows the person\u2019s groups. Allow gives this person the app even without a group; Block takes it away even if a group gives it.",
+        state: { byGroup: "Allowed by group", allowed: "Allowed for this person", blocked: "Blocked", none: "No access" },
+        choice: { group: "Group default", allow: "Allow", deny: "Block" },
+      },
       addTitle: "Add user",
       editTitle: "Edit user",
       edit: "Edit",

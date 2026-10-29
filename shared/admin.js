@@ -11,24 +11,26 @@
   const isSuper = me.role === "super_admin";
   const main = GW.shell(me, "admin");
 
-  /* 两个入口（首页的两张卡片）：
-     ?area=access → User Access：用户、权限矩阵（部门 admin 另外有公告、操作记录）
-     ?area=super  → Super Admin：模块、群组、部门、公告、操作记录（只限 super_admin） */
-  const area = new URLSearchParams(location.search).get("area") === "super" && isSuper ? "super" : "access";
+  /* 设置页（右上角齿轮进来）：
+     super_admin → User Access（用户、权限矩阵）＋ Master Data（模块、群组、部门、公告、操作记录）
+     部门 admin  → User Access（用户、权限矩阵、公告、操作记录） */
   const tab = (k) => [k, t("admin.tabs." + k)];
-  const TABS =
-    area === "super"
-      ? ["modules", "groups", "departments", "announcements", "audit"].map(tab)
-      : ["users", "matrix", ...(isSuper ? [] : ["announcements", "audit"])].map(tab);
+  const GROUPS = isSuper
+    ? [
+        [t("admin.groupAccess"), ["users", "matrix"].map(tab)],
+        [t("admin.groupMaster"), ["modules", "groups", "departments", "announcements", "audit"].map(tab)],
+      ]
+    : [[t("admin.groupAccess"), ["users", "matrix", "announcements", "audit"].map(tab)]];
+  const TABS = GROUPS.flatMap(([, tabs]) => tabs);
 
   main.innerHTML = `<div class="space-y-5">
     <div>
       <a href="index.html" class="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">${icon("arrow-left")} ${esc(t("nav.home"))}</a>
-      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t(area === "super" ? "admin.superTitle" : "admin.accessTitle"))}</h1>
-      <p class="mt-1 text-sm text-slate-500">${esc(area === "super" ? t("admin.superDescription") : isSuper ? t("admin.roleSuper") : t("admin.roleAdmin"))}</p>
+      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t(isSuper ? "admin.superTitle" : "admin.accessTitle"))}</h1>
+      <p class="mt-1 text-sm text-slate-500">${esc(isSuper ? t("admin.superDescription") : t("admin.roleAdmin"))}</p>
     </div>
     <div class="-mx-4 overflow-x-auto px-4">
-      <nav id="tabs" class="flex min-w-max gap-1 border-b border-slate-200 dark:border-slate-800"></nav>
+      <nav id="tabs" class="flex min-w-max items-end gap-6 border-b border-slate-200 dark:border-slate-800"></nav>
     </div>
     <div id="msg"></div>
     <div id="view"></div>
@@ -133,7 +135,8 @@
                   <a href="#preview=${u.id}" class="${btn("ghost", "sm")}">${icon("eye")} ${esc(tu("preview"))}</a>
                   ${
                     canManage(u)
-                      ? `<button data-edit="${u.id}" class="${btn("ghost", "sm")}">${icon("pencil")} ${esc(tu("edit"))}</button>
+                      ? `<button data-access="${u.id}" class="${btn("secondary", "sm")}">${icon("layout-grid")} ${esc(tu("access"))}</button>
+                         <button data-edit="${u.id}" class="${btn("ghost", "sm")}">${icon("pencil")} ${esc(tu("edit"))}</button>
                          <button data-reset="${u.id}" class="${btn("ghost", "sm")}">${icon("key-round")} ${esc(tu("resetPassword"))}</button>
                          ${
                            u.id !== me.id
@@ -261,6 +264,77 @@
       return { ok: true };
     }
 
+    /* 某个人可以用哪些 App：每个 App 选「跟随群组 / 允许 / 禁止」（写入个人例外）。
+       权限检查在数据库（RLS）：admin 只能改本部门用户的本部门 App。 */
+    async function accessDialog(user) {
+      const ta = (k, v) => t("admin.users.accessDialog." + k, v);
+      const m = modal(ta("title", { name: user.full_name }), GW.spinner(), { wide: true });
+      const [mods, ovRows, eff] = await Promise.all([
+        sb.from("gw_modules").select("*").order("sort_order").order("name").then((r) => r.data || []),
+        sb.from("gw_user_module_overrides").select("module_id, effect").eq("user_id", user.id).then((r) => r.data || []),
+        sb.rpc("gw_admin_effective", { p_users: [user.id] }).then((r) => r.data || []),
+      ]);
+      const overrides = new Map(ovRows.map((o) => [o.module_id, o.effect]));
+      let effective = new Set(eff.map((e) => e.module_id));
+      const canEdit = (mod) =>
+        isSuper || (user.role === "user" && user.id !== me.id && !!me.department_id && user.department_id === me.department_id && mod.department_id === me.department_id);
+
+      function draw() {
+        const status = (mod) => {
+          const ov = overrides.get(mod.id);
+          if (ov === "deny") return badge(ta("state.blocked"), "red");
+          if (ov === "allow") return badge(ta("state.allowed"), "green");
+          return effective.has(mod.id) ? badge(ta("state.byGroup"), "blue") : badge(ta("state.none"));
+        };
+        const choice = (mod, value, label) => {
+          const cur = overrides.get(mod.id) || "group";
+          const on = cur === value;
+          return `<button type="button" data-set="${value}" data-m="${mod.id}" ${canEdit(mod) ? "" : "disabled"} class="px-2.5 py-1 text-xs font-medium first:rounded-l-md last:rounded-r-md disabled:cursor-not-allowed disabled:opacity-40 ${
+            on ? (value === "deny" ? "bg-red-600 text-white" : value === "allow" ? "bg-emerald-600 text-white" : "bg-slate-700 text-white") : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300"
+          }">${esc(label)}</button>`;
+        };
+        m.el.innerHTML = `<div class="space-y-3">
+          <p class="text-sm text-slate-500">${esc(ta("hint"))}</p>
+          ${
+            mods.length
+              ? `<div class="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">${mods
+                  .map(
+                    (mod) => `<div class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center ${mod.is_active ? "" : "opacity-50"}">
+                      <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-700/20 dark:text-brand-100">${moduleIcon(mod.icon, "size-4")}</span>
+                      <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium">${esc(mod.name)}</div><div class="mt-0.5">${status(mod)}</div></div>
+                      <div class="inline-flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-700">
+                        ${choice(mod, "group", ta("choice.group"))}${choice(mod, "allow", ta("choice.allow"))}${choice(mod, "deny", ta("choice.deny"))}
+                      </div>
+                    </div>`,
+                  )
+                  .join("")}</div>`
+              : empty(t("admin.matrix.empty"))
+          }
+          <div class="flex justify-end"><button data-done class="${btn("primary")}">${esc(tu("done"))}</button></div>
+        </div>`;
+        refreshIcons();
+      }
+
+      m.el.addEventListener("click", async (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        if ("done" in b.dataset) return m.close();
+        if (!b.dataset.set || b.disabled) return;
+        const mod = b.dataset.m;
+        const value = b.dataset.set;
+        const { error } =
+          value === "group"
+            ? await sb.from("gw_user_module_overrides").delete().eq("user_id", user.id).eq("module_id", mod)
+            : await sb.from("gw_user_module_overrides").upsert({ user_id: user.id, module_id: mod, effect: value });
+        if (error) return toast(t("admin.matrix.saveFailed"));
+        value === "group" ? overrides.delete(mod) : overrides.set(mod, value);
+        const { data } = await sb.rpc("gw_admin_effective", { p_users: [user.id] });
+        effective = new Set((data || []).map((x) => x.module_id));
+        draw();
+      });
+      draw();
+    }
+
     function importDialog() {
       const ti = (k, v) => t("admin.users.import." + k, v);
       const m = modal(
@@ -350,9 +424,10 @@
     $("#list").addEventListener("click", async (e) => {
       const b = e.target.closest("button");
       if (!b) return;
-      const user = users.find((u) => u.id === (b.dataset.edit || b.dataset.reset || b.dataset.status));
+      const user = users.find((u) => u.id === (b.dataset.edit || b.dataset.reset || b.dataset.status || b.dataset.access));
       if (!user) return;
       if (b.dataset.edit) return userDialog(user);
+      if (b.dataset.access) return accessDialog(user);
       b.disabled = true;
       if (b.dataset.reset) {
         const r = await invoke("gw-admin", { action: "reset_password", id: user.id });
@@ -1064,10 +1139,17 @@
     const hash = location.hash.slice(1) || TABS[0][0];
     const [name, arg] = hash.split("=");
     const active = name === "preview" ? "users" : HANDLERS[name] && TABS.some(([k]) => k === name) ? name : TABS[0][0];
-    $("#tabs").innerHTML = TABS.map(
-      ([k, label]) => `<a href="#${k}" class="-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap ${
-        k === active ? "border-brand-600 text-brand-700 dark:text-brand-100" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-      }">${esc(label)}</a>`,
+    $("#tabs").innerHTML = GROUPS.map(
+      ([groupLabel, tabs]) => `<div>
+        <div class="px-3 pb-1 text-[10px] font-bold tracking-[.18em] text-slate-400 uppercase">${esc(groupLabel)}</div>
+        <div class="flex gap-1">${tabs
+          .map(
+            ([k, label]) => `<a href="#${k}" class="-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap ${
+              k === active ? "border-brand-600 text-brand-700 dark:text-brand-100" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }">${esc(label)}</a>`,
+          )
+          .join("")}</div>
+      </div>`,
     ).join("");
     routeSeq++;
     if (name !== "preview") setMsg("");

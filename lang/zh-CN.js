@@ -8,7 +8,7 @@ window.GW_LANG["zh-CN"] = {
   "nav": {
     "home": "首页",
     "library": "模块库",
-    "admin": "权限后台",
+    "admin": "管理设置",
     "settings": "设置",
     "logout": "登出"
   },
@@ -210,8 +210,10 @@ window.GW_LANG["zh-CN"] = {
   "admin": {
     "title": "权限后台",
     "accessTitle": "User Access",
+    "groupAccess": "User Access",
+    "groupMaster": "Master Data",
     "superTitle": "Super Admin",
-    "superDescription": "管理全公司的系统模块、群组、部门、公告和操作记录。",
+    "superDescription": "决定谁可以打开哪些系统，并设定主资料：系统模块、群组、部门和公告。",
     "roleSuper": "超级管理员：可管理全部用户、群组和模块。",
     "roleAdmin": "部门管理员：可管理本部门的用户和本部门模块的权限。",
     "tabs": {
@@ -237,6 +239,13 @@ window.GW_LANG["zh-CN"] = {
         "user": "一般用户"
       },
       "add": "新增用户",
+      "access": "Access",
+      "accessDialog": {
+        "title": "App 权限 — {name}",
+        "hint": "「跟随群组」依这个人所属的群组决定；「允许」就算群组没有也给他；「禁止」就算群组有也拿掉。",
+        "state": { "byGroup": "群组给予", "allowed": "个人允许", "blocked": "已禁止", "none": "没有权限" },
+        "choice": { "group": "跟随群组", "allow": "允许", "deny": "禁止" }
+      },
       "addTitle": "新增用户",
       "editTitle": "编辑用户",
       "edit": "编辑",

@@ -85,7 +85,7 @@ window.GW = (function () {
     if (profile.must_change_password) return go("login.html?mode=change"), null;
     const isAdmin = profile.role === "super_admin" || profile.role === "admin";
     if ((need === "admin" && !isAdmin) || (need === "super" && profile.role !== "super_admin")) {
-      return go(need === "super" && isAdmin ? "admin.html?area=access" : "index.html"), null;
+      return go(need === "super" && isAdmin ? "admin.html" : "index.html"), null;
     }
     applyTheme(profile.theme);
     return profile;
@@ -113,8 +113,7 @@ window.GW = (function () {
     const items = [
       { href: "index.html", key: "home", label: t("nav.home"), icon: "house" },
       { href: "library.html", key: "library", label: t("nav.library"), icon: "library" },
-      ...(isAdmin ? [{ href: "admin.html?area=access", key: "admin", label: t("nav.admin"), icon: "shield-check" }] : []),
-      { href: "settings.html", key: "settings", label: t("nav.settings"), icon: "settings" },
+      { href: "settings.html", key: "settings", label: t("nav.settings"), icon: "user-round" },
     ];
     const header = document.createElement("div");
     header.innerHTML = `
@@ -133,6 +132,13 @@ window.GW = (function () {
               .join("")}
           </nav>
           <div class="ml-auto flex items-center gap-3">
+            ${
+              isAdmin
+                ? `<a href="admin.html" title="${esc(t("nav.admin"))}" aria-label="${esc(t("nav.admin"))}" class="rounded-lg p-2 ${
+                    active === "admin" ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+                  }">${icon("settings", "size-5")}</a>`
+                : ""
+            }
             <div class="hidden text-right leading-tight md:block">
               <div class="text-sm font-medium">${esc(profile.full_name)}</div>
               <div class="text-xs text-slate-500">${esc(profile.email)}</div>
