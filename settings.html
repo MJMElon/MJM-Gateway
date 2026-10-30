@@ -15,8 +15,6 @@
   const profile = await GW.requireProfile("user");
   if (!profile) return;
   const main = GW.shell(profile, "settings");
-  const LOCALES = ["zh-CN", "en", "ms"];
-  const AVAILABLE = Object.keys(window.GW_LANG);
   const save = (patch) => sb.from("gw_profiles").update(patch).eq("id", profile.id);
 
   main.innerHTML = `<div class="mx-auto max-w-2xl space-y-5">
@@ -24,12 +22,6 @@
     <div class="${cls.card} space-y-5 p-5">
       <h2 class="font-semibold">${esc(t("settings.preferences"))}</h2>
       <div id="done"></div>
-      <label class="block space-y-1.5">
-        <span class="${cls.label}">${esc(t("settings.language"))}</span>
-        <select id="locale" class="${cls.input}">
-          ${LOCALES.map((l) => `<option value="${l}" ${GW.LOCALE === l ? "selected" : ""} ${AVAILABLE.includes(l) ? "" : "disabled"}>${esc(t("settings.locales." + l))}${AVAILABLE.includes(l) ? "" : ` (${esc(t("settings.comingSoon"))})`}</option>`).join("")}
-        </select>
-      </label>
       <div>
         <p class="mb-1.5 ${cls.label}">${esc(t("settings.theme"))}</p>
         <div class="grid grid-cols-3 gap-2" id="themes">
@@ -76,11 +68,6 @@
     GW.applyTheme(theme);
     paintThemes();
     save({ theme });
-  });
-  document.getElementById("locale").addEventListener("change", async (e) => {
-    GW.setLocale(e.target.value);
-    await save({ locale: e.target.value });
-    location.reload();
   });
   document.getElementById("reset").addEventListener("click", async () => {
     const ok = await GW.confirmDialog(t("settings.resetHome"), t("settings.resetHomeConfirm"), t("settings.confirm"), t("settings.cancel"));

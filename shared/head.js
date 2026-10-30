@@ -16,7 +16,6 @@
     "https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js",
     base + "shared/config.js",
     base + "lang/en.js",
-    base + "lang/zh-CN.js",
     base + "shared/core.js",
   ];
   const theme = `

@@ -13,16 +13,8 @@ window.GW = (function () {
   });
 
   // ---------------------------------------------------------------- 多语言
-  // 预设英文；个人设置可改语言（存在这台装置）
-  const LOCALE = (() => {
-    try {
-      const saved = localStorage.getItem("gw_locale");
-      if (saved && window.GW_LANG[saved]) return saved;
-    } catch (e) {
-      /* 忽略 */
-    }
-    return "en";
-  })();
+  // 系统只用英文（中文文字档保留在 lang/zh-CN.js，之后要开放再加回语言选项）
+  const LOCALE = "en";
   const LANG = window.GW_LANG[LOCALE];
   document.documentElement.lang = LOCALE;
 
