@@ -30,35 +30,30 @@
 
   // 小工具资料表还没建立（资料库尚未更新）时，主画面照常运作，只是不能加小工具
   let widgets = widgetRes.error ? null : widgetRes.data;
-  // 预设小工具：Notice Board（公告栏），放在最上面，每位用户加一次
+  // Notice Board（公告栏）：每个人都一定有一个，固定在最上面
   const notice = { widget_type: "announcements", size: "large", sort_order: -1, user_id: profile.id, config: {} };
-  const seededKey = "gw_widgets_seeded_" + profile.id;
   // 旧版预设的 Greeting / Search 换成 Notice Board（每人一次）
   const noticeKey = "gw_widgets_notice_" + profile.id;
-  const flag = (k) => {
-    try {
-      return !!localStorage.getItem(k);
-    } catch (e) {
-      return false;
-    }
-  };
-  if (widgets && widgets.length === 0 && (firstVisit || !flag(seededKey))) {
-    const res = await GW.sb.from("gw_user_widgets").insert(notice).select();
-    if (!res.error) widgets = res.data;
-  } else if (widgets && !flag(noticeKey)) {
-    const old = widgets.filter((w) => w.widget_type === "greeting" || w.widget_type === "search").map((w) => w.id);
-    if (old.length) await GW.sb.from("gw_user_widgets").delete().in("id", old);
-    widgets = widgets.filter((w) => !old.includes(w.id));
-    if (!widgets.some((w) => w.widget_type === "announcements")) {
+  let cleaned = false;
+  try {
+    cleaned = !!localStorage.getItem(noticeKey);
+  } catch (e) {
+    /* 忽略 */
+  }
+  if (widgets) {
+    const boards = widgets.filter((w) => w.widget_type === "announcements");
+    const drop = [...(cleaned ? [] : widgets.filter((w) => w.widget_type === "greeting" || w.widget_type === "search")), ...boards.slice(1)].map((w) => w.id);
+    if (drop.length) await GW.sb.from("gw_user_widgets").delete().in("id", drop);
+    widgets = widgets.filter((w) => !drop.includes(w.id));
+    if (!boards.length) {
       const res = await GW.sb.from("gw_user_widgets").insert(notice).select();
       if (!res.error) widgets = [...res.data, ...widgets];
     }
-  }
-  try {
-    localStorage.setItem(seededKey, "1");
-    if (widgets) localStorage.setItem(noticeKey, "1");
-  } catch (e) {
-    /* 忽略 */
+    try {
+      localStorage.setItem(noticeKey, "1");
+    } catch (e) {
+      /* 忽略 */
+    }
   }
 
   // 公告要显示发布日期（gw_get_home 没有日期），直接读公告表；RLS 只给看得到的，再按生效时间筛

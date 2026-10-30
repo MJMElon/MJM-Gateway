@@ -271,6 +271,8 @@ window.GW_LANG["en"] = {
     accessTitle: "User Access",
     groupAccess: "User Access",
     groupMaster: "Master Data",
+    "pageTitle": "User Setting",
+    "backToPortal": "Back to Portal",
     superTitle: "Super Admin",
     superDescription: "Place people into businesses and companies, and set up the master data: businesses, companies, apps, departments and announcements.",
     roleSuper: "Super admin: manage every user, group and module.",

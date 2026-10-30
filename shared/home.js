@@ -27,7 +27,8 @@ window.GWHome = (function () {
     clock: { sizes: ["small", "medium"], icon: "clock" },
     search: { sizes: ["medium"], icon: "search" },
     recent: { sizes: ["small", "medium"], icon: "history" },
-    announcements: { sizes: ["medium", "large"], icon: "megaphone" },
+    // Notice Board：固定在最上面，只能调大小，不能移动、不能删除，也不能再加第二个
+    announcements: { sizes: ["medium", "large"], icon: "megaphone", hidden: true, pinned: true },
     calendar: { sizes: ["small", "medium"], icon: "calendar" },
     notes: { sizes: ["small", "medium", "large"], icon: "sticky-note" },
     // 管理入口已改为右上角齿轮；旧的管理小工具仍照常显示，但不再提供新增
@@ -59,12 +60,14 @@ window.GWHome = (function () {
     let clockTimer = null;
 
     // ------------------------------------------------------------ 资料
+    const isPinned = (w) => !!(w && WIDGETS[w.widget_type] && WIDGETS[w.widget_type].pinned);
     function rootItems() {
       const items = [];
       layout.forEach((l, id) => modules.has(id) && !l.folder_id && items.push({ kind: "app", id, order: l.sort_order }));
       folders.forEach((f) => items.push({ kind: "folder", id: f.id, order: f.sort_order }));
       widgets.forEach((w) => items.push({ kind: "widget", id: w.id, order: w.sort_order }));
-      return items.sort((a, b) => a.order - b.order);
+      const pinned = (i) => (i.kind === "widget" && isPinned(widgets.find((w) => w.id === i.id)) ? 0 : 1);
+      return items.sort((a, b) => pinned(a) - pinned(b) || a.order - b.order);
     }
     const folderApps = (fid) =>
       [...layout.entries()]
@@ -155,6 +158,7 @@ window.GWHome = (function () {
     }
 
     async function removeWidget(id) {
+      if (isPinned(widgets.find((w) => w.id === id))) return;
       widgets = widgets.filter((w) => w.id !== id);
       draw();
       await sb.from("gw_user_widgets").delete().eq("id", id);
@@ -288,9 +292,10 @@ window.GWHome = (function () {
     }
 
     function widgetTile(w) {
-      return `<div data-kind="widget" data-id="${w.id}" class="gw-item relative ${SPAN[w.size]}">
+      const pinned = isPinned(w);
+      return `<div data-kind="widget" data-id="${w.id}" class="${pinned ? "gw-pinned" : "gw-item"} relative ${SPAN[w.size]}">
         <div class="${glass}">${widgetBody(w)}</div>
-        ${editing ? badge(`data-remove-widget="${w.id}"`, "minus", t("widgets.remove"), "-top-2 -left-2") : ""}
+        ${editing && !pinned ? badge(`data-remove-widget="${w.id}"`, "minus", t("widgets.remove"), "-top-2 -left-2") : ""}
         ${editing && WIDGETS[w.widget_type].sizes.length > 1 ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
       </div>`;
     }
@@ -420,8 +425,10 @@ window.GWHome = (function () {
           animation: 180,
           delay: 250,
           delayOnTouchOnly: true,
-          filter: ".no-drag",
+          filter: ".no-drag, .gw-pinned",
           preventOnFilter: false,
+          // 不能把东西放到 Notice Board 前面
+          onMove: (evt) => !(evt.related.classList.contains("gw-pinned") && !evt.willInsertAfter),
           onStart: start,
           onAdd: (evt) => {
             // 从「Add Apps」面板拖进来

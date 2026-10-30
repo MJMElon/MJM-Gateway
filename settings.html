@@ -89,7 +89,6 @@
     await sb.from("gw_user_widgets").delete().eq("user_id", profile.id);
     await sb.rpc("gw_reset_layout");
     try {
-      localStorage.removeItem("gw_widgets_seeded_" + profile.id);
       localStorage.removeItem("gw_home_filled_" + profile.id);
     } catch (e) {
       /* 忽略 */

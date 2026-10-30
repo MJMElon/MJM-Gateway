@@ -271,6 +271,8 @@ window.GW_LANG["zh-CN"] = {
     "accessTitle": "User Access",
     "groupAccess": "User Access",
     "groupMaster": "Master Data",
+    "pageTitle": "User Setting",
+    "backToPortal": "返回 Portal",
     "superTitle": "Super Admin",
     "superDescription": "把人放进 Business 和 Company，并设定主资料：Business、Company、App、部门和公告。",
     "roleSuper": "超级管理员：可管理全部用户、群组和模块。",

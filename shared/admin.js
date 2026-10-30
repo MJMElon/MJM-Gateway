@@ -23,13 +23,12 @@
   const TABS = SECTIONS.flatMap(([, , tabs]) => tabs);
 
   main.innerHTML = `<div class="space-y-5">
-    <div>
-      <a href="index.html" class="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">${icon("arrow-left")} ${esc(t("nav.home"))}</a>
-      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t(isSuper ? "admin.superTitle" : "admin.accessTitle"))}</h1>
-      <p class="mt-1 text-sm text-slate-500">${esc(isSuper ? t("admin.superDescription") : t("admin.roleAdmin"))}</p>
+    <div class="relative flex min-h-10 flex-col items-center gap-2 sm:flex-row sm:justify-center">
+      <a href="index.html" class="inline-flex self-start sm:absolute sm:left-0 sm:self-auto items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">${icon("arrow-left")} ${esc(t("admin.backToPortal"))}</a>
+      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t("admin.pageTitle"))}</h1>
     </div>
-    <div id="sections" class="grid gap-2 sm:flex"></div>
-    <div class="-mx-4 overflow-x-auto px-4">
+    <div id="sections" class="grid gap-2 sm:flex sm:justify-center"></div>
+    <div class="-mx-4 overflow-x-auto px-4 sm:text-center">
       <nav id="tabs" class="inline-flex min-w-max gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800"></nav>
     </div>
     <div id="msg"></div>
