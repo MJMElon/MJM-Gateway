@@ -280,7 +280,7 @@
       canReport ? loadCardData(month + "-01") : Promise.resolve({ usage: [] }),
       isAdmin ? loadPeople() : Promise.resolve([]),
       isAdmin ? sb.from("gw_groups").select("id, name").order("name").then((r) => r.data || []) : Promise.resolve([]),
-      isAdmin ? sb.from("gw_companies").select("id, group_id, name").order("name").then((r) => r.data || []) : Promise.resolve([]),
+      isAdmin ? sb.from("gw_companies").select("id, code, name").eq("is_active", true).order("name").then((r) => r.data || []) : Promise.resolve([]),
     ]);
     if (stale(seq)) return;
     const person = new Map(people.map((p) => [p.id, p]));

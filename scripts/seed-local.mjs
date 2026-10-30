@@ -82,7 +82,30 @@ await must(
     ].map(([g, e]) => ({ group_id: grp[g], user_id: ids[e] })),
   ),
 );
-// 每个 Business 有哪些模块
+// Company：独立主资料，可以属于多个 Business；对应到现有系统
+const companies = await must(
+  db
+    .from("gw_companies")
+    .upsert(
+      [
+        { code: "MJMP", name: "MJM Plantation Sdn Bhd", short_name: "MJM Plantation", sort_order: 1 },
+        { code: "MJMA", name: "MJM Agro Sdn Bhd", short_name: "MJM Agro", sort_order: 2 },
+      ],
+      { onConflict: "code" },
+    )
+    .select(),
+);
+const co = Object.fromEntries(companies.map((c) => [c.code, c.id]));
+await must(
+  db.from("gw_business_companies").upsert(
+    [
+      ["全体员工", "MJMP"],
+      ["全体员工", "MJMA"],
+      ["总部车队", "MJMP"],
+    ].map(([g, c]) => ({ group_id: grp[g], company_id: co[c] })),
+  ),
+);
+// 每个 Business 有哪些 Icon（Business 标签）
 await must(
   db.from("gw_group_modules").upsert(
     [
@@ -125,6 +148,9 @@ await must(
     ["WIKI", "HR"].map((m) => ({ role_id: hrRole.id, group_id: grp["全体员工"], module_id: mod[m] })),
   ),
 );
+await must(db.from("gw_company_mappings").upsert({ company_id: co.MJMP, module_id: mod.MACHINERY, external_id: "12", external_name: "MJM PLANTATION" }, { onConflict: "module_id,external_id" }));
+await must(db.from("gw_module_companies").upsert({ module_id: mod.MACHINERY, company_id: co.MJMP }));
+
 // Diesel 模块（migration 已建立 DIESEL 模块）：放进「总部车队」；车队组长是 Admin，陈司机、新同事有 Access
 // 模块里的 User Access：陈司机可以现金报销
 const [diesel] = await must(db.from("gw_modules").select("id").eq("code", "DIESEL"));

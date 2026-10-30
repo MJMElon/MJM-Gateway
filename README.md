@@ -34,7 +34,11 @@ docs/                    目标系统接入说明、上线步骤
 
 ## 权限模型
 
-- **Business**（`gw_groups`）底下有模块（`gw_group_modules`）和 Company（`gw_companies`）
+- **Icon**（`gw_modules`，以前叫「模块」）：`kind` = `system`（MJM Connect 旗下的系统，例如 Diesel）或 `link`（现有系统、任何外部网站）
+  - 标签：Business（`gw_group_modules`）＋ Company（`gw_module_companies`）
+- **Company**（`gw_companies`）是独立主资料：固定的代码（`code`）、简称、注册号码；可以属于多个 Business（`gw_business_companies`）
+  - 对应到现有系统：`gw_company_mappings`（Company × 系统 Icon → 那个系统里的 ID / 名称），之后资料对接用
+- **Business**（`gw_groups`）底下有 Icon 和 Company
 - 用户放进 Business 后「有机会」用它的模块，但一开始看不到；要逐个模块打开（`gw_module_members`）
   - **有效权限** = 开给他的模块 ∩ 他所属 Business 的模块
   - 每个模块对每个人两个勾：**Access**（可以用）、**Admin**（模块管理员，一定也有 Access）

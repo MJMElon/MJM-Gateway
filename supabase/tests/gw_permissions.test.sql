@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(74);
+select plan(83);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -348,20 +348,46 @@ select is((select count(*) from public.gw_user_widgets)::int, 0, '重设首页�
 select pg_temp.logout();
 
 -- ---------------------------------------------------------------------
--- 8. Business → Company
+-- 8. Company：独立主资料，可以属于多个 Business；对应到现有系统；Icon 标签
 -- ---------------------------------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
 select lives_ok(
-  $$ insert into public.gw_companies (id, group_id, name) values
-       ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'MJM Plantation Sdn Bhd'),
-       ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000c1', 'MJM Agro Sdn Bhd'),
-       ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000c2', 'Fleet Co') $$,
+  $$ insert into public.gw_companies (id, code, name) values
+       ('00000000-0000-0000-0000-0000000000e1', 'MJMP', 'MJM Plantation Sdn Bhd'),
+       ('00000000-0000-0000-0000-0000000000e3', 'MJMA', 'MJM Agro Sdn Bhd'),
+       ('00000000-0000-0000-0000-0000000000e2', 'FLEET', 'Fleet Co') $$,
   'super_admin 可以新增 Company'
+);
+select lives_ok(
+  $$ insert into public.gw_business_companies (group_id, company_id) values
+       ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000e1'),
+       ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000e3'),
+       ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000e2'),
+       ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000e1') $$,
+  '同一个 Company 可以属于多个 Business'
+);
+select throws_ok(
+  $$ insert into public.gw_companies (code, name) values ('bad code', 'Bad') $$,
+  '23514', null, 'Company 代码格式要对（大写英文数字）'
 );
 select throws_ok(
   $$ update public.gw_group_members set company_id = '00000000-0000-0000-0000-0000000000e2'
      where group_id = '00000000-0000-0000-0000-0000000000c1' and user_id = '00000000-0000-0000-0000-0000000000a4' $$,
-  '23503', null, '不能放进别的 Business 的 Company'
+  '23503', null, '不能放进没有连结到这个 Business 的 Company'
+);
+select lives_ok(
+  $$ insert into public.gw_company_mappings (company_id, module_id, external_id, external_name) values
+       ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b2', '12', 'MJM PLANTATION') $$,
+  'super_admin 可以设定 Company 在现有系统的对应'
+);
+select throws_ok(
+  $$ insert into public.gw_company_mappings (company_id, module_id, external_id) values
+       ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000b2', '12') $$,
+  '23505', null, '同一个系统的同一个 ID 不能对应到两个 Company'
+);
+select lives_ok(
+  $$ insert into public.gw_module_companies (module_id, company_id) values ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000e1') $$,
+  'super_admin 可以给 Icon 加 Company 标签'
 );
 select pg_temp.logout();
 
@@ -372,19 +398,29 @@ select lives_ok(
   'HR 可以在自己管的 Business 里换 Company'
 );
 select throws_ok(
-  $$ insert into public.gw_companies (group_id, name) values ('00000000-0000-0000-0000-0000000000c1', 'X') $$,
+  $$ insert into public.gw_companies (code, name) values ('XX', 'X') $$,
   '42501', null, '角色不能新增 Company'
 );
-select is((select count(*) from public.gw_companies)::int, 2, 'HR 只看到自己管的 Business 的 Company');
+select throws_ok(
+  $$ insert into public.gw_business_companies (group_id, company_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000e2') $$,
+  '42501', null, '角色不能改 Company 属于哪个 Business'
+);
+select is((select count(*) from public.gw_company_mappings)::int, 1, '有管理权的人看得到系统对应');
+select pg_temp.logout();
+
+select pg_temp.login('00000000-0000-0000-0000-0000000000a6');
+select is((select count(*) from public.gw_company_mappings)::int, 0, '一般用户看不到系统对应');
 select pg_temp.logout();
 
 select pg_temp.login('00000000-0000-0000-0000-0000000000a4');
+select is((select count(*) from public.gw_companies)::int, 3, '所有人都看得到 Company 主资料');
+select is((select count(*) from public.gw_module_companies)::int, 1, '看得到自己能用的 Icon 的 Company 标签');
 update public.gw_group_members set company_id = null where user_id = '00000000-0000-0000-0000-0000000000a4';
 select is((select company_id from public.gw_group_members where user_id = '00000000-0000-0000-0000-0000000000a4'), '00000000-0000-0000-0000-0000000000e3'::uuid, '一般用户不能改自己的 Company');
 select pg_temp.logout();
 
-delete from public.gw_companies where id = '00000000-0000-0000-0000-0000000000e3';
-select is((select company_id from public.gw_group_members where user_id = '00000000-0000-0000-0000-0000000000a4'), null, '删掉 Company 后成员还在 Business 里');
+delete from public.gw_business_companies where group_id = '00000000-0000-0000-0000-0000000000c1' and company_id = '00000000-0000-0000-0000-0000000000e3';
+select is((select company_id from public.gw_group_members where user_id = '00000000-0000-0000-0000-0000000000a4'), null, 'Company 从 Business 拿掉后，成员还在 Business 里');
 
 select * from finish();
 rollback;

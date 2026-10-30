@@ -16,8 +16,8 @@
 -- =====================================================================
 
 -- Gateway 上的模块入口（同一个网站里的页面，同一个分页打开）
-insert into public.gw_modules (code, name, icon, url, description, category, access_level, open_mode, sort_order)
-values ('DIESEL', 'Diesel Claims', 'fuel', 'diesel/index.html', 'Vehicles, fuel use and diesel receipt claims', 'Fleet', 1, 'same_tab', 10)
+insert into public.gw_modules (code, name, icon, url, description, category, access_level, open_mode, sort_order, kind)
+values ('DIESEL', 'Diesel Claims', 'fuel', 'diesel/index.html', 'Vehicles, fuel use and diesel receipt claims', 'Fleet', 1, 'same_tab', 10, 'system')
 on conflict (code) do nothing;
 
 -- ---------------------------------------------------------------------
