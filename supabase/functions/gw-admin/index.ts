@@ -1,26 +1,24 @@
 // 后台管理动作（需要 service_role 的部分）：建立用户、批量导入、停用/启用、重设密码、产生模块 API Key
-// 每个动作都先以调用者身份检查权限；写入 gw_profiles / gw_group_members 时也用调用者身份，RLS 再检查一次
+// 只有 super_admin 可以用；写入 gw_profiles / gw_group_members 时用调用者身份，RLS 再检查一次
 import { corsHeaders, generatePassword, getCaller, json, logEvent, serviceClient, sha256Hex } from "../_shared/gw.ts";
 
-type Role = "super_admin" | "admin" | "user";
+type Role = "super_admin" | "user";
 type Caller = NonNullable<Awaited<ReturnType<typeof getCaller>>>;
-type CreateInput = { email: string; full_name: string; department_id: string | null; role?: Role; group_ids?: string[] };
+// role_id = 自订角色（只在 role = user 时有意义）
+type CreateInput = { email: string; full_name: string; role?: Role; role_id?: string | null; group_ids?: string[] };
 type CreateResult = { ok: true; email: string; password?: string; linked?: boolean } | { ok: false; email: string; error: string };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ROLES: Role[] = ["super_admin", "admin", "user"];
+const ROLES: Role[] = ["super_admin", "user"];
 
 async function createUser(caller: Caller, input: CreateInput): Promise<CreateResult> {
   const email = String(input.email ?? "").trim().toLowerCase();
   const fullName = String(input.full_name ?? "").trim();
   const role: Role = ROLES.includes(input.role as Role) ? (input.role as Role) : "user";
+  const roleId = role === "user" && input.role_id ? String(input.role_id) : null;
   const groupIds = Array.isArray(input.group_ids) ? input.group_ids : [];
   if (!EMAIL.test(email) || !fullName || fullName.length > 100) return { ok: false, email, error: "invalid_input" };
-
   const me = caller.profile;
-  if (me.role === "admin" && (role !== "user" || input.department_id !== me.department_id)) {
-    return { ok: false, email, error: "forbidden" };
-  }
 
   const admin = serviceClient();
   const { data: existing } = await admin.from("gw_profiles").select("id").ilike("email", email).maybeSingle();
@@ -44,8 +42,8 @@ async function createUser(caller: Caller, input: CreateInput): Promise<CreateRes
     id: userId,
     email,
     full_name: fullName,
-    department_id: input.department_id,
     role,
+    role_id: roleId,
     must_change_password: !linked,
   });
   if (profileError) {
@@ -65,7 +63,7 @@ Deno.serve(async (req) => {
 
   const caller = await getCaller(req);
   const me = caller?.profile;
-  if (!caller || !me || me.status !== "active" || (me.role !== "super_admin" && me.role !== "admin")) {
+  if (!caller || !me || me.status !== "active" || me.role !== "super_admin") {
     return json({ ok: false, error: "forbidden" }, 403);
   }
   const body = await req.json().catch(() => ({}));
@@ -75,24 +73,25 @@ Deno.serve(async (req) => {
     case "create_user":
       return json(await createUser(caller, body.user ?? {}));
 
-    // 批量导入：rows = [{ email, full_name, department_code, groups: [群组名称], role }]
+    // 批量导入：rows = [{ email, full_name, groups: [Business 名称], role: 角色名称 | "Super Admin" | 空白 }]
     case "import_users": {
       const rows = Array.isArray(body.rows) ? body.rows : [];
       if (rows.length > 500) return json({ results: [], error: "too_many" });
-      const [{ data: departments }, { data: groups }] = await Promise.all([
-        caller.supabase.from("gw_departments").select("id, code"),
+      const [{ data: roles }, { data: groups }] = await Promise.all([
+        caller.supabase.from("gw_roles").select("id, name"),
         caller.supabase.from("gw_groups").select("id, name"),
       ]);
-      const deptByCode = new Map((departments ?? []).map((d) => [String(d.code).toUpperCase(), d.id]));
+      const roleByName = new Map((roles ?? []).map((r) => [String(r.name).trim().toLowerCase(), r.id]));
       const groupByName = new Map((groups ?? []).map((g) => [String(g.name).trim(), g.id]));
       const results: CreateResult[] = [];
       for (const row of rows) {
         const email = String(row.email ?? "").trim();
         if (!email) continue;
-        const code = String(row.department_code ?? "").trim().toUpperCase();
-        const departmentId = code ? deptByCode.get(code) : me.role === "admin" ? me.department_id : null;
-        if (code && !departmentId) {
-          results.push({ ok: false, email, error: "unknown_department" });
+        const roleText = String(row.role ?? "").trim().toLowerCase().replace(/[\s_-]+/g, " ");
+        const isSuper = roleText === "super admin";
+        const roleId = roleText && !isSuper && roleText !== "user" ? roleByName.get(String(row.role).trim().toLowerCase()) : null;
+        if (roleText && !isSuper && roleText !== "user" && !roleId) {
+          results.push({ ok: false, email, error: "unknown_role" });
           continue;
         }
         const names: string[] = Array.isArray(row.groups) ? row.groups : [];
@@ -105,8 +104,8 @@ Deno.serve(async (req) => {
           await createUser(caller, {
             email,
             full_name: String(row.full_name ?? "").trim() || email,
-            department_id: departmentId ?? null,
-            role: (String(row.role ?? "").trim() || "user") as Role,
+            role: isSuper ? "super_admin" : "user",
+            role_id: roleId ?? null,
             group_ids: groupIds as string[],
           }),
         );

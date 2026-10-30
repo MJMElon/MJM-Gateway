@@ -16,17 +16,16 @@ async function must(promise) {
   return data;
 }
 
-const departments = await must(
-  db.from("gw_departments").upsert([{ code: "HQ", name: "总部" }, { code: "OPS", name: "营运部" }], { onConflict: "code" }).select(),
-);
-const dept = Object.fromEntries(departments.map((d) => [d.code, d.id]));
+// 角色 HR：负责「全体员工」和「总部车队」，在「全体员工」负责 WIKI、HR 的权限，可以发公告
+const [hrRole] = await must(db.from("gw_roles").upsert([{ name: "HR", description: "人事", can_post_notice: true }], { onConflict: "name" }).select());
 
 const people = [
-  { email: "super@mjm.local", full_name: "超级管理员", role: "super_admin", department_id: null, must_change_password: false },
-  { email: "admin.hq@mjm.local", full_name: "总部管理员", role: "admin", department_id: dept.HQ, must_change_password: false },
-  { email: "driver@mjm.local", full_name: "陈司机", role: "user", department_id: dept.HQ, must_change_password: false },
-  { email: "ops@mjm.local", full_name: "林营运", role: "user", department_id: dept.OPS, must_change_password: false },
-  { email: "new@mjm.local", full_name: "新同事", role: "user", department_id: dept.HQ, must_change_password: true },
+  { email: "super@mjm.local", full_name: "超级管理员", role: "super_admin", role_id: null, must_change_password: false },
+  { email: "admin.hq@mjm.local", full_name: "总部管理员", role: "user", role_id: hrRole.id, must_change_password: false },
+  { email: "driver@mjm.local", full_name: "陈司机", role: "user", role_id: null, must_change_password: false },
+  { email: "ops@mjm.local", full_name: "林营运", role: "user", role_id: null, must_change_password: false },
+  { email: "new@mjm.local", full_name: "新同事", role: "user", role_id: null, must_change_password: true },
+  { email: "fleet.lead@mjm.local", full_name: "车队组长", role: "user", role_id: null, must_change_password: false },
 ];
 const ids = {};
 for (const p of people) {
@@ -42,11 +41,11 @@ const modules = await must(
     .from("gw_modules")
     .upsert(
       [
-        { code: "DIESEL-HQ", name: "HQ 车辆 Diesel", icon: "fuel", url: "https://example.com/diesel", description: "总部车辆加油与耗油监控", category: "车队", access_level: 2, department_id: dept.HQ, sort_order: 1 },
+        { code: "DIESEL-HQ", name: "HQ 车辆 Diesel", icon: "fuel", url: "https://example.com/diesel", description: "总部车辆加油与耗油监控", category: "车队", access_level: 2, sort_order: 1 },
         { code: "MACHINERY", name: "机械工时", icon: "tractor", url: "https://example.com/machinery", description: "机械工作时数与维修记录", category: "机械", access_level: 1, sort_order: 2 },
         { code: "WIKI", name: "公司知识库", icon: "book-open", url: "https://example.com/wiki", description: "制度、表格与常见问题", category: "一般", access_level: 1, sort_order: 3 },
         { code: "HR", name: "人事请假", icon: "calendar", url: "https://example.com/hr", description: "请假与出勤", category: "一般", access_level: 1, sort_order: 4 },
-        { code: "OPS-REPORT", name: "营运日报", icon: "chart", url: "https://example.com/ops", description: "每日营运数据", category: "营运", access_level: 1, department_id: dept.OPS, sort_order: 5 },
+        { code: "OPS-REPORT", name: "营运日报", icon: "chart", url: "https://example.com/ops", description: "每日营运数据", category: "营运", access_level: 1, sort_order: 5 },
       ],
       { onConflict: "code" },
     )
@@ -60,8 +59,8 @@ const groups = await must(
     .upsert(
       [
         { name: "全体员工", description: "公司所有员工", sort_order: 1 },
-        { name: "总部车队", description: "总部司机与车队", department_id: dept.HQ, sort_order: 2 },
-        { name: "营运团队", department_id: dept.OPS, sort_order: 3 },
+        { name: "总部车队", description: "总部司机与车队", sort_order: 2 },
+        { name: "营运团队", sort_order: 3 },
       ],
       { onConflict: "name" },
     )
@@ -79,9 +78,11 @@ await must(
       ["总部车队", "driver@mjm.local"],
       ["总部车队", "new@mjm.local"],
       ["营运团队", "ops@mjm.local"],
+      ["总部车队", "fleet.lead@mjm.local"],
     ].map(([g, e]) => ({ group_id: grp[g], user_id: ids[e] })),
   ),
 );
+// 每个 Business 有哪些模块
 await must(
   db.from("gw_group_modules").upsert(
     [
@@ -91,6 +92,37 @@ await must(
       ["总部车队", "MACHINERY"],
       ["营运团队", "OPS-REPORT"],
     ].map(([g, m]) => ({ group_id: grp[g], module_id: mod[m] })),
+  ),
+);
+// 逐个开给人；车队组长是 HQ 车辆 Diesel 的模块管理员
+await must(
+  db.from("gw_module_members").upsert(
+    [
+      ["admin.hq@mjm.local", "WIKI"],
+      ["admin.hq@mjm.local", "HR"],
+      ["driver@mjm.local", "WIKI"],
+      ["driver@mjm.local", "HR"],
+      ["driver@mjm.local", "DIESEL-HQ"],
+      ["driver@mjm.local", "MACHINERY"],
+      ["ops@mjm.local", "WIKI"],
+      ["ops@mjm.local", "HR"],
+      ["ops@mjm.local", "OPS-REPORT"],
+      ["new@mjm.local", "WIKI"],
+      ["new@mjm.local", "HR"],
+      ["new@mjm.local", "DIESEL-HQ"],
+      ["new@mjm.local", "MACHINERY"],
+      ["fleet.lead@mjm.local", "DIESEL-HQ", true],
+    ].map(([e, m, admin]) => ({ user_id: ids[e], module_id: mod[m], is_admin: !!admin })),
+  ),
+);
+await must(
+  db.from("gw_role_businesses").upsert(
+    ["全体员工", "总部车队"].map((g) => ({ role_id: hrRole.id, group_id: grp[g] })),
+  ),
+);
+await must(
+  db.from("gw_role_modules").upsert(
+    ["WIKI", "HR"].map((m) => ({ role_id: hrRole.id, group_id: grp["全体员工"], module_id: mod[m] })),
   ),
 );
 await must(db.from("gw_announcements").insert({ message: "欢迎使用 MJM Gateway！所有公司系统都可以从这里打开。", level: "info" }));

@@ -41,7 +41,8 @@ window.GWHome = (function () {
     const readOnly = !!(opts && opts.readOnly);
     const profile = (opts && opts.profile) || data.profile;
     const isSuper = profile.role === "super_admin";
-    const isAdmin = isSuper || profile.role === "admin";
+    const isAdmin = isSuper || !!profile.manages;
+    const canPost = isSuper || !!profile.canPost;
     const widgetsEnabled = !!(opts && Array.isArray(opts.widgets));
     const uninitialized = readOnly && !data.profile.layout_initialized;
 
@@ -252,7 +253,7 @@ window.GWHome = (function () {
           const when = (d) => (d ? new Intl.DateTimeFormat(GW.LOCALE, { day: "numeric", month: "short" }).format(new Date(d)) : "");
           return `<div class="mb-2 flex items-center justify-between gap-2">
               <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-100">${icon("megaphone", "size-4 text-brand-600 dark:text-brand-400")}${esc(t("widgets.types.announcements"))}</div>
-              ${isAdmin && !readOnly && !editing ? `<button type="button" data-post class="no-drag flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900">${icon("plus", "size-3.5")}${esc(t("widgets.post"))}</button>` : ""}
+              ${canPost && !readOnly && !editing ? `<button type="button" data-post class="no-drag flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900">${icon("plus", "size-3.5")}${esc(t("widgets.post"))}</button>` : ""}
             </div>
             ${
               data.announcements.length
@@ -531,15 +532,23 @@ window.GWHome = (function () {
       });
     }
 
-    // 管理员在 Notice Board 直接发布公告（super_admin 发给全公司；部门管理员发给自己的部门）
-    function postNotice() {
+    // 在 Notice Board 直接发布公告：super_admin 可发全公司或某个 Business；角色只能发给自己管的 Business
+    async function postNotice() {
+      const { data: groups } = await sb.from("gw_groups").select("id, name").order("sort_order").order("name");
+      const targets = [
+        ...(isSuper ? [["", t("widgets.postEveryone")]] : []),
+        ...(groups || []).filter((g) => isSuper || (profile.businessIds || []).includes(g.id)).map((g) => [g.id, g.name]),
+      ];
+      if (!targets.length) return toast(t("widgets.postFailed"));
       const dlg = modal(
         t("widgets.postTitle"),
         `<form class="space-y-4">
           <div data-err></div>
           <textarea name="message" required maxlength="500" rows="4" placeholder="${esc(t("widgets.postPlaceholder"))}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900"></textarea>
+          <label class="block space-y-1.5"><span class="${cls.label}">${esc(t("widgets.postAudience"))}</span>
+            <select name="group_id" class="${cls.input}">${targets.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>
+          </label>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="important" class="size-4 accent-amber-500"> ${esc(t("widgets.postImportant"))}</label>
-          <p class="text-xs text-slate-500">${esc(isSuper ? t("widgets.postAudienceAll") : t("widgets.postAudienceDept"))}</p>
           <div class="flex justify-end gap-2">
             <button type="button" data-cancel class="${btn("secondary")}">${esc(t("settings.cancel"))}</button>
             <button type="submit" class="${btn("primary")}">${esc(t("widgets.post"))}</button>
@@ -550,20 +559,19 @@ window.GWHome = (function () {
       $("form", dlg.el).addEventListener("submit", async (e) => {
         e.preventDefault();
         const f = e.target;
+        const groupId = f.group_id.value || null;
         const { data: row, error } = await sb
           .from("gw_announcements")
-          .insert({
-            message: f.message.value.trim(),
-            level: f.important.checked ? "warning" : "info",
-            department_id: isSuper ? null : profile.department_id,
-            created_by: profile.id,
-          })
+          .insert({ message: f.message.value.trim(), level: f.important.checked ? "warning" : "info", group_id: groupId, created_by: profile.id })
           .select("id, message, level, starts_at")
           .single();
         if (error) return ($("[data-err]", dlg.el).innerHTML = GW.alertBox(t("widgets.postFailed")));
         dlg.close();
-        data.announcements = [row, ...data.announcements];
-        draw();
+        // 发给自己不在的 Business 时，自己的公告栏不会显示，只提示已发布
+        if (!groupId || (opts && opts.memberOf && opts.memberOf.includes(groupId))) {
+          data.announcements = [row, ...data.announcements];
+          draw();
+        }
         toast(t("widgets.posted"));
       });
     }

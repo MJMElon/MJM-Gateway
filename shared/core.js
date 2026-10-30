@@ -70,11 +70,35 @@ window.GW = (function () {
     const session = data.session;
     if (!session) return { session: null, profile: null };
     const { data: profile } = await sb.from("gw_profiles").select("*").eq("id", session.user.id).maybeSingle();
+    if (profile) {
+      // 自订角色：管哪些 Business、能不能发公告（RLS 只给看自己的角色）
+      profile.isSuper = profile.role === "super_admin";
+      profile.roleName = null;
+      profile.canPost = profile.isSuper;
+      profile.businessIds = [];
+      profile.adminModules = 0;
+      if (!profile.isSuper) {
+        // 模块管理员：可以开 / 收回自己管理的模块的权限
+        const { count } = await sb.from("gw_module_members").select("module_id", { count: "exact", head: true }).eq("user_id", profile.id).eq("is_admin", true);
+        profile.adminModules = count || 0;
+      }
+      if (!profile.isSuper && profile.role_id) {
+        const [{ data: role }, { data: biz }] = await Promise.all([
+          sb.from("gw_roles").select("name, can_post_notice").eq("id", profile.role_id).maybeSingle(),
+          sb.from("gw_role_businesses").select("group_id").eq("role_id", profile.role_id),
+        ]);
+        profile.roleName = role ? role.name : null;
+        profile.canPost = !!(role && role.can_post_notice);
+        profile.businessIds = (biz || []).map((b) => b.group_id);
+      }
+      // 有管理权（super_admin、角色管至少一个 Business、或是某个模块的管理员）→ 右上角齿轮进设置页
+      profile.manages = profile.isSuper || profile.businessIds.length > 0 || profile.adminModules > 0;
+    }
     return { session, profile };
   }
 
   /* 页面保护：未登录 → 登录页；没有 Gateway 资料或已停用 → 登录页；
-     未改初始密码 → 改密码；权限不足 → 首页。need = "user" | "admin" | "super" */
+     未改初始密码 → 改密码；权限不足 → 首页。need = "user" | "manage"（super_admin 或有管理权的角色）| "super" */
   async function requireProfile(need) {
     const { session, profile } = await loadProfile();
     if (!session) return go("login.html"), null;
@@ -83,9 +107,8 @@ window.GW = (function () {
       return go("login.html?error=no_access"), null;
     }
     if (profile.must_change_password) return go("login.html?mode=change"), null;
-    const isAdmin = profile.role === "super_admin" || profile.role === "admin";
-    if ((need === "admin" && !isAdmin) || (need === "super" && profile.role !== "super_admin")) {
-      return go(need === "super" && isAdmin ? "admin.html" : "index.html"), null;
+    if ((need === "manage" && !profile.manages) || (need === "super" && !profile.isSuper)) {
+      return go(need === "super" && profile.manages ? "admin.html" : "index.html"), null;
     }
     applyTheme(profile.theme);
     return profile;
@@ -109,7 +132,7 @@ window.GW = (function () {
 
   // ---------------------------------------------------------------- 页面外框
   function shell(profile, active) {
-    const isAdmin = profile.role === "super_admin" || profile.role === "admin";
+    const isAdmin = profile.manages;
     const header = document.createElement("div");
     header.innerHTML = `
       <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">

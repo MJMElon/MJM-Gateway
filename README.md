@@ -16,7 +16,7 @@ index.html               主画面（像 iPhone）：App、小工具、文件夹
 login.html               登录封面（MJM 字标 assets/mjm-logo 落下，接着出现白色玻璃登录框）、忘记密码、改密码
 library.html             模块库
 settings.html            个人设置（语言、浅色/深色、重设首页、改密码）
-admin.html               设置页（右上角齿轮）：User Access（用户、个人 App 权限、权限矩阵）＋ Master Data（模块、User Group Manage：待分配名单拖进群组＋群组权限、部门、公告、操作记录，只限 super admin）
+admin.html               设置页（右上角齿轮）：User & Group Manage（全部用户、群组列表、模块权限）＋ Master Manage（角色、Business、Company、模块、公告、操作记录）
 shared/head.js           每页第一个载入：主题、Tailwind、共用函式库（版本在这里统一改）
 shared/config.js         Supabase 网址与 anon key
 shared/core.js           登录检查、页面外框、对话框、Edge Function 调用、Excel
@@ -32,15 +32,22 @@ docs/                    目标系统接入说明、上线步骤
 
 ## 权限模型
 
-- **有效权限** = 所属全部群组的模块 ∪ 个人允许 − 个人禁止（禁止优先）
+- **Business**（`gw_groups`）底下有模块（`gw_group_modules`）和 Company（`gw_companies`）
+- 用户放进 Business 后「有机会」用它的模块，但一开始看不到；要逐个模块打开（`gw_module_members`）
+  - **有效权限** = 开给他的模块 ∩ 他所属 Business 的模块
+  - 每个模块对每个人两个勾：**Access**（可以用）、**Admin**（模块管理员，一定也有 Access）
 - 帐号停用或模块下架 → 全部看不到；没有权限的模块连名字都不显示
 - 所有检查都在数据库 RLS / 函数里做；网页上的页面保护只负责导航，绕过前端也拿不到没权限的资料
 - **权限和版面分开存**：权限关掉的模块不显示，但 `gw_user_layout` 记录保留；权限开回来，原位置还在
-- 角色
-  - `super_admin`：管理所有用户、群组、模块、部门；看全部操作记录
-  - `admin`：只能管理本部门的一般用户，以及「本部门模块」（`gw_modules.department_id`）的权限；不能给自己加权限
-  - `user`：只能看到、打开有权限的模块，自己排首页
-- 操作记录 `gw_audit_logs` 由触发器自动写入，不能修改、不能删除（连 service_role 也不行）
+- 谁能管
+  - `super_admin`：全部（用户、角色、Business、Company、模块、公告、操作记录）
+  - **自订角色**（`gw_roles`，例如 HR）：super_admin 命名并设定
+    - 负责哪些 Business（`gw_role_businesses`）：可以把人放进 / 移出、换 Company
+    - 负责这些 Business 的哪些模块（`gw_role_modules`）：可以开 / 收回 Access，也可以指定模块 Admin
+    - 可否在 Notice Board 发公告（只给它负责的 Business 的人看）
+  - **模块 Admin**：可以把这个模块开给 / 收回同一个 Business 的人，但不能指定别人当 Admin
+  - 都不能改自己的权限，也不能动 super_admin
+- 操作记录 `gw_audit_logs` 由触发器自动写入，不能修改、不能删除（连 service_role 也不行）；只有 super_admin 看得到
 
 ## 本地开发
 

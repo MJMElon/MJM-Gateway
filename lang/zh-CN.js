@@ -154,69 +154,69 @@ window.GW_LANG["zh-CN"] = {
     "confirm": "确定重设"
   },
   "fab": {
-      "menu": "新增或编辑",
-      "addWidget": "Add Widget",
-      "addWidgetHint": "选一个小工具和大小，会加在主画面最后面，再拖到你想放的位置。",
-      "addApps": "Add Apps",
-      "addAppsHint": "你可以使用的全部系统。把图标拖到主画面上想放的位置，或点 + 加在最后面。",
-      "newFolder": "新建文件夹",
-      "edit": "编辑主画面",
-      "editHint": "拖拉可以重新排列；点 − 移除，点缩放按钮可改变小工具大小。",
-      "done": "完成",
-      "homeScreen": "主画面（不放文件夹）",
-      "moveOut": "移回主画面",
-      "emptyFolder": "这个文件夹是空的。在「编辑主画面」用 App 的 … 选单把它移进来。",
-      "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。"
+    "menu": "新增或编辑",
+    "addWidget": "Add Widget",
+    "addWidgetHint": "选一个小工具和大小，会加在主画面最后面，再拖到你想放的位置。",
+    "addApps": "Add Apps",
+    "addAppsHint": "你可以使用的全部系统。把图标拖到主画面上想放的位置，或点 + 加在最后面。",
+    "newFolder": "新建文件夹",
+    "edit": "编辑主画面",
+    "editHint": "拖拉可以重新排列；点 − 移除，点缩放按钮可改变小工具大小。",
+    "done": "完成",
+    "homeScreen": "主画面（不放文件夹）",
+    "moveOut": "移回主画面",
+    "emptyFolder": "这个文件夹是空的。在「编辑主画面」用 App 的 … 选单把它移进来。",
+    "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。"
+  },
+  "widgets": {
+    "unavailable": "小工具要等下次系统更新后才能使用。",
+    "added": "已新增小工具",
+    "remove": "移除小工具",
+    "resize": "改变大小",
+    "greeting": {
+      "morning": "早安，{name}",
+      "afternoon": "午安，{name}",
+      "evening": "晚安，{name}"
     },
-    "widgets": {
-      "unavailable": "小工具要等下次系统更新后才能使用。",
-      "added": "已新增小工具",
-      "remove": "移除小工具",
-      "resize": "改变大小",
-      "greeting": {
-        "morning": "早安，{name}",
-        "afternoon": "午安，{name}",
-        "evening": "晚安，{name}"
-      },
-      "appsOnHome": "主画面上有 {count} 个 App",
-      "noRecent": "打开过的 App 会出现在这里。",
-      "post": "发布",
-      "postTitle": "发布公告",
-      "postPlaceholder": "想让大家知道什么？",
-      "postImportant": "标记为重要",
-      "postAudienceAll": "全公司的人都会看到。",
-      "postAudienceDept": "你部门的人都会看到。",
-      "postFailed": "发布失败，请再试一次。",
-      "posted": "公告已发布",
-      "noAnnouncements": "目前没有公告。",
-      "notesPlaceholder": "写点什么…",
-      "adminOnly": "只有管理员可以使用。",
-      "types": {
-        "greeting": "问候",
-        "clock": "时钟",
-        "search": "搜索",
-        "recent": "最近打开",
-        "announcements": "公告栏",
-        "calendar": "月历",
-        "notes": "便条",
-        "admin": "管理"
-      },
-      "desc": {
-        "greeting": "问候语和今天日期",
-        "clock": "马来西亚目前时间",
-        "search": "快速找到任何 App",
-        "recent": "最近打开过的 App",
-        "announcements": "公司和部门公告",
-        "calendar": "这个月的月历",
-        "notes": "只有自己看得到的便条",
-        "admin": "User Access 和 Super Admin 捷径"
-      },
-      "sizes": {
-        "small": "小",
-        "medium": "中",
-        "large": "大"
-      }
+    "appsOnHome": "主画面上有 {count} 个 App",
+    "noRecent": "打开过的 App 会出现在这里。",
+    "post": "发布",
+    "postTitle": "发布公告",
+    "postPlaceholder": "想让大家知道什么？",
+    "postImportant": "标记为重要",
+    "postFailed": "发布失败，请再试一次。",
+    "posted": "公告已发布",
+    "noAnnouncements": "目前没有公告。",
+    "notesPlaceholder": "写点什么…",
+    "adminOnly": "只有管理员可以使用。",
+    "types": {
+      "greeting": "问候",
+      "clock": "时钟",
+      "search": "搜索",
+      "recent": "最近打开",
+      "announcements": "公告栏",
+      "calendar": "月历",
+      "notes": "便条",
+      "admin": "管理"
     },
+    "desc": {
+      "greeting": "问候语和今天日期",
+      "clock": "马来西亚目前时间",
+      "search": "快速找到任何 App",
+      "recent": "最近打开过的 App",
+      "announcements": "公司和部门公告",
+      "calendar": "这个月的月历",
+      "notes": "只有自己看得到的便条",
+      "admin": "User Access 和 Super Admin 捷径"
+    },
+    "sizes": {
+      "small": "小",
+      "medium": "中",
+      "large": "大"
+    },
+    "postAudience": "谁看得到",
+    "postEveryone": "全公司"
+  },
   "admin": {
     "sections": {
       "userGroup": "用户与群组管理",
@@ -224,7 +224,7 @@ window.GW_LANG["zh-CN"] = {
       "access": "User Access"
     },
     "business": {
-      "description": "Business 就是一群人。打开这个 Business 的人可以使用的 App；它底下的公司在 Company 设定。",
+      "description": "Business 就是一群人。勾选属于它的模块，之后再逐个把模块开给里面的人。",
       "add": "新增 Business",
       "addTitle": "新增 Business",
       "editTitle": "编辑 Business",
@@ -232,7 +232,7 @@ window.GW_LANG["zh-CN"] = {
       "deleteBody": "确定删除「{name}」？它底下的 Company 也会删掉，里面的人会失去从这里拿到的 App。",
       "empty": "还没有 Business，先新增一个。",
       "duplicate": "已经有同名的 Business。",
-      "access": "这个 Business 可以用的 App",
+      "access": "这个 Business 的模块",
       "counts": "{companies} 个 Company · {members} 人"
     },
     "company": {
@@ -265,49 +265,44 @@ window.GW_LANG["zh-CN"] = {
       "noCompany": "没有 Company",
       "noCompanies": "这个 Business 还没有 Company，请到这里新增：",
       "noBusiness": "还没有 Business，请先到这里设定：",
-      "appsCount": "{count} 个 App"
+      "appsCount": "{count} 个 App",
+      "apps": "模块权限"
     },
     "title": "权限后台",
-    "accessTitle": "User Access",
-    "groupAccess": "User Access",
-    "groupMaster": "Master Data",
     "pageTitle": "User Setting",
     "backToPortal": "返回 Portal",
-    "superTitle": "Super Admin",
-    "superDescription": "把人放进 Business 和 Company，并设定主资料：Business、Company、App、部门和公告。",
-    "roleSuper": "超级管理员：可管理全部用户、群组和模块。",
-    "roleAdmin": "部门管理员：可管理本部门的用户和本部门模块的权限。",
     "tabs": {
       "users": "全部用户",
       "groups": "群组列表",
-      "matrix": "权限矩阵",
       "business": "Business",
       "company": "Company",
       "modules": "模块",
-      "departments": "部门",
       "announcements": "公告",
-      "audit": "操作记录"
+      "audit": "操作记录",
+      "access": "模块权限",
+      "roles": "角色"
     },
     "users": {
       "search": "搜索姓名或 Email…",
-      "allDepartments": "全部部门",
       "allStatus": "全部状态",
       "status": {
         "active": "启用",
         "disabled": "已停用"
       },
       "roles": {
-        "super_admin": "超级管理员",
-        "admin": "部门管理员",
+        "super_admin": "Super Admin",
         "user": "一般用户"
       },
       "add": "新增用户",
-      "access": "Access",
+      "access": "模块权限",
       "accessDialog": {
-        "title": "App 权限 — {name}",
-        "hint": "「跟随群组」依这个人所属的群组决定；「允许」就算群组没有也给他；「禁止」就算群组有也拿掉。",
-        "state": { "byGroup": "群组给予", "allowed": "个人允许", "blocked": "已禁止", "none": "没有权限" },
-        "choice": { "group": "跟随群组", "allow": "允许", "deny": "禁止" }
+        "title": "模块权限 — {name}",
+        "hint": "Access = 可以打开这个模块。Admin = 这个模块的管理员，可以把 Access 开给 / 收回同一个 Business 的人。勾 Admin 一定同时有 Access。",
+        "admin": "这个模块的 Admin",
+        "access": "可以使用这个模块",
+        "noModules": "这个人所属的 Business 还没有模块。",
+        "noBusiness": "这个人还没放进任何 Business，请先放进 Business。",
+        "saveFailed": "无法储存，你可能没有管理这个模块的权限。"
       },
       "addTitle": "新增用户",
       "editTitle": "编辑用户",
@@ -318,12 +313,10 @@ window.GW_LANG["zh-CN"] = {
       "enable": "启用",
       "empty": "没有符合的用户。",
       "mustChange": "待改密码",
-      "noDepartment": "未指定部门",
       "name": "姓名",
-      "department": "部门",
       "role": "角色",
-      "groups": "群组",
-      "noGroups": "目前没有可指定的群组。",
+      "groups": "Business",
+      "noGroups": "还没有 Business，请到 Master Manage → Business 新增。",
       "passwordHint": "系统会产生临时密码；用户第一次登录时必须改密码。如果这个 Email 已有 Supabase 帐号，会直接连结，不会改动原本的密码。",
       "create": "建立",
       "save": "保存",
@@ -343,13 +336,13 @@ window.GW_LANG["zh-CN"] = {
         "forbidden": "你没有权限执行这个操作。",
         "exists": "这个 Email 已经是 Gateway 用户。",
         "auth_failed": "建立登录帐号失败。",
-        "unknown_department": "找不到部门代码。",
+        "unknown_role": "找不到这个角色名称。",
         "unknown_group": "找不到群组名称。"
       },
       "import": {
         "button": "Excel 导入",
         "title": "Excel 批量导入用户",
-        "description": "第一行是标题。栏位顺序：email、姓名、部门代码、群组（多个用逗号分隔）、角色（可空，默认一般用户）。一次最多 500 人。",
+        "description": "第一行是标题。栏位：email、姓名、Business（逗号分隔）、角色（角色名称或 Super Admin；空白 = 一般用户）。一次最多 500 人。",
         "template": "下载范本",
         "submit": "开始导入",
         "importing": "导入中…",
@@ -357,15 +350,16 @@ window.GW_LANG["zh-CN"] = {
         "passwordWarning": "临时密码只会出现在导出的结果档里，请下载后妥善保管并发给用户。",
         "downloadResult": "下载结果（含临时密码）",
         "colName": "姓名",
-        "colDepartment": "部门代码",
-        "colGroups": "群组",
+        "colGroups": "Business",
         "colRole": "角色",
         "errors": {
           "no_file": "请选择档案。",
           "bad_file": "无法读取档案，请使用 .xlsx 格式。",
           "too_many": "一次最多导入 500 人。"
         }
-      }
+      },
+      "allRoles": "全部角色",
+      "roleHint": "角色在 Master Manage → 角色 设定。一般用户没有管理权。"
     },
     "groups": {
       "description": "群组决定一群人能用哪些模块。",
@@ -377,33 +371,11 @@ window.GW_LANG["zh-CN"] = {
       "deleteTitle": "删除群组",
       "deleteBody": "确定删除「{name}」吗？群组成员会失去经由这个群组取得的权限。",
       "empty": "还没有群组。",
-      "companyWide": "全公司",
       "counts": "{members} 位成员 · {modules} 个模块",
       "name": "名称",
       "descriptionLabel": "说明",
-      "department": "所属部门",
-      "departmentHint": "指定部门后，该部门的管理员可以管理这个群组的成员和本部门模块。",
       "sortOrder": "排序",
       "duplicate": "群组名称已存在。",
-      "saveFailed": "保存失败。",
-      "cancel": "取消",
-      "save": "保存"
-    },
-    "departments": {
-      "description": "部门管理员只能管理自己部门的用户和模块。",
-      "add": "新增部门",
-      "addTitle": "新增部门",
-      "editTitle": "编辑部门",
-      "edit": "编辑",
-      "delete": "删除",
-      "deleteTitle": "删除部门",
-      "deleteBody": "确定删除「{name}」吗？属于这个部门的用户、群组和模块会变成未指定部门。",
-      "empty": "还没有部门。",
-      "code": "代码",
-      "codeHint": "大写英文、数字、- 或 _，例如 HQ。",
-      "name": "名称",
-      "duplicate": "部门代码已存在。",
-      "badCode": "代码格式不对。",
       "saveFailed": "保存失败。",
       "cancel": "取消",
       "save": "保存"
@@ -430,9 +402,6 @@ window.GW_LANG["zh-CN"] = {
       "url": "网址",
       "descriptionLabel": "一行说明",
       "category": "类别",
-      "department": "所属部门",
-      "departmentHint": "该部门的管理员可以开关这个模块的权限。",
-      "noDepartment": "无（只有超级管理员可授权）",
       "accessLevel": "接入级别",
       "openMode": "打开方式",
       "newTab": "新分页",
@@ -457,27 +426,6 @@ window.GW_LANG["zh-CN"] = {
       "done": "完成",
       "cancel": "取消",
       "save": "保存"
-    },
-    "matrix": {
-      "mode": {
-        "groups": "群组",
-        "users": "用户（个人例外）"
-      },
-      "search": {
-        "groups": "搜索群组…",
-        "users": "搜索用户…"
-      },
-      "allDepartments": "全部部门",
-      "module": "模块",
-      "legend": {
-        "group": "来自群组",
-        "allow": "个人允许",
-        "deny": "个人禁止",
-        "cycle": "点格子切换：跟随群组 → 个人允许 → 个人禁止"
-      },
-      "adminHint": "你只能开关本部门群组的本部门模块；自己所属的群组不能改（不能给自己加权限）。",
-      "empty": "没有可显示的资料。",
-      "saveFailed": "没有权限或保存失败。"
     },
     "preview": {
       "banner": "正在以 {name}（{email}）的身份预览首页（只读）",
@@ -524,14 +472,16 @@ window.GW_LANG["zh-CN"] = {
       "targets": {
         "auth": "登录 / 密码",
         "profiles": "用户",
-        "groups": "群组",
-        "group_members": "群组成员",
+        "groups": "Business",
+        "group_members": "Business 成员",
         "companies": "Company",
         "modules": "模块",
-        "group_modules": "群组权限",
-        "user_module_overrides": "个人例外",
-        "departments": "部门",
-        "announcements": "公告"
+        "group_modules": "Business 的模块",
+        "announcements": "公告",
+        "roles": "角色",
+        "role_businesses": "角色的 Business",
+        "role_modules": "角色的模块",
+        "module_members": "模块权限"
       },
       "filter": "筛选",
       "export": "导出 Excel",
@@ -545,6 +495,34 @@ window.GW_LANG["zh-CN"] = {
       "prev": "上一页",
       "next": "下一页",
       "page": "第 {page} / {pages} 页"
+    },
+    "access": {
+      "description": "每个模块列出它所属 Business 里的人。勾 Access 让他可以打开；勾 Admin 让他当这个模块的管理员。",
+      "counts": "{access} 人有 Access · {admins} 位 Admin",
+      "noPeople": "这个 Business 还没有人。",
+      "noMatch": "没有符合的人。",
+      "empty": "没有可以管理的模块。模块在 Master Manage → Business 加进 Business。"
+    },
+    "roles": {
+      "description": "自己命名角色并设定它能做什么。勾选它负责的 Business（可以把人放进去），再勾选每个 Business 里它负责开权限的模块。",
+      "add": "新增角色",
+      "addTitle": "新增角色",
+      "editTitle": "编辑角色",
+      "name": "角色名称",
+      "namePlaceholder": "例如 HR、Admin",
+      "canPost": "可发公告",
+      "canPostLabel": "可以在 Notice Board 发公告（给它负责的 Business 的人看）",
+      "scope": "Business 和模块",
+      "scopeHint": "勾 Business：可以把人放进 / 移出。勾模块：可以开 / 收回这个模块的 Access，也可以指定模块 Admin。",
+      "noModules": "这个 Business 还没有模块。",
+      "people": "{count} 人",
+      "manages": "负责开权限：{list}",
+      "placeOnly": "可以放人；没有负责的模块",
+      "noBusiness": "还没勾选 Business。",
+      "empty": "还没有角色，先新增一个，例如 HR。",
+      "deleteTitle": "删除角色",
+      "deleteBody": "确定删除「{name}」？有这个角色的人会变回一般用户。",
+      "duplicate": "已经有同名的角色。"
     }
   }
 };

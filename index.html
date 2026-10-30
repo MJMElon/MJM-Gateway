@@ -56,47 +56,23 @@
     }
   }
 
-  // 公告要显示发布日期（gw_get_home 没有日期），直接读公告表；RLS 只给看得到的，再按生效时间筛
-  const annRes = await GW.sb.from("gw_announcements").select("id, message, level, starts_at, ends_at, is_active, department_id").order("starts_at", { ascending: false });
-  if (!annRes.error) {
-    const now = Date.now();
-    data.announcements = annRes.data.filter(
-      (a) =>
-        a.is_active &&
-        new Date(a.starts_at).getTime() <= now &&
-        (!a.ends_at || new Date(a.ends_at).getTime() > now) &&
-        (!a.department_id || a.department_id === profile.department_id),
-    );
-  }
-
-  // 一般用户还没被分配到群组、也没有个人开放的 App：显示「等待分配」
-  const isAdmin = profile.role === "super_admin" || profile.role === "admin";
-  const pending = !isAdmin && !memberRes.error && (memberRes.data || []).length === 0 && data.modules.length === 0;
-  // 从「等待开通」变成有权限：主画面还是空的，就把有权限的 App 都放上去（每人一次）
-  const filledKey = "gw_home_filled_" + profile.id;
-  let filled = false;
-  try {
-    filled = !!localStorage.getItem(filledKey);
-  } catch (e) {
-    /* 忽略 */
-  }
-  if (!pending && !filled && data.layout.length === 0 && data.modules.length > 0) {
-    const items = data.modules.map((m, i) => ({ module_id: m.id, folder_id: null, sort_order: i + 1, card_size: "large" }));
+  // 还没被放进任何 Business、也没有管理权：显示「等待分配」
+  const memberOf = memberRes.error ? [] : (memberRes.data || []).map((m) => m.group_id);
+  const pending = !profile.manages && !memberRes.error && memberOf.length === 0 && data.modules.length === 0;
+  // 新开给他的 App（还没看过、也不在主画面上）：自动放到主画面最后面
+  const placed = new Set(data.layout.map((l) => l.module_id));
+  const fresh = data.modules.filter((m) => m.is_new && !placed.has(m.id));
+  if (!pending && fresh.length) {
+    const start = Math.max(0, ...data.layout.map((l) => l.sort_order));
+    const items = fresh.map((m, i) => ({ module_id: m.id, folder_id: null, sort_order: start + i + 1, card_size: "large" }));
     const { error: fillError } = await GW.sb.rpc("gw_save_layout", { p_items: items });
     if (!fillError) {
-      data.layout = items;
-      GW.sb.rpc("gw_mark_seen", { p_modules: data.modules.map((m) => m.id) });
-    }
-  }
-  if (data.layout.length > 0) {
-    try {
-      localStorage.setItem(filledKey, "1");
-    } catch (e) {
-      /* 忽略 */
+      data.layout = [...data.layout, ...items];
+      GW.sb.rpc("gw_mark_seen", { p_modules: fresh.map((m) => m.id) });
     }
   }
   main.innerHTML = '<div id="board" class="mx-auto max-w-5xl"></div>';
-  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending });
+  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending, memberOf });
 })();
 </script>
 </body>

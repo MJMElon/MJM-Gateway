@@ -31,7 +31,7 @@
 
    ```json
    { "allowed": true, "module_code": "DIESEL-HQ",
-     "user": { "id": "…", "email": "…", "full_name": "…", "gw_departments": { "code": "HQ", "name": "总部" } } }
+     "user": { "id": "…", "email": "…", "full_name": "…" } }
    ```
 
    - 每个 Token 只能兑换一次（第二次回 `409 token_already_used`）

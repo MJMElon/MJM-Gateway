@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
   const { data: profile } = await supabase
     .from("gw_profiles")
-    .select("id, email, full_name, gw_departments(code, name)")
+    .select("id, email, full_name")
     .eq("id", userId)
     .single();
   return json({ allowed: true, module_code: module.code, user: profile });
