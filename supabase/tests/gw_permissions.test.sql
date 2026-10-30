@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(41);
+select plan(49);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -224,6 +224,45 @@ select is((select count(*) from public.gw_user_widgets)::int, 1, '看不到别�
 select public.gw_reset_layout();
 select is((select count(*) from public.gw_user_widgets)::int, 0, '重设首页会清掉自己的小工具');
 select pg_temp.logout();
+
+-- ---------------------------------------------------------------------
+-- 7. Business → Company：只有 super_admin 能设定 Company；成员可以换到同一个 Business 的 Company
+-- ---------------------------------------------------------------------
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+select lives_ok(
+  $$ insert into public.gw_companies (id, group_id, name) values
+       ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'MJM Sdn Bhd'),
+       ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000c2', 'Fleet Co') $$,
+  'super_admin 可以新增 Company'
+);
+select lives_ok(
+  $$ update public.gw_group_members set company_id = '00000000-0000-0000-0000-0000000000e1'
+     where group_id = '00000000-0000-0000-0000-0000000000c1' and user_id = '00000000-0000-0000-0000-0000000000a4' $$,
+  'super_admin 可以把成员放进 Company'
+);
+select throws_ok(
+  $$ update public.gw_group_members set company_id = '00000000-0000-0000-0000-0000000000e2'
+     where group_id = '00000000-0000-0000-0000-0000000000c1' and user_id = '00000000-0000-0000-0000-0000000000a4' $$,
+  '23503', null, '不能放进别的 Business 的 Company'
+);
+select pg_temp.logout();
+
+select pg_temp.login('00000000-0000-0000-0000-0000000000a2');
+select throws_ok(
+  $$ insert into public.gw_companies (group_id, name) values ('00000000-0000-0000-0000-0000000000c2', 'X') $$,
+  '42501', null, '部门管理员不能新增 Company'
+);
+select is((select count(*) from public.gw_companies where group_id = '00000000-0000-0000-0000-0000000000c2')::int, 1, '部门管理员看得到自己部门 Business 的 Company');
+select pg_temp.logout();
+
+select pg_temp.login('00000000-0000-0000-0000-0000000000a4');
+select is((select count(*) from public.gw_companies)::int, 1, '一般用户只看得到自己所属 Business 的 Company');
+update public.gw_group_members set company_id = null where user_id = '00000000-0000-0000-0000-0000000000a4';
+select is((select company_id from public.gw_group_members where user_id = '00000000-0000-0000-0000-0000000000a4' and group_id = '00000000-0000-0000-0000-0000000000c1'), '00000000-0000-0000-0000-0000000000e1'::uuid, '一般用户不能改自己的 Company');
+select pg_temp.logout();
+
+delete from public.gw_companies where id = '00000000-0000-0000-0000-0000000000e1';
+select is((select company_id from public.gw_group_members where user_id = '00000000-0000-0000-0000-0000000000a4' and group_id = '00000000-0000-0000-0000-0000000000c1'), null, '删掉 Company 后成员还在 Business 里');
 
 select * from finish();
 rollback;
