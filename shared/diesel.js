@@ -1,7 +1,9 @@
 /* ================================================================
    MJM Connect — Diesel 模块（车辆、加油报销、收据）
-   分页：我的报销（所有有 Access 的人）、车辆、全部报销（审核）、统计（管理者）
-   权限都在数据库：diesel_can_use() = 有 DIESEL 的 Access；diesel_is_admin() = DIESEL 的 Admin / 负责的角色 / super_admin
+   权限两层（都在数据库检查）：
+     Gateway：DIESEL 的 Access = 可以进来；Admin（或负责的角色、super_admin）= 模块管理者
+     模块里的 User Access（diesel_user_access，管理者设定）：Cash Claim、Report
+   分页：我的报销（Cash Claim）、车辆、全部报销 / Fleet Card / User Access（管理者）、报表（Report）
    收据照片先在手机上压缩，再上传到私有 bucket diesel-receipts/<自己的 id>/
    ================================================================ */
 (async function () {
@@ -12,7 +14,12 @@
   const main = GW.shell(me, "diesel");
   main.innerHTML = GW.spinner();
 
-  const [{ data: canUse }, { data: isAdmin }] = await Promise.all([sb.rpc("diesel_can_use"), sb.rpc("diesel_is_admin")]);
+  const [{ data: canUse }, { data: isAdmin }, { data: canClaim }, { data: canReport }] = await Promise.all([
+    sb.rpc("diesel_can_use"),
+    sb.rpc("diesel_is_admin"),
+    sb.rpc("diesel_can_claim"),
+    sb.rpc("diesel_can_report"),
+  ]);
   if (!canUse) {
     main.innerHTML = `<div class="mx-auto mt-[12vh] max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
       <span class="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">${icon("lock", "size-7")}</span>
@@ -23,7 +30,7 @@
     return refreshIcons();
   }
 
-  const TABS = ["mine", "vehicles", ...(isAdmin ? ["claims", "summary"] : [])];
+  const TABS = [...(canClaim ? ["mine"] : []), "vehicles", ...(isAdmin ? ["claims", "cards"] : []), ...(canReport ? ["report"] : []), ...(isAdmin ? ["access"] : [])];
   const STATUS_TONE = { pending: "amber", approved: "green", rejected: "red", paid: "blue" };
   const money = (n) => "RM " + Number(n || 0).toLocaleString(GW.LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const num = (n, d = 1) => Number(n || 0).toLocaleString(GW.LOCALE, { maximumFractionDigits: d });
@@ -42,6 +49,7 @@
     <div class="-mx-4 overflow-x-auto px-4 sm:text-center">
       <nav id="tabs" class="inline-flex min-w-max gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800"></nav>
     </div>
+    ${!canClaim && !canReport ? `<div>${alertBox(td("noPagesYet"), "amber")}</div>` : ""}
     <div id="view"></div>
   </div>`;
   const view = $("#view");
@@ -62,9 +70,19 @@
     return data || [];
   }
   async function loadPeople() {
-    // 管理者看得到用户名单（Gateway 规则：有管理权就看得到）；一般用户只看得到自己
-    const { data } = await sb.from("gw_profiles").select("id, full_name, email").order("full_name");
+    // 在 Gateway 有 DIESEL Access 的人（只给 Report / 管理者）
+    const { data } = await sb.rpc("diesel_people");
     return data || [];
+  }
+  async function loadCardData(from) {
+    const usageQ = sb.from("diesel_card_usage").select("*").order("fill_date", { ascending: false });
+    const reloadQ = sb.from("diesel_card_reloads").select("*").order("reload_date", { ascending: false });
+    const [cards, usage, reloads] = await Promise.all([
+      sb.from("diesel_cards").select("*").order("card_no").then((r) => r.data || []),
+      (from ? usageQ.gte("fill_date", from) : usageQ).limit(5000).then((r) => r.data || []),
+      (from ? reloadQ.gte("reload_date", from) : reloadQ).limit(5000).then((r) => r.data || []),
+    ]);
+    return { cards, usage, reloads };
   }
   const vehicleLabel = (v) => (v ? v.plate_no + (v.name ? " · " + v.name : "") : "—");
 
@@ -256,9 +274,10 @@
   async function vehiclesTab() {
     const seq = routeSeq;
     const month = today().slice(0, 7);
-    const [vehicles, claims, people, groups, companies] = await Promise.all([
+    const [vehicles, claims, cardData, people, groups, companies] = await Promise.all([
       loadVehicles(),
-      isAdmin ? loadClaims({ from: month + "-01" }) : Promise.resolve([]),
+      canReport ? loadClaims({ from: month + "-01" }) : Promise.resolve([]),
+      canReport ? loadCardData(month + "-01") : Promise.resolve({ usage: [] }),
       isAdmin ? loadPeople() : Promise.resolve([]),
       isAdmin ? sb.from("gw_groups").select("id, name").order("name").then((r) => r.data || []) : Promise.resolve([]),
       isAdmin ? sb.from("gw_companies").select("id, group_id, name").order("name").then((r) => r.data || []) : Promise.resolve([]),
@@ -282,7 +301,8 @@
           list.length
             ? `<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">${list
                 .map((v) => {
-                  const mc = claims.filter((c) => c.vehicle_id === v.id && c.status !== "rejected");
+                  // 本月用油 = 现金报销（不算已拒绝）＋ 油卡加油
+                  const mc = [...claims.filter((c) => c.vehicle_id === v.id && c.status !== "rejected"), ...cardData.usage.filter((u) => u.vehicle_id === v.id)];
                   const drv = person.get(v.driver_id);
                   return `<div class="${cls.card} p-4 ${v.status === "inactive" ? "opacity-60" : ""}">
                     <div class="flex items-start gap-3">
@@ -295,11 +315,11 @@
                       ${isAdmin ? `<button data-edit="${v.id}" aria-label="${esc(td("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>` : ""}
                     </div>
                     ${
-                      isAdmin
+                      canReport
                         ? `<div class="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2 text-center dark:bg-white/5">
                             <div><div class="text-[11px] text-slate-500">${esc(td("thisMonth"))}</div><div class="text-sm font-semibold">${num(mc.reduce((s, c) => s + Number(c.litres), 0))} L</div></div>
                             <div><div class="text-[11px] text-slate-500">${esc(td("amount"))}</div><div class="text-sm font-semibold">${money(mc.reduce((s, c) => s + Number(c.amount), 0))}</div></div>
-                            <div><div class="text-[11px] text-slate-500">${esc(td("claimsCount"))}</div><div class="text-sm font-semibold">${mc.length}</div></div>
+                            <div><div class="text-[11px] text-slate-500">${esc(td("fills"))}</div><div class="text-sm font-semibold">${mc.length}</div></div>
                           </div>`
                         : ""
                     }
@@ -508,17 +528,260 @@
     draw();
   }
 
-  // ================================================================ 统计（每台车每月用油、花费、油耗）
-  async function summaryTab() {
+  // ================================================================ Fleet Card（管理者：油卡、充值、刷卡加油）
+  async function cardsTab() {
     const seq = routeSeq;
     let month = today().slice(0, 7);
-    const [vehicles, allClaims] = await Promise.all([loadVehicles(), loadClaims()]);
+    const [{ cards, usage, reloads }, vehicles, people] = await Promise.all([loadCardData(), loadVehicles(), loadPeople()]);
     if (stale(seq)) return;
-    const claims = allClaims.filter((c) => c.status !== "rejected");
+    const vById = new Map(vehicles.map((v) => [v.id, v]));
+    const person = new Map(people.map((p) => [p.id, p]));
+    const cardById = new Map(cards.map((c) => [c.id, c]));
+    const sum = (rows) => rows.reduce((s, r) => s + Number(r.amount), 0);
+    const balance = (cid) => sum(reloads.filter((r) => r.card_id === cid)) - sum(usage.filter((u) => u.card_id === cid));
+    const opt = (list, value, blank) => `${blank != null ? `<option value="">${esc(blank)}</option>` : ""}${list.map(([k, l]) => `<option value="${esc(k)}" ${k === value ? "selected" : ""}>${esc(l)}</option>`).join("")}`;
+    const STATUS = { active: "green", blocked: "amber", cancelled: "slate" };
 
-    // 油耗：同一台车按里程排序，两次加油之间的公里数 ÷ 后一次加的油
+    function draw() {
+      const mUsage = usage.filter((u) => u.fill_date.startsWith(month));
+      const mReloads = reloads.filter((r) => r.reload_date.startsWith(month));
+      const months = [...new Set([today().slice(0, 7), ...usage.map((u) => u.fill_date.slice(0, 7)), ...reloads.map((r) => r.reload_date.slice(0, 7))])].sort().reverse();
+      // 每个司机本月刷卡
+      const byDriver = new Map();
+      mUsage.forEach((u) => {
+        const k = u.driver_id || "";
+        const r = byDriver.get(k) || { litres: 0, amount: 0, count: 0 };
+        r.litres += Number(u.litres);
+        r.amount += Number(u.amount);
+        r.count++;
+        byDriver.set(k, r);
+      });
+      view.innerHTML = `<div class="space-y-5">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="w-40 shrink-0"><select id="c-month" class="${cls.input}">${months.map((m) => `<option ${m === month ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+          <div class="flex-1"></div>
+          <button id="card-add" class="${btn("secondary")}">${icon("credit-card")} ${esc(td("addCard"))}</button>
+          <button id="reload-add" class="${btn("secondary")}" ${cards.length ? "" : "disabled"}>${icon("wallet")} ${esc(td("addReload"))}</button>
+          <button id="usage-add" class="${btn("primary")}" ${cards.length ? "" : "disabled"}>${icon("fuel")} ${esc(td("addUsage"))}</button>
+        </div>
+
+        <section class="space-y-2">
+          <h3 class="font-semibold">${esc(td("cards"))}</h3>
+          ${
+            cards.length
+              ? `<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">${cards
+                  .map((c) => {
+                    const used = sum(mUsage.filter((u) => u.card_id === c.id));
+                    const over = c.monthly_limit && used > Number(c.monthly_limit);
+                    const pct = c.monthly_limit ? Math.min(100, Math.round((used / Number(c.monthly_limit)) * 100)) : 0;
+                    return `<div class="${cls.card} p-4">
+                      <div class="flex items-start gap-3">
+                        <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">${icon("credit-card", "size-5")}</span>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex flex-wrap items-center gap-2"><span class="font-semibold tracking-wide">${esc(c.card_no)}</span>${badge(td("cardStatus." + c.status), STATUS[c.status])}</div>
+                          <div class="text-sm text-slate-500">${esc([c.provider, c.vehicle_id ? vehicleLabel(vById.get(c.vehicle_id)) : td("noVehicleLinked")].filter(Boolean).join(" · "))}</div>
+                        </div>
+                        <button data-card="${c.id}" aria-label="${esc(td("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
+                      </div>
+                      <div class="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-2 text-center dark:bg-white/5">
+                        <div><div class="text-[11px] text-slate-500">${esc(td("balance"))}</div><div class="text-sm font-semibold ${balance(c.id) < 0 ? "text-red-600" : ""}">${money(balance(c.id))}</div></div>
+                        <div><div class="text-[11px] text-slate-500">${esc(td("usedThisMonth"))}</div><div class="text-sm font-semibold ${over ? "text-red-600" : ""}">${money(used)}${c.monthly_limit ? ` / ${money(c.monthly_limit)}` : ""}</div></div>
+                      </div>
+                      ${c.monthly_limit ? `<div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"><div class="h-full ${over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"}" style="width:${pct}%"></div></div>` : ""}
+                    </div>`;
+                  })
+                  .join("")}</div>`
+              : empty(td("noCards"))
+          }
+        </section>
+
+        <section class="space-y-2">
+          <h3 class="font-semibold">${esc(td("usageByDriver"))}</h3>
+          ${
+            byDriver.size
+              ? `<div class="${cls.card} divide-y divide-slate-100 dark:divide-slate-800">${[...byDriver.entries()]
+                  .sort((a, b) => b[1].amount - a[1].amount)
+                  .map(([k, r]) => `<div class="flex items-center gap-3 px-4 py-2.5 text-sm"><span class="min-w-0 flex-1 truncate font-medium">${esc(k && person.get(k) ? person.get(k).full_name : td("noDriverRecorded"))}</span><span class="text-slate-500">${esc(td("fillsCount", { count: r.count }))}</span><span class="w-20 text-right">${num(r.litres)} L</span><span class="w-28 text-right font-medium">${money(r.amount)}</span></div>`)
+                  .join("")}</div>`
+              : empty(td("noUsageMonth"))
+          }
+        </section>
+
+        <section class="space-y-2">
+          <h3 class="font-semibold">${esc(td("cardRecords"))}</h3>
+          ${
+            mUsage.length || mReloads.length
+              ? `<div class="${cls.card} divide-y divide-slate-100 dark:divide-slate-800">${[
+                  ...mUsage.map((u) => ({ kind: "usage", date: u.fill_date, row: u })),
+                  ...mReloads.map((r) => ({ kind: "reload", date: r.reload_date, row: r })),
+                ]
+                  .sort((a, b) => (a.date < b.date ? 1 : -1))
+                  .map(({ kind, row }) => {
+                    const c = cardById.get(row.card_id) || {};
+                    return kind === "usage"
+                      ? `<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm">
+                          ${badge(td("usage"), "blue")}<span class="text-slate-500">${esc(day(row.fill_date))}</span>
+                          <span class="font-medium">${esc(vehicleLabel(vById.get(row.vehicle_id)))}</span>
+                          <span class="text-slate-500">${esc([c.card_no, row.driver_id && person.get(row.driver_id) ? person.get(row.driver_id).full_name : null, row.odometer_km != null ? num(row.odometer_km, 0) + " km" : null, row.station].filter(Boolean).join(" · "))}</span>
+                          <span class="flex-1"></span><span>${num(row.litres, 2)} L</span><span class="w-24 text-right font-medium">${money(row.amount)}</span>
+                          <button data-del-usage="${row.id}" aria-label="${esc(td("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                        </div>`
+                      : `<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm">
+                          ${badge(td("reload"), "green")}<span class="text-slate-500">${esc(day(row.reload_date))}</span>
+                          <span class="font-medium">${esc(c.card_no || "")}</span><span class="text-slate-500">${esc(row.reference || "")}</span>
+                          <span class="flex-1"></span><span class="w-24 text-right font-medium text-emerald-600">+ ${money(row.amount)}</span>
+                          <button data-del-reload="${row.id}" aria-label="${esc(td("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                        </div>`;
+                  })
+                  .join("")}</div>`
+              : empty(td("noRecordsMonth"))
+          }
+        </section>
+      </div>`;
+      refreshIcons();
+      $("#c-month").onchange = (e) => ((month = e.target.value), draw());
+    }
+
+    function cardDialog(c) {
+      const x = c || { card_no: "", provider: "", vehicle_id: null, monthly_limit: "", status: "active", notes: "" };
+      const m = modal(
+        c ? td("editCard") : td("addCard"),
+        `<form class="space-y-4"><div data-err></div>
+          <div class="grid grid-cols-2 gap-3">
+            ${field(td("cardNo"), `<input name="card_no" required maxlength="40" value="${esc(x.card_no)}" class="${cls.input}">`)}
+            ${field(td("provider"), `<input name="provider" maxlength="40" value="${esc(x.provider || "")}" placeholder="Petronas / Shell" class="${cls.input}">`)}
+            ${field(td("monthlyLimit"), `<input name="monthly_limit" type="number" min="0" step="0.01" value="${esc(x.monthly_limit ?? "")}" placeholder="RM" class="${cls.input}">`)}
+            ${field(td("statusLabel"), `<select name="status" class="${cls.input}">${opt(["active", "blocked", "cancelled"].map((k) => [k, td("cardStatus." + k)]), x.status)}</select>`)}
+          </div>
+          ${field(td("linkedVehicle"), `<select name="vehicle_id" class="${cls.input}">${opt(vehicles.map((v) => [v.id, vehicleLabel(v)]), x.vehicle_id, td("noVehicleLinked"))}</select>`)}
+          ${field(td("notes"), `<input name="notes" value="${esc(x.notes || "")}" class="${cls.input}">`)}
+          <div class="flex justify-end gap-2"><button type="button" data-cancel class="${btn("secondary")}">${esc(td("cancel"))}</button><button type="submit" class="${btn("primary")}">${esc(td("save"))}</button></div>
+        </form>`,
+      );
+      $("[data-cancel]", m.el).onclick = m.close;
+      $("form", m.el).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const row = {
+          card_no: f.card_no.value.trim(),
+          provider: f.provider.value.trim() || null,
+          monthly_limit: f.monthly_limit.value === "" ? null : Number(f.monthly_limit.value),
+          status: f.status.value,
+          vehicle_id: f.vehicle_id.value || null,
+          notes: f.notes.value.trim() || null,
+        };
+        const { error } = c ? await sb.from("diesel_cards").update(row).eq("id", c.id) : await sb.from("diesel_cards").insert(row);
+        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(td(error.code === "23505" ? "duplicateCard" : "saveFailed")));
+        m.close();
+        cardsTab();
+      });
+    }
+
+    function reloadDialog() {
+      const m = modal(
+        td("addReload"),
+        `<form class="space-y-4"><div data-err></div>
+          ${field(td("card"), `<select name="card_id" required class="${cls.input}">${opt(cards.filter((c) => c.status !== "cancelled").map((c) => [c.id, c.card_no]), "")}</select>`)}
+          <div class="grid grid-cols-2 gap-3">
+            ${field(td("fillDate"), `<input name="reload_date" type="date" required max="${today()}" value="${today()}" class="${cls.input}">`)}
+            ${field(td("amount"), `<input name="amount" type="number" min="0.01" step="0.01" required class="${cls.input}">`)}
+          </div>
+          ${field(td("reference"), `<input name="reference" maxlength="80" class="${cls.input}">`)}
+          <div class="flex justify-end gap-2"><button type="button" data-cancel class="${btn("secondary")}">${esc(td("cancel"))}</button><button type="submit" class="${btn("primary")}">${esc(td("save"))}</button></div>
+        </form>`,
+      );
+      $("[data-cancel]", m.el).onclick = m.close;
+      $("form", m.el).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const { error } = await sb.from("diesel_card_reloads").insert({ card_id: f.card_id.value, reload_date: f.reload_date.value, amount: Number(f.amount.value), reference: f.reference.value.trim() || null });
+        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(td("saveFailed")));
+        m.close();
+        toast(td("saved"));
+        cardsTab();
+      });
+    }
+
+    function usageDialog() {
+      const active = cards.filter((c) => c.status === "active");
+      const m = modal(
+        td("addUsage"),
+        `<form class="space-y-4"><div data-err></div>
+          ${field(td("card"), `<select name="card_id" required class="${cls.input}">${opt(active.map((c) => [c.id, c.card_no + (c.vehicle_id ? " · " + vehicleLabel(vById.get(c.vehicle_id)) : "")]), "")}</select>`)}
+          ${field(td("vehicle"), `<select name="vehicle_id" required class="${cls.input}">${opt(vehicles.filter((v) => v.status === "active").map((v) => [v.id, vehicleLabel(v)]), active[0] && active[0].vehicle_id)}</select>`)}
+          ${field(td("driverCol"), `<select name="driver_id" class="${cls.input}">${opt(people.map((p) => [p.id, p.full_name + " · " + p.email]), "", td("noDriverRecorded"))}</select>`)}
+          <div class="grid grid-cols-2 gap-3">
+            ${field(td("fillDate"), `<input name="fill_date" type="date" required max="${today()}" value="${today()}" class="${cls.input}">`)}
+            ${field(td("odometer"), `<input name="odometer_km" type="number" min="0" step="1" class="${cls.input}">`)}
+            ${field(td("litres"), `<input name="litres" type="number" min="0.01" step="0.01" required class="${cls.input}">`)}
+            ${field(td("amount"), `<input name="amount" type="number" min="0" step="0.01" required class="${cls.input}">`)}
+          </div>
+          ${field(td("station"), `<input name="station" maxlength="120" class="${cls.input}">`)}
+          <div class="flex justify-end gap-2"><button type="button" data-cancel class="${btn("secondary")}">${esc(td("cancel"))}</button><button type="submit" class="${btn("primary")}">${esc(td("save"))}</button></div>
+        </form>`,
+      );
+      const f = $("form", m.el);
+      // 选油卡时，车辆自动跳到这张卡绑定的车
+      f.card_id.addEventListener("change", () => {
+        const c = cardById.get(f.card_id.value);
+        if (c && c.vehicle_id) f.vehicle_id.value = c.vehicle_id;
+      });
+      $("[data-cancel]", m.el).onclick = m.close;
+      f.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const row = {
+          card_id: f.card_id.value,
+          vehicle_id: f.vehicle_id.value,
+          driver_id: f.driver_id.value || null,
+          fill_date: f.fill_date.value,
+          odometer_km: f.odometer_km.value === "" ? null : Number(f.odometer_km.value),
+          litres: Number(f.litres.value),
+          amount: Number(f.amount.value),
+          station: f.station.value.trim() || null,
+        };
+        const c = cardById.get(row.card_id);
+        if (c && c.vehicle_id && c.vehicle_id !== row.vehicle_id && !(await confirmDialog(td("otherVehicleTitle"), td("otherVehicleBody"), td("submitAnyway"), td("cancel")))) return;
+        const { error } = await sb.from("diesel_card_usage").insert(row);
+        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(td("saveFailed")));
+        m.close();
+        toast(td("saved"));
+        cardsTab();
+      });
+    }
+
+    view.onclick = async (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.id === "card-add") return cardDialog(null);
+      if (b.id === "reload-add") return reloadDialog();
+      if (b.id === "usage-add") return usageDialog();
+      if (b.dataset.card) return cardDialog(cardById.get(b.dataset.card));
+      const table = b.dataset.delUsage ? "diesel_card_usage" : b.dataset.delReload ? "diesel_card_reloads" : null;
+      if (!table) return;
+      if (!(await confirmDialog(td("deleteRecordTitle"), td("deleteRecordBody"), td("delete"), td("cancel")))) return;
+      const { error } = await sb.from(table).delete().eq("id", b.dataset.delUsage || b.dataset.delReload);
+      if (error) return toast(td("saveFailed"));
+      cardsTab();
+    };
+    draw();
+  }
+
+  // ================================================================ 报表（现金报销 ＋ 油卡，按车辆、按司机）
+  async function reportTab() {
+    const seq = routeSeq;
+    let month = today().slice(0, 7);
+    const [vehicles, allClaims, cardData, people] = await Promise.all([loadVehicles(), loadClaims(), loadCardData(), loadPeople()]);
+    if (stale(seq)) return;
+    const person = new Map(people.map((p) => [p.id, p]));
+    // 统一成一份加油记录：source = cash（不算已拒绝）/ card
+    const fills = [
+      ...allClaims.filter((c) => c.status !== "rejected").map((c) => ({ ...c, source: "cash", driver: c.claimant_id })),
+      ...cardData.usage.map((u) => ({ ...u, source: "card", driver: u.driver_id })),
+    ];
+
+    // 油耗：同一台车按里程排序，两次加油之间的公里数 ÷ 后一次加的油（现金、油卡都算）
     function efficiency(vid, monthPrefix) {
-      const rows = claims.filter((c) => c.vehicle_id === vid && c.odometer_km != null).sort((a, b) => a.odometer_km - b.odometer_km);
+      const rows = fills.filter((c) => c.vehicle_id === vid && c.odometer_km != null).sort((a, b) => a.odometer_km - b.odometer_km);
       let km = 0, litres = 0;
       for (let i = 1; i < rows.length; i++) {
         if (!rows[i].fill_date.startsWith(monthPrefix)) continue;
@@ -527,72 +790,172 @@
       }
       return { km, kmPerL: litres > 0 ? km / litres : null };
     }
+    const tot = (rows, k) => rows.reduce((s, r) => s + Number(r[k]), 0);
 
     function draw() {
-      const inMonth = claims.filter((c) => c.fill_date.startsWith(month));
+      const inMonth = fills.filter((c) => c.fill_date.startsWith(month));
       const per = vehicles
         .map((v) => {
           const rows = inMonth.filter((c) => c.vehicle_id === v.id);
-          const litres = rows.reduce((s, c) => s + Number(c.litres), 0);
-          const amount = rows.reduce((s, c) => s + Number(c.amount), 0);
-          const eff = efficiency(v.id, month);
+          const cash = rows.filter((r) => r.source === "cash");
+          const card = rows.filter((r) => r.source === "card");
           const overTank = v.tank_capacity_l ? rows.filter((c) => Number(c.litres) > Number(v.tank_capacity_l)).length : 0;
-          return { v, count: rows.length, litres, amount, ...eff, overTank };
+          return { v, count: rows.length, cashL: tot(cash, "litres"), cashRM: tot(cash, "amount"), cardL: tot(card, "litres"), cardRM: tot(card, "amount"), litres: tot(rows, "litres"), amount: tot(rows, "amount"), ...efficiency(v.id, month), overTank };
         })
         .filter((r) => r.count > 0)
         .sort((a, b) => b.amount - a.amount);
-      const total = (k) => per.reduce((s, r) => s + r[k], 0);
-      const months = [...new Set([today().slice(0, 7), ...claims.map((c) => c.fill_date.slice(0, 7))])].sort().reverse();
-      view.innerHTML = `<div class="space-y-4">
-        <div class="flex items-center gap-2">
+      const drivers = new Map();
+      inMonth.forEach((r) => {
+        const k = r.driver || "";
+        const d = drivers.get(k) || { cashL: 0, cashRM: 0, cardL: 0, cardRM: 0 };
+        if (r.source === "cash") ((d.cashL += Number(r.litres)), (d.cashRM += Number(r.amount)));
+        else ((d.cardL += Number(r.litres)), (d.cardRM += Number(r.amount)));
+        drivers.set(k, d);
+      });
+      const months = [...new Set([today().slice(0, 7), ...fills.map((c) => c.fill_date.slice(0, 7))])].sort().reverse();
+      const th = (k, right) => `<th class="p-3 font-medium ${right ? "text-right" : ""}">${esc(td(k))}</th>`;
+      const td_ = (v, right) => `<td class="p-3 ${right ? "text-right" : ""}">${v}</td>`;
+      view.innerHTML = `<div class="space-y-5">
+        <div class="flex flex-wrap items-center gap-2">
           <div class="w-40 shrink-0"><select id="s-month" class="${cls.input}">${months.map((m) => `<option ${m === month ? "selected" : ""}>${m}</option>`).join("")}</select></div>
-          <span class="text-sm text-slate-500">${esc(td("summaryHint"))}</span>
+          <span class="flex-1 text-sm text-slate-500">${esc(td("summaryHint"))}</span>
+          <button id="r-export" class="${btn("secondary")}">${icon("download")} ${esc(td("export"))}</button>
         </div>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
           ${[
-            [td("claimsCount"), total("count")],
-            [td("litres"), num(total("litres")) + " L"],
-            [td("amount"), money(total("amount"))],
-            [td("avgPrice"), total("litres") ? money(total("amount") / total("litres")) + " / L" : "—"],
+            [td("totalLitres"), num(tot(inMonth, "litres")) + " L"],
+            [td("totalAmount"), money(tot(inMonth, "amount"))],
+            [td("cashClaims"), money(tot(inMonth.filter((r) => r.source === "cash"), "amount"))],
+            [td("fleetCard"), money(tot(inMonth.filter((r) => r.source === "card"), "amount"))],
           ]
             .map(([k, v]) => `<div class="${cls.card} p-3"><div class="text-xs text-slate-500">${esc(k)}</div><div class="mt-1 text-lg font-semibold">${esc(String(v))}</div></div>`)
             .join("")}
         </div>
-        ${
-          per.length
-            ? `<div class="${cls.card} overflow-x-auto">
-                <table class="w-full min-w-[640px] text-sm">
+        <section class="space-y-2">
+          <h3 class="font-semibold">${esc(td("byVehicle"))}</h3>
+          ${
+            per.length
+              ? `<div class="${cls.card} overflow-x-auto"><table class="w-full min-w-[820px] text-sm">
                   <thead><tr class="border-b border-slate-200 text-left text-xs text-slate-500 dark:border-slate-800">
-                    <th class="p-3 font-medium">${esc(td("vehicle"))}</th><th class="p-3 text-right font-medium">${esc(td("claimsCount"))}</th>
-                    <th class="p-3 text-right font-medium">${esc(td("litres"))}</th><th class="p-3 text-right font-medium">${esc(td("amount"))}</th>
-                    <th class="p-3 text-right font-medium">${esc(td("distance"))}</th><th class="p-3 text-right font-medium">${esc(td("kmPerL"))}</th><th class="p-3 font-medium">${esc(td("flags"))}</th>
+                    ${th("vehicle")}${th("cashClaims", 1)}${th("fleetCard", 1)}${th("totalLitres", 1)}${th("totalAmount", 1)}${th("distance", 1)}${th("kmPerL", 1)}${th("flags")}
                   </tr></thead>
                   <tbody class="divide-y divide-slate-100 dark:divide-slate-800">${per
                     .map(
                       (r) => `<tr>
-                        <td class="p-3"><span class="font-medium">${esc(r.v.plate_no)}</span><span class="text-slate-500">${r.v.name ? " · " + esc(r.v.name) : ""}</span></td>
-                        <td class="p-3 text-right">${r.count}</td>
-                        <td class="p-3 text-right">${num(r.litres)}</td>
-                        <td class="p-3 text-right">${money(r.amount)}</td>
-                        <td class="p-3 text-right">${r.km ? num(r.km, 0) + " km" : "—"}</td>
-                        <td class="p-3 text-right">${r.kmPerL ? num(r.kmPerL, 2) : "—"}</td>
-                        <td class="p-3">${r.overTank ? badge(td("flagOverTank", { count: r.overTank }), "red") : ""}</td>
+                        ${td_(`<span class="font-medium">${esc(r.v.plate_no)}</span><span class="text-slate-500">${r.v.name ? " · " + esc(r.v.name) : ""}</span>`)}
+                        ${td_(r.cashL ? `${num(r.cashL)} L · ${money(r.cashRM)}` : "—", 1)}
+                        ${td_(r.cardL ? `${num(r.cardL)} L · ${money(r.cardRM)}` : "—", 1)}
+                        ${td_(num(r.litres) + " L", 1)}
+                        ${td_(`<span class="font-medium">${money(r.amount)}</span>`, 1)}
+                        ${td_(r.km ? num(r.km, 0) + " km" : "—", 1)}
+                        ${td_(r.kmPerL ? num(r.kmPerL, 2) : "—", 1)}
+                        ${td_(r.overTank ? badge(td("flagOverTank", { count: r.overTank }), "red") : "")}
                       </tr>`,
                     )
-                    .join("")}</tbody>
-                </table>
-              </div>`
-            : empty(td("noClaimsMonth"))
-        }
+                    .join("")}</tbody></table></div>`
+              : empty(td("noClaimsMonth"))
+          }
+        </section>
+        <section class="space-y-2">
+          <h3 class="font-semibold">${esc(td("byDriver"))}</h3>
+          ${
+            drivers.size
+              ? `<div class="${cls.card} overflow-x-auto"><table class="w-full min-w-[560px] text-sm">
+                  <thead><tr class="border-b border-slate-200 text-left text-xs text-slate-500 dark:border-slate-800">${th("driverCol")}${th("cashClaims", 1)}${th("fleetCard", 1)}${th("totalAmount", 1)}</tr></thead>
+                  <tbody class="divide-y divide-slate-100 dark:divide-slate-800">${[...drivers.entries()]
+                    .sort((a, b) => b[1].cashRM + b[1].cardRM - (a[1].cashRM + a[1].cardRM))
+                    .map(
+                      ([k, d]) => `<tr>
+                        ${td_(esc(k && person.get(k) ? person.get(k).full_name : td("noDriverRecorded")))}
+                        ${td_(d.cashL ? `${num(d.cashL)} L · ${money(d.cashRM)}` : "—", 1)}
+                        ${td_(d.cardL ? `${num(d.cardL)} L · ${money(d.cardRM)}` : "—", 1)}
+                        ${td_(`<span class="font-medium">${money(d.cashRM + d.cardRM)}</span>`, 1)}
+                      </tr>`,
+                    )
+                    .join("")}</tbody></table></div>`
+              : empty(td("noClaimsMonth"))
+          }
+        </section>
       </div>`;
-      $("#s-month").onchange = (e) => ((month = e.target.value), draw());
       refreshIcons();
+      $("#s-month").onchange = (e) => ((month = e.target.value), draw());
+      $("#r-export").onclick = () =>
+        GW.downloadXlsx(`diesel-report-${month}.xlsx`, (wb) => {
+          const vById = new Map(vehicles.map((v) => [v.id, v]));
+          const ws = wb.addWorksheet(month);
+          ws.columns = [
+            { header: td("fillDate"), width: 12 },
+            { header: td("source"), width: 12 },
+            { header: td("plateNo"), width: 12 },
+            { header: td("vehicleName"), width: 18 },
+            { header: td("driverCol"), width: 22 },
+            { header: td("odometer"), width: 11 },
+            { header: td("litres"), width: 9 },
+            { header: td("amount"), width: 11 },
+            { header: td("statusLabel"), width: 11 },
+          ];
+          inMonth
+            .sort((a, b) => (a.fill_date < b.fill_date ? -1 : 1))
+            .forEach((r) => {
+              const v = vById.get(r.vehicle_id) || {};
+              const p = person.get(r.driver);
+              ws.addRow([r.fill_date, td(r.source === "cash" ? "cashClaims" : "fleetCard"), v.plate_no, v.name, p ? p.full_name : "", r.odometer_km, Number(r.litres), Number(r.amount), r.source === "cash" ? td("status." + r.status) : ""]);
+            });
+          ws.getRow(1).font = { bold: true };
+        });
     }
     draw();
   }
 
+  // ================================================================ 模块 User Access（管理者：每个人可以用哪些页面）
+  async function accessTab() {
+    const seq = routeSeq;
+    const people = await loadPeople();
+    if (stale(seq)) return;
+    view.innerHTML = `<div class="space-y-4">
+      <p class="text-sm text-slate-500">${esc(td("accessHint"))}</p>
+      ${
+        people.length
+          ? `<div class="${cls.card} divide-y divide-slate-100 dark:divide-slate-800">${people
+              .map(
+                (p) => `<div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <span class="min-w-0 flex-1"><span class="block truncate font-medium">${esc(p.full_name)}</span><span class="block truncate text-xs text-slate-500">${esc(p.email)}</span></span>
+                  ${
+                    p.is_admin
+                      ? badge(td("moduleAdminAll"), "amber")
+                      : `<span class="flex gap-4">
+                          ${["can_claim", "can_report"]
+                            .map((k) => `<label class="inline-flex cursor-pointer items-center gap-1.5 text-sm"><input type="checkbox" data-acc="${p.id}:${k}" ${p[k] ? "checked" : ""} class="size-4 accent-emerald-600">${esc(td(k === "can_claim" ? "cashClaims" : "report"))}</label>`)
+                            .join("")}
+                        </span>`
+                  }
+                </div>`,
+              )
+              .join("")}</div>`
+          : empty(td("accessEmpty"))
+      }
+    </div>`;
+    refreshIcons();
+    view.onchange = async (e) => {
+      const box = e.target.closest("input[data-acc]");
+      if (!box) return;
+      const [uid, key] = box.dataset.acc.split(":");
+      const p = people.find((x) => x.id === uid);
+      p[key] = box.checked;
+      box.disabled = true;
+      const { error } = await sb.from("diesel_user_access").upsert({ user_id: uid, can_claim: p.can_claim, can_report: p.can_report, updated_by: me.id, updated_at: new Date().toISOString() });
+      box.disabled = false;
+      if (error) {
+        p[key] = !box.checked;
+        box.checked = !box.checked;
+        return toast(td("saveFailed"));
+      }
+      toast(td("saved"));
+    };
+  }
+
   // ---------------------------------------------------------------- 分页
-  const HANDLERS = { mine: mineTab, vehicles: vehiclesTab, claims: claimsTab, summary: summaryTab };
+  const HANDLERS = { mine: mineTab, vehicles: vehiclesTab, claims: claimsTab, cards: cardsTab, report: reportTab, access: accessTab };
   async function route() {
     const name = location.hash.slice(1);
     const active = TABS.includes(name) ? name : TABS[0];
@@ -603,6 +966,7 @@
     ).join("");
     routeSeq++;
     view.onclick = null;
+    view.onchange = null;
     view.innerHTML = GW.spinner();
     await HANDLERS[active]();
   }

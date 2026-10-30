@@ -1,33 +1,40 @@
 -- Diesel 模块权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(38);
 
--- a1 super_admin；a2 DIESEL Admin；a3、a5 有 DIESEL Access；a4 没有
+-- a1 super_admin；a2 DIESEL Admin；a3、a5 有 DIESEL Access＋Cash Claim；a6 有 Access＋Report；a4 没有 Access
 insert into auth.users (id, email, instance_id, aud, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'super@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-0000000000a2', 'fleet.admin@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-0000000000a3', 'driver@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-0000000000a4', 'office@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
-  ('00000000-0000-0000-0000-0000000000a5', 'driver2@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated');
+  ('00000000-0000-0000-0000-0000000000a5', 'driver2@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
+  ('00000000-0000-0000-0000-0000000000a6', 'manager@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated');
 insert into public.gw_profiles (id, email, full_name, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'super@test.local', 'Super', 'super_admin'),
   ('00000000-0000-0000-0000-0000000000a2', 'fleet.admin@test.local', 'Fleet Admin', 'user'),
   ('00000000-0000-0000-0000-0000000000a3', 'driver@test.local', 'Driver', 'user'),
   ('00000000-0000-0000-0000-0000000000a4', 'office@test.local', 'Office', 'user'),
-  ('00000000-0000-0000-0000-0000000000a5', 'driver2@test.local', 'Driver Two', 'user');
+  ('00000000-0000-0000-0000-0000000000a5', 'driver2@test.local', 'Driver Two', 'user'),
+  ('00000000-0000-0000-0000-0000000000a6', 'manager@test.local', 'Manager', 'user');
 insert into public.gw_groups (id, name) values ('00000000-0000-0000-0000-0000000000c1', 'Fleet');
 insert into public.gw_group_modules (group_id, module_id) select '00000000-0000-0000-0000-0000000000c1', id from public.gw_modules where code = 'DIESEL';
 insert into public.gw_group_members (group_id, user_id) values
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2'),
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a3'),
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a4'),
-  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a5');
+  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a5'),
+  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a6');
 insert into public.gw_module_members (user_id, module_id, is_admin)
 select u, m.id, u = '00000000-0000-0000-0000-0000000000a2'
 from public.gw_modules m,
-     unnest(array['00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000a5']::uuid[]) as u
+     unnest(array['00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000a5', '00000000-0000-0000-0000-0000000000a6']::uuid[]) as u
 where m.code = 'DIESEL';
+insert into public.diesel_user_access (user_id, can_claim, can_report) values
+  ('00000000-0000-0000-0000-0000000000a3', true, false),
+  ('00000000-0000-0000-0000-0000000000a5', true, false),
+  ('00000000-0000-0000-0000-0000000000a6', false, true);
 
 insert into public.diesel_vehicles (id, plate_no, name) values
   ('00000000-0000-0000-0000-0000000000d1', 'WXY 1234', 'Hilux'),
@@ -123,6 +130,50 @@ select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
 update public.diesel_claims set litres = 99 where id = '00000000-0000-0000-0000-0000000000e1';
 select pg_temp.logout();
 select is((select litres from public.diesel_claims where id = '00000000-0000-0000-0000-0000000000e1'), 52.00, '批准后司机不能再修改');
+
+-- ---------------------------------------------------------------------
+-- 模块 User Access、Report、Fleet Card
+-- ---------------------------------------------------------------------
+select pg_temp.login('00000000-0000-0000-0000-0000000000a2');
+select throws_ok(
+  $$ insert into public.diesel_user_access (user_id, can_claim) values ('00000000-0000-0000-0000-0000000000a4', true) $$,
+  '42501', null, '模块 User Access 只能设定在 Gateway 有 Access 的人'
+);
+select lives_ok(
+  $$ insert into public.diesel_cards (id, card_no, vehicle_id, monthly_limit) values ('00000000-0000-0000-0000-0000000000f1', 'FC-0001', '00000000-0000-0000-0000-0000000000d1', 1500) $$,
+  '管理者可以新增油卡'
+);
+select lives_ok(
+  $$ insert into public.diesel_card_reloads (card_id, amount, reference) values ('00000000-0000-0000-0000-0000000000f1', 1000, 'TOPUP-1') $$,
+  '管理者可以记录油卡充值'
+);
+select lives_ok(
+  $$ insert into public.diesel_card_usage (card_id, vehicle_id, driver_id, litres, amount, odometer_km) values ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a5', 60, 129, 10600) $$,
+  '管理者可以记录司机刷油卡加油'
+);
+select pg_temp.logout();
+
+select pg_temp.login('00000000-0000-0000-0000-0000000000a6');
+select ok(public.diesel_can_report(), '有 Report 的人可以看报表');
+select is((select count(*) from public.diesel_people())::int, 4, 'Report：人员名单只有在 Gateway 有 DIESEL Access 的人');
+select ok(not public.diesel_can_claim(), '没有 Cash Claim 的人不能报销');
+select is((select count(*) from public.diesel_claims)::int, 2, 'Report：看得到全部现金报销');
+select is((select count(*) from public.diesel_card_usage)::int, 1, 'Report：看得到油卡加油记录');
+select throws_ok(
+  $$ insert into public.diesel_claims (vehicle_id, claimant_id, litres, amount) values ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a6', 10, 20) $$,
+  '42501', null, 'Report 用户不能报销'
+);
+select throws_ok(
+  $$ insert into public.diesel_card_reloads (card_id, amount) values ('00000000-0000-0000-0000-0000000000f1', 50) $$,
+  '42501', null, 'Report 用户不能记录油卡'
+);
+select pg_temp.logout();
+
+select pg_temp.login('00000000-0000-0000-0000-0000000000a5');
+select is((select count(*) from public.diesel_cards)::int, 0, '一般司机看不到油卡');
+select is((select can_claim from public.diesel_user_access), true, '看得到自己的模块权限');
+select is((select count(*) from public.diesel_people())::int, 0, '没有 Report：拿不到人员名单');
+select pg_temp.logout();
 
 -- 收回 Access 后什么都看不到
 delete from public.gw_module_members where user_id = '00000000-0000-0000-0000-0000000000a3';

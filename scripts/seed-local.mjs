@@ -125,7 +125,8 @@ await must(
     ["WIKI", "HR"].map((m) => ({ role_id: hrRole.id, group_id: grp["全体员工"], module_id: mod[m] })),
   ),
 );
-// Diesel 模块（migration 已建立 DIESEL 模块）：放进「总部车队」；车队组长是 Admin，陈司机、新同事可以报销
+// Diesel 模块（migration 已建立 DIESEL 模块）：放进「总部车队」；车队组长是 Admin，陈司机、新同事有 Access
+// 模块里的 User Access：陈司机可以现金报销
 const [diesel] = await must(db.from("gw_modules").select("id").eq("code", "DIESEL"));
 if (diesel) {
   await must(db.from("gw_group_modules").upsert({ group_id: grp["总部车队"], module_id: diesel.id }));
@@ -148,6 +149,7 @@ if (diesel) {
       { onConflict: "plate_no" },
     ),
   );
+  await must(db.from("diesel_user_access").upsert({ user_id: ids["driver@mjm.local"], can_claim: true }));
 }
 await must(db.from("gw_announcements").insert({ message: "欢迎使用 MJM Gateway！所有公司系统都可以从这里打开。", level: "info" }));
 
