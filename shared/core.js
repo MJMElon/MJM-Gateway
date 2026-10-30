@@ -110,35 +110,12 @@ window.GW = (function () {
   // ---------------------------------------------------------------- 页面外框
   function shell(profile, active) {
     const isAdmin = profile.role === "super_admin" || profile.role === "admin";
-    const items = [
-      { href: "index.html", key: "home", label: t("nav.home"), icon: "house" },
-      { href: "library.html", key: "library", label: t("nav.library"), icon: "library" },
-      { href: "settings.html", key: "settings", label: t("nav.settings"), icon: "user-round" },
-    ];
     const header = document.createElement("div");
     header.innerHTML = `
       <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
         <div class="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
           <a href="index.html" class="text-lg font-bold tracking-tight whitespace-nowrap">${esc(t("app.name"))}</a>
-          <nav class="hidden items-center gap-1 sm:flex">
-            ${items
-              .map(
-                (i) => `<a href="${i.href}" class="rounded-lg px-3 py-1.5 text-sm font-medium ${
-                  i.key === active
-                    ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                }">${esc(i.label)}</a>`,
-              )
-              .join("")}
-          </nav>
           <div class="ml-auto flex items-center gap-3">
-            ${
-              isAdmin
-                ? `<a href="admin.html" title="${esc(t("nav.admin"))}" aria-label="${esc(t("nav.admin"))}" class="rounded-lg p-2 ${
-                    active === "admin" ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
-                  }">${icon("settings", "size-5")}</a>`
-                : ""
-            }
             <a href="settings.html" title="${esc(t("nav.settings"))}" class="flex items-center gap-3">
               <div class="hidden text-right leading-tight md:block">
                 <div class="text-sm font-medium">${esc(profile.full_name)}</div>
@@ -148,6 +125,9 @@ window.GW = (function () {
                 active === "settings" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-slate-200 dark:bg-slate-800"
               }">${esc(profile.full_name.slice(0, 1))}</span>
             </a>
+            <a href="${isAdmin ? "admin.html" : "settings.html"}" title="${esc(t(isAdmin ? "nav.admin" : "nav.settings"))}" aria-label="${esc(t(isAdmin ? "nav.admin" : "nav.settings"))}" class="rounded-lg p-2 ${
+              active === (isAdmin ? "admin" : "settings") ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+            }">${icon("settings", "size-5")}</a>
             <button id="gw-logout" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="${esc(
               t("nav.logout"),
             )}" aria-label="${esc(t("nav.logout"))}">${icon("log-out")}</button>

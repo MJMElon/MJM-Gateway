@@ -243,15 +243,23 @@ window.GWHome = (function () {
                 : `<p class="text-sm text-slate-400">${esc(t("widgets.noRecent"))}</p>`
             }`;
         }
-        case "announcements":
-          return `${wTitle("megaphone", t("widgets.types.announcements"))}
+        case "announcements": {
+          // Notice Board：公告；管理员可以直接在这里发布
+          const when = (d) => (d ? new Intl.DateTimeFormat(GW.LOCALE, { day: "numeric", month: "short" }).format(new Date(d)) : "");
+          return `<div class="mb-2 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-100">${icon("megaphone", "size-4 text-brand-600 dark:text-brand-400")}${esc(t("widgets.types.announcements"))}</div>
+              ${isAdmin && !readOnly && !editing ? `<button type="button" data-post class="no-drag flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900">${icon("plus", "size-3.5")}${esc(t("widgets.post"))}</button>` : ""}
+            </div>
             ${
               data.announcements.length
-                ? `<ul class="space-y-2 overflow-y-auto ${w.size === "large" ? "max-h-[85%]" : "max-h-[70%]"}">${data.announcements
-                    .map((a) => `<li class="flex gap-2 text-sm">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<span class="whitespace-pre-line">${esc(a.message)}</span></li>`)
+                ? `<ul class="no-drag -mr-2 space-y-2 overflow-y-auto pr-2 h-[calc(100%-2.25rem)]">${data.announcements
+                    .map(
+                      (a) => `<li class="flex gap-2.5 rounded-xl px-3 py-2 text-sm ${a.level === "warning" ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-slate-50 dark:bg-white/5"}">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<div class="min-w-0 flex-1"><p class="whitespace-pre-line break-words">${esc(a.message)}</p>${a.starts_at ? `<p class="mt-0.5 text-[11px] text-slate-400">${esc(when(a.starts_at))}</p>` : ""}</div></li>`,
+                    )
                     .join("")}</ul>`
-                : `<p class="text-sm text-slate-400">${esc(t("widgets.noAnnouncements"))}</p>`
+                : `<div class="flex h-[calc(100%-2.25rem)] flex-col items-center justify-center gap-1 text-center text-sm text-slate-400">${icon("inbox", "size-6")}<span>${esc(t("widgets.noAnnouncements"))}</span></div>`
             }`;
+        }
         case "calendar": {
           const y = Number(fmt({ year: "numeric" }));
           const mo = Number(fmt({ month: "numeric" })) - 1;
@@ -357,13 +365,6 @@ window.GWHome = (function () {
     }
 
     // ------------------------------------------------------------ 整页
-    const dismissed = (() => {
-      try {
-        return JSON.parse(localStorage.getItem("gw_dismissed_announcements") || "[]");
-      } catch (e) {
-        return [];
-      }
-    })();
 
     function draw() {
       sortables.forEach((s) => s.destroy());
@@ -380,15 +381,7 @@ window.GWHome = (function () {
         return refreshIcons();
       }
       const items = rootItems();
-      const announcements = data.announcements.filter((a) => !dismissed.includes(a.id));
       root.innerHTML = `
-        ${announcements
-          .map(
-            (a) => `<div class="mb-4 flex items-start gap-2 rounded-2xl border px-3 py-2.5 text-sm backdrop-blur ${
-              a.level === "warning" ? "border-amber-200 bg-amber-50/90 text-amber-900 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-200" : "border-white/70 bg-white/70 text-slate-700 dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-200"
-            }">${icon(a.level === "warning" ? "triangle-alert" : "megaphone", "mt-0.5 size-4 shrink-0")}<p class="flex-1 whitespace-pre-line">${esc(a.message)}</p>${readOnly ? "" : `<button data-dismiss="${a.id}" aria-label="${esc(t("home.dismiss"))}" class="rounded p-0.5 opacity-60 hover:opacity-100">${icon("x")}</button>`}</div>`,
-          )
-          .join("")}
         ${uninitialized ? `<div class="mb-4 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">${esc(t("home.previewUninitialized"))}</div>` : ""}
         ${editing ? `<p class="mb-3 text-center text-xs text-slate-500">${esc(t("fab.editHint"))}</p>` : ""}
         <div id="gw-grid" class="${editing ? "gw-editing" : ""} grid grid-flow-row-dense grid-cols-4 gap-x-2 gap-y-4 [grid-auto-rows:5.25rem] sm:grid-cols-6 sm:[grid-auto-rows:5.75rem] lg:grid-cols-8">
@@ -531,6 +524,43 @@ window.GWHome = (function () {
       });
     }
 
+    // 管理员在 Notice Board 直接发布公告（super_admin 发给全公司；部门管理员发给自己的部门）
+    function postNotice() {
+      const dlg = modal(
+        t("widgets.postTitle"),
+        `<form class="space-y-4">
+          <div data-err></div>
+          <textarea name="message" required maxlength="500" rows="4" placeholder="${esc(t("widgets.postPlaceholder"))}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900"></textarea>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="important" class="size-4 accent-amber-500"> ${esc(t("widgets.postImportant"))}</label>
+          <p class="text-xs text-slate-500">${esc(isSuper ? t("widgets.postAudienceAll") : t("widgets.postAudienceDept"))}</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" data-cancel class="${btn("secondary")}">${esc(t("settings.cancel"))}</button>
+            <button type="submit" class="${btn("primary")}">${esc(t("widgets.post"))}</button>
+          </div>
+        </form>`,
+      );
+      $("[data-cancel]", dlg.el).onclick = dlg.close;
+      $("form", dlg.el).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const { data: row, error } = await sb
+          .from("gw_announcements")
+          .insert({
+            message: f.message.value.trim(),
+            level: f.important.checked ? "warning" : "info",
+            department_id: isSuper ? null : profile.department_id,
+            created_by: profile.id,
+          })
+          .select("id, message, level, starts_at")
+          .single();
+        if (error) return ($("[data-err]", dlg.el).innerHTML = GW.alertBox(t("widgets.postFailed")));
+        dlg.close();
+        data.announcements = [row, ...data.announcements];
+        draw();
+        toast(t("widgets.posted"));
+      });
+    }
+
     function folderDialog(folder) {
       const dlg = modal(
         folder ? t("home.editFolder") : t("fab.newFolder"),
@@ -608,15 +638,7 @@ window.GWHome = (function () {
       if (d.removeWidget) return removeWidget(d.removeWidget);
       if (d.removeFolder) return deleteFolder(d.removeFolder);
       if (d.resize) return resizeWidget(d.resize);
-      if (d.dismiss) {
-        dismissed.push(d.dismiss);
-        try {
-          localStorage.setItem("gw_dismissed_announcements", JSON.stringify(dismissed.slice(-50)));
-        } catch (x) {
-          /* localStorage 不可用时无法记住，忽略 */
-        }
-        return draw();
-      }
+      if ("post" in d) return postNotice();
       if ("fabToggle" in d) return ((fabOpen = !fabOpen), draw());
       if (d.fab) {
         fabOpen = false;
