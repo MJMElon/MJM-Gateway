@@ -215,16 +215,23 @@ window.GW_LANG["zh-CN"] = {
       "large": "大"
     },
     "postAudience": "谁看得到",
-    "postEveryone": "全公司"
+    "postEveryone": "全公司",
+    "editNotice": "修改公告",
+    "deleteNotice": "删除公告",
+    "deleteNoticeBody": "确定删除这则公告？大家都不会再看到。",
+    "delete": "删除",
+    "save": "储存",
+    "saved": "已储存"
   },
   "admin": {
     "sections": {
       "userGroup": "用户与群组管理",
       "master": "主资料管理",
-      "access": "User Access"
+      "access": "User Access",
+      "audit": "操作记录"
     },
     "business": {
-      "description": "Business 就是一群人。勾选属于它的Icon，之后再逐个把Icon开给里面的人。",
+      "description": "Business 就是一群人。勾选属于它的模块，之后再逐个把模块开给里面的人。",
       "add": "新增 Business",
       "addTitle": "新增 Business",
       "editTitle": "编辑 Business",
@@ -232,7 +239,7 @@ window.GW_LANG["zh-CN"] = {
       "deleteBody": "确定删除「{name}」？它底下的 Company 也会删掉，里面的人会失去从这里拿到的 App。",
       "empty": "还没有 Business，先新增一个。",
       "duplicate": "已经有同名的 Business。",
-      "access": "这个 Business 的Icon",
+      "access": "这个 Business 的模块",
       "counts": "{companies} 个 Company · {members} 人"
     },
     "company": {
@@ -259,13 +266,13 @@ window.GW_LANG["zh-CN"] = {
       "noMappings": "还没有对应到任何系统。",
       "mappingTitle": "把 {name} 对应到系统",
       "mappingHint": "记录这个 Company 在现有系统里叫什么，之后资料才对得起来。",
-      "system": "系统（Icon）",
+      "system": "系统（模块）",
       "externalId": "在那个系统的 ID / 代码",
       "externalIdHint": "跟那个系统里一模一样。",
       "externalName": "在那个系统的名称",
       "notes": "备注",
       "mappingDuplicate": "这个系统的这个 ID 已经对应到某个 Company。",
-      "noSystems": "请先把系统加成 Icon（Master Manage → Icon）。",
+      "noSystems": "请先把系统加成 模块（Master Manage → 模块）。",
       "duplicate": "已经有同样代码或名称的 Company。",
       "badCode": "代码格式不对，请用 2–20 个大写英文、数字、- 或 _。",
       "saveFailed": "无法储存。",
@@ -289,7 +296,7 @@ window.GW_LANG["zh-CN"] = {
       "members": "成员",
       "dropHere": "把人拖到这里",
       "removeMember": "移出 Business",
-      "noModules": "还没有 App，请先在Icon新增。",
+      "noModules": "还没有 App，请先在模块新增。",
       "alreadyMember": "已经在这里了。",
       "added": "{name} → {group}",
       "addToGroup": "把 {name} 放进…",
@@ -297,7 +304,7 @@ window.GW_LANG["zh-CN"] = {
       "noCompanies": "这个 Business 还没有 Company，请到这里新增：",
       "noBusiness": "还没有 Business，请先到这里设定：",
       "appsCount": "{count} 个 App",
-      "apps": "Icon权限"
+      "apps": "模块权限"
     },
     "title": "权限后台",
     "pageTitle": "User Setting",
@@ -307,10 +314,10 @@ window.GW_LANG["zh-CN"] = {
       "groups": "群组列表",
       "business": "Business",
       "company": "Company",
-      "modules": "Icon",
+      "modules": "模块",
       "announcements": "公告",
       "audit": "操作记录",
-      "access": "Icon权限",
+      "access": "模块权限",
       "roles": "角色"
     },
     "users": {
@@ -325,15 +332,15 @@ window.GW_LANG["zh-CN"] = {
         "user": "一般用户"
       },
       "add": "新增用户",
-      "access": "Icon权限",
+      "access": "模块权限",
       "accessDialog": {
-        "title": "Icon权限 — {name}",
-        "hint": "Access = 可以打开这个Icon。Admin = 这个Icon的管理员，可以把 Access 开给 / 收回同一个 Business 的人。勾 Admin 一定同时有 Access。",
-        "admin": "这个Icon的 Admin",
-        "access": "可以使用这个Icon",
-        "noModules": "这个人所属的 Business 还没有Icon。",
+        "title": "模块权限 — {name}",
+        "hint": "Access = 可以打开这个模块。Admin = 这个模块的管理员，可以把 Access 开给 / 收回同一个 Business 的人。勾 Admin 一定同时有 Access。",
+        "admin": "这个模块的 Admin",
+        "access": "可以使用这个模块",
+        "noModules": "这个人所属的 Business 还没有模块。",
         "noBusiness": "这个人还没放进任何 Business，请先放进 Business。",
-        "saveFailed": "无法储存，你可能没有管理这个Icon的权限。"
+        "saveFailed": "无法储存，你可能没有管理这个模块的权限。"
       },
       "addTitle": "新增用户",
       "editTitle": "编辑用户",
@@ -393,7 +400,7 @@ window.GW_LANG["zh-CN"] = {
       "roleHint": "角色在 Master Manage → 角色 设定。一般用户没有管理权。"
     },
     "groups": {
-      "description": "群组决定一群人能用哪些Icon。",
+      "description": "群组决定一群人能用哪些模块。",
       "add": "新增群组",
       "addTitle": "新增群组",
       "editTitle": "编辑群组",
@@ -402,7 +409,7 @@ window.GW_LANG["zh-CN"] = {
       "deleteTitle": "删除群组",
       "deleteBody": "确定删除「{name}」吗？群组成员会失去经由这个群组取得的权限。",
       "empty": "还没有群组。",
-      "counts": "{members} 位成员 · {modules} 个Icon",
+      "counts": "{members} 位成员 · {modules} 个模块",
       "name": "名称",
       "descriptionLabel": "说明",
       "sortOrder": "排序",
@@ -412,12 +419,12 @@ window.GW_LANG["zh-CN"] = {
       "save": "保存"
     },
     "modules": {
-      "description": "大家可以从 MJM Connect 打开的每一个 Icon。System = MJM Connect 旗下的系统（例如 Diesel）；Link = 现有系统或任何外部网站。给每个 Icon 标上 Business（和 Company），开权限时就会出现在对的地方。",
-      "add": "新增Icon",
-      "addTitle": "新增Icon",
-      "editTitle": "编辑Icon",
+      "description": "大家可以从 MJM Connect 打开的每一个 模块。System = MJM Connect 旗下的系统（例如 Diesel）；Link = 现有系统或任何外部网站。给每个 模块 标上 Business（和 Company），开权限时就会出现在对的地方。",
+      "add": "新增模块",
+      "addTitle": "新增模块",
+      "editTitle": "编辑模块",
       "edit": "编辑",
-      "empty": "还没有Icon。",
+      "empty": "还没有模块。",
       "active": "上架",
       "inactive": "下架",
       "activate": "上架",
@@ -439,9 +446,9 @@ window.GW_LANG["zh-CN"] = {
       "sameTab": "同页",
       "sortOrder": "排序",
       "status": "状态",
-      "icon": "图标",
+      "icon": "图示",
       "badUrl": "网址不对。Link 要以 https:// 开头。",
-      "duplicate": "Icon代码已存在。",
+      "duplicate": "模块代码已存在。",
       "badCode": "代码格式不对。",
       "saveFailed": "保存失败。",
       "apiKeySet": "API Key：{prefix}…",
@@ -467,7 +474,7 @@ window.GW_LANG["zh-CN"] = {
       "businessTags": "Business 标签",
       "businessTagsHint": "这些 Business 的人可以被开权限。",
       "companyTags": "Company 标签",
-      "companyTagsHint": "这个 Icon 是给哪些 Company 用的（开权限时显示）。",
+      "companyTagsHint": "这个 模块 是给哪些 Company 用的（开权限时显示）。",
       "noTags": "还没有 Business 标签，没办法开权限给任何人。",
       "noOptions": "还没有。"
     },
@@ -519,16 +526,16 @@ window.GW_LANG["zh-CN"] = {
         "groups": "Business",
         "group_members": "Business 成员",
         "companies": "Company",
-        "modules": "Icon",
-        "group_modules": "Business 的Icon",
+        "modules": "模块",
+        "group_modules": "Business 的模块",
         "announcements": "公告",
         "roles": "角色",
         "role_businesses": "角色的 Business",
-        "role_modules": "角色的Icon",
-        "module_members": "Icon权限",
+        "role_modules": "角色的模块",
+        "module_members": "模块权限",
         "business_companies": "Business 的 Company",
         "company_mappings": "Company 对应",
-        "module_companies": "Icon 的 Company 标签"
+        "module_companies": "模块 的 Company 标签"
       },
       "filter": "筛选",
       "export": "导出 Excel",
@@ -544,14 +551,14 @@ window.GW_LANG["zh-CN"] = {
       "page": "第 {page} / {pages} 页"
     },
     "access": {
-      "description": "每个Icon列出它所属 Business 里的人。勾 Access 让他可以打开；勾 Admin 让他当这个Icon的管理员。",
+      "description": "每个模块列出它所属 Business 里的人。勾 Access 让他可以打开；勾 Admin 让他当这个模块的管理员。",
       "counts": "{access} 人有 Access · {admins} 位 Admin",
       "noPeople": "这个 Business 还没有人。",
       "noMatch": "没有符合的人。",
-      "empty": "没有可以管理的Icon。Icon在 Master Manage → Business 加进 Business。"
+      "empty": "没有可以管理的模块。模块在 Master Manage → Business 加进 Business。"
     },
     "roles": {
-      "description": "自己命名角色并设定它能做什么。勾选它负责的 Business（可以把人放进去），再勾选每个 Business 里它负责开权限的Icon。",
+      "description": "角色 = 一组功能，只在你勾选的 Business 和模块内有效。在用户名单把角色给人。",
       "add": "新增角色",
       "addTitle": "新增角色",
       "editTitle": "编辑角色",
@@ -559,17 +566,44 @@ window.GW_LANG["zh-CN"] = {
       "namePlaceholder": "例如 HR、Admin",
       "canPost": "可发公告",
       "canPostLabel": "可以在 Notice Board 发公告（给它负责的 Business 的人看）",
-      "scope": "Business 和Icon",
-      "scopeHint": "勾 Business：可以把人放进 / 移出。勾Icon：可以开 / 收回这个Icon的 Access，也可以指定Icon Admin。",
-      "noModules": "这个 Business 还没有Icon。",
+      "scope": "负责的 Business 和模块",
+      "scopeHint": "功能只在这里勾选的 Business 内有效；模块相关的功能只限每个 Business 底下勾选的模块。",
+      "noModules": "这个 Business 还没有模块。",
       "people": "{count} 人",
       "manages": "负责开权限：{list}",
-      "placeOnly": "可以放人；没有负责的Icon",
+      "placeOnly": "可以放人；没有负责的模块",
       "noBusiness": "还没勾选 Business。",
       "empty": "还没有角色，先新增一个，例如 HR。",
       "deleteTitle": "删除角色",
       "deleteBody": "确定删除「{name}」？有这个角色的人会变回一般用户。",
-      "duplicate": "已经有同名的角色。"
+      "duplicate": "已经有同名的角色。",
+      "funcs": {
+        "can_post_notice": "更新公告栏",
+        "can_delete_notice": "删除公告",
+        "can_grant_module": "把人加进模块",
+        "can_revoke_module": "把人从模块移除",
+        "can_set_module_admin": "设定模块 Admin",
+        "can_place_users": "把人放进 Business",
+        "can_view_users": "看用户名单",
+        "can_view_audit": "看操作记录"
+      },
+      "funcHints": {
+        "can_post_notice": "发布、修改它负责的 Business 的公告",
+        "can_delete_notice": "删除它负责的 Business 的公告",
+        "can_grant_module": "把它负责的模块开给人",
+        "can_revoke_module": "收回它负责的模块的权限",
+        "can_set_module_admin": "指定它负责的模块的 Admin",
+        "can_place_users": "把人放进 / 移出它负责的 Business 和 Company",
+        "can_view_users": "看它负责的 Business 的人（只能看）",
+        "can_view_audit": "看操作记录"
+      },
+      "colRole": "角色",
+      "colFunctions": "角色功能",
+      "colScope": "Business / 模块",
+      "colPeople": "人数",
+      "noFunctions": "没有功能",
+      "functionsHint": "勾选有这个角色的人可以做什么。",
+      "normalUserHint": "没有角色的人就是一般用户：只能用开给他的模块。不需要另外建立「User」角色。"
     }
   },
   "diesel": {

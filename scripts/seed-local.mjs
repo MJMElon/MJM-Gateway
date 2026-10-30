@@ -17,7 +17,27 @@ async function must(promise) {
 }
 
 // 角色 HR：负责「全体员工」和「总部车队」，在「全体员工」负责 WIKI、HR 的权限，可以发公告
-const [hrRole] = await must(db.from("gw_roles").upsert([{ name: "HR", description: "人事", can_post_notice: true }], { onConflict: "name" }).select());
+const [hrRole] = await must(
+  db
+    .from("gw_roles")
+    .upsert(
+      [
+        {
+          name: "HR",
+          description: "人事",
+          can_post_notice: true,
+          can_delete_notice: true,
+          can_grant_module: true,
+          can_revoke_module: true,
+          can_set_module_admin: true,
+          can_place_users: true,
+          can_view_users: true,
+        },
+      ],
+      { onConflict: "name" },
+    )
+    .select(),
+);
 
 const people = [
   { email: "super@mjm.local", full_name: "超级管理员", role: "super_admin", role_id: null, must_change_password: false },

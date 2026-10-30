@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(83);
+select plan(90);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -16,7 +16,8 @@ insert into auth.users (id, email, instance_id, aud, role) values
   ('00000000-0000-0000-0000-0000000000a3', 'user.both@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-0000000000a4', 'user.ops@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-0000000000a5', 'diesel.admin@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
-  ('00000000-0000-0000-0000-0000000000a6', 'pending@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated');
+  ('00000000-0000-0000-0000-0000000000a6', 'pending@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
+  ('00000000-0000-0000-0000-0000000000a7', 'viewer@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated');
 
 insert into public.gw_modules (id, code, name, url) values
   ('00000000-0000-0000-0000-0000000000b1', 'FUEL', 'Fuel', 'https://fuel.example.com'),
@@ -35,12 +36,14 @@ insert into public.gw_group_modules (group_id, module_id) values
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b4'),
   ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000b1');
 
-insert into public.gw_roles (id, name, can_post_notice) values
-  ('00000000-0000-0000-0000-0000000000f1', 'HR', true),
-  ('00000000-0000-0000-0000-0000000000f2', 'Diesel Admin', false);
+insert into public.gw_roles (id, name, can_post_notice, can_delete_notice, can_grant_module, can_revoke_module, can_set_module_admin, can_place_users, can_view_users, can_view_audit) values
+  ('00000000-0000-0000-0000-0000000000f1', 'HR', true, true, true, true, true, true, true, false),
+  ('00000000-0000-0000-0000-0000000000f2', 'Diesel Admin', false, false, true, false, false, true, false, false),
+  ('00000000-0000-0000-0000-0000000000f3', 'Viewer', false, false, false, false, false, false, true, true);
 insert into public.gw_role_businesses (role_id, group_id) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1'),
-  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c2');
+  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c2'),
+  ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000c2');
 insert into public.gw_role_modules (role_id, group_id, module_id) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b3'),
   ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000b1');
@@ -51,7 +54,8 @@ insert into public.gw_profiles (id, email, full_name, role, role_id) values
   ('00000000-0000-0000-0000-0000000000a3', 'user.both@test.local', '两边都有', 'user', null),
   ('00000000-0000-0000-0000-0000000000a4', 'user.ops@test.local', '营运员工', 'user', null),
   ('00000000-0000-0000-0000-0000000000a5', 'diesel.admin@test.local', 'Diesel 管理员', 'user', '00000000-0000-0000-0000-0000000000f2'),
-  ('00000000-0000-0000-0000-0000000000a6', 'pending@test.local', '待分配', 'user', null);
+  ('00000000-0000-0000-0000-0000000000a6', 'pending@test.local', '待分配', 'user', null),
+  ('00000000-0000-0000-0000-0000000000a7', 'viewer@test.local', '只看名单', 'user', '00000000-0000-0000-0000-0000000000f3');
 
 insert into public.gw_group_members (group_id, user_id) values
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a3'),
@@ -164,7 +168,7 @@ update public.gw_profiles set status = 'active' where id = '00000000-0000-0000-0
 -- 4. 自订角色 HR：管 Plantation，只管 WIKI，可以发公告
 -- ---------------------------------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-0000000000a2');
-select is((select count(*) from public.gw_profiles)::int, 6, '有管理权的角色看得到全部用户名单（才能把人拉进 Business）');
+select is((select count(*) from public.gw_profiles)::int, 7, '可以放人进 Business 的角色看得到全部用户（才找得到还没分配的人）');
 select set_eq($$ select name from public.gw_groups $$, array['Plantation'], 'HR 只看到自己管的 Business');
 select set_eq($$ select code from public.gw_modules $$, array['WIKI'], 'HR 只看到自己管的模块');
 select is((select name from public.gw_roles), 'HR', '看得到自己的角色设定');
@@ -228,7 +232,7 @@ select set_eq(
 -- 模块管理员：a4 是 WIKI 的 Admin（同时一定有 Access）
 update public.gw_module_members set is_admin = true where user_id = '00000000-0000-0000-0000-0000000000a4' and module_id = '00000000-0000-0000-0000-0000000000b3';
 select pg_temp.login('00000000-0000-0000-0000-0000000000a4');
-select is((select count(*) from public.gw_profiles)::int, 6, '模块管理员看得到用户名单');
+select is((select count(*) from public.gw_profiles)::int, 3, '模块管理员只看得到同一个 Business 的人');
 select lives_ok(
   $$ delete from public.gw_module_members where user_id = '00000000-0000-0000-0000-0000000000a6' and module_id = '00000000-0000-0000-0000-0000000000b3' $$,
   '模块管理员可以收回同一个 Business 的人的 Access'
@@ -277,6 +281,8 @@ select lives_ok(
   $$ insert into public.gw_module_members values ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000b1') $$,
   '放进 Fleet 后可以开 DIESEL'
 );
+delete from public.gw_module_members where user_id = '00000000-0000-0000-0000-0000000000a6' and module_id = '00000000-0000-0000-0000-0000000000b1';
+select is((select count(*) from public.gw_module_members where user_id = '00000000-0000-0000-0000-0000000000a6' and module_id = '00000000-0000-0000-0000-0000000000b1')::int, 1, '没有「移除」功能的角色不能收回 Access');
 select is(
   (select count(*) from public.gw_module_members where module_id = '00000000-0000-0000-0000-0000000000b3')::int, 0,
   'Diesel Admin 看不到不归他管的模块开给了谁'
@@ -308,6 +314,21 @@ select is((select count(*) from public.gw_announcements)::int, 1, 'Plantation �
 select pg_temp.logout();
 select pg_temp.login('00000000-0000-0000-0000-0000000000a5');
 select is((select count(*) from public.gw_announcements)::int, 0, '不在 Plantation 的人看不到');
+select pg_temp.logout();
+
+-- 角色功能：删除公告、只看名单、看操作记录
+select pg_temp.login('00000000-0000-0000-0000-0000000000a2');
+select lives_ok($$ update public.gw_announcements set message = 'Plantation 后天停电' where group_id = '00000000-0000-0000-0000-0000000000c1' $$, '有「更新」功能可以修改公告');
+select lives_ok($$ delete from public.gw_announcements where group_id = '00000000-0000-0000-0000-0000000000c1' $$, '有「删除」功能可以删除公告');
+select is((select count(*) from public.gw_announcements)::int, 0, '公告已删除');
+select pg_temp.logout();
+select pg_temp.login('00000000-0000-0000-0000-0000000000a7');
+select set_eq($$ select email from public.gw_profiles $$, array['viewer@test.local', 'user.both@test.local'], '「看名单」只看得到角色负责的 Business 的人');
+select ok((select count(*) from public.gw_audit_logs) > 0, '有「看操作记录」功能可以看操作记录');
+select throws_ok(
+  $$ insert into public.gw_group_members (group_id, user_id) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a6') $$,
+  '42501', null, '没有「放人」功能不能放人进 Business'
+);
 select pg_temp.logout();
 
 -- ---------------------------------------------------------------------

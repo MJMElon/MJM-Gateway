@@ -215,16 +215,23 @@ window.GW_LANG["en"] = {
       "large": "L"
     },
     "postAudience": "Who sees it",
-    "postEveryone": "Everyone"
+    "postEveryone": "Everyone",
+    "editNotice": "Edit notice",
+    "deleteNotice": "Delete notice",
+    "deleteNoticeBody": "Delete this notice? Everyone will stop seeing it.",
+    "delete": "Delete",
+    "save": "Save",
+    "saved": "Saved"
   },
   "admin": {
     "sections": {
       "userGroup": "User & Group Manage",
       "master": "Master Manage",
-      "access": "User Access"
+      "access": "User Access",
+      "audit": "Audit Log"
     },
     "business": {
-      "description": "A business is a group of people. Tick the icons that belong to it — people in the business can then be given access to them one by one.",
+      "description": "A business is a group of people. Tick the modules that belong to it — people in the business can then be given access to them one by one.",
       "add": "Add business",
       "addTitle": "Add business",
       "editTitle": "Edit business",
@@ -232,7 +239,7 @@ window.GW_LANG["en"] = {
       "deleteBody": "Delete “{name}”? Its companies are deleted too, and its people lose the apps they had through it.",
       "empty": "No businesses yet. Add the first one.",
       "duplicate": "A business with this name already exists.",
-      "access": "Icons in this business",
+      "access": "Modules in this business",
       "counts": "{companies} companies · {members} people"
     },
     "company": {
@@ -259,13 +266,13 @@ window.GW_LANG["en"] = {
       "noMappings": "Not mapped to any system yet.",
       "mappingTitle": "Map {name} to a system",
       "mappingHint": "Record what this company is called in an existing system, so data can be matched later.",
-      "system": "System (icon)",
+      "system": "System (module)",
       "externalId": "ID / code in that system",
       "externalIdHint": "Exactly as it appears in that system.",
       "externalName": "Name in that system",
       "notes": "Notes",
       "mappingDuplicate": "That ID in this system is already mapped to a company.",
-      "noSystems": "Add the system as an icon first (Master Manage → Icons).",
+      "noSystems": "Add the system as an module first (Master Manage → Modules).",
       "duplicate": "A company with this code or name already exists.",
       "badCode": "Invalid code. Use 2–20 capital letters, numbers, - or _.",
       "saveFailed": "Could not save.",
@@ -289,7 +296,7 @@ window.GW_LANG["en"] = {
       "members": "Members",
       "dropHere": "Drag people here",
       "removeMember": "Remove from business",
-      "noModules": "No apps yet. Add apps under Icons first.",
+      "noModules": "No apps yet. Add apps under Modules first.",
       "alreadyMember": "Already there.",
       "added": "{name} → {group}",
       "addToGroup": "Place {name}",
@@ -297,7 +304,7 @@ window.GW_LANG["en"] = {
       "noCompanies": "No companies in this business yet. Add them under",
       "noBusiness": "No businesses yet. Set them up in",
       "appsCount": "Apps: {count}",
-      "apps": "Icon access"
+      "apps": "Module access"
     },
     "title": "Admin",
     "pageTitle": "User Setting",
@@ -307,11 +314,11 @@ window.GW_LANG["en"] = {
       "groups": "Group list",
       "business": "Business",
       "company": "Company",
-      "modules": "Icons",
+      "modules": "Module",
       "announcements": "Announcements",
       "audit": "Audit log",
-      "access": "Icon access",
-      "roles": "Roles"
+      "access": "Module access",
+      "roles": "Role"
     },
     "users": {
       "search": "Search name or email…",
@@ -325,15 +332,15 @@ window.GW_LANG["en"] = {
         "user": "User"
       },
       "add": "Add user",
-      "access": "Icon access",
+      "access": "Module access",
       "accessDialog": {
-        "title": "Icon access — {name}",
-        "hint": "Access lets the person open the icon. Admin makes them the icon’s admin: they can give or remove Access for people in the same business. Admin always includes Access.",
-        "admin": "Admin for this icon",
-        "access": "Access to this icon",
-        "noModules": "The businesses this person is in have no icons yet.",
+        "title": "Module access — {name}",
+        "hint": "Access lets the person open the module. Admin makes them the module’s admin: they can give or remove Access for people in the same business. Admin always includes Access.",
+        "admin": "Admin for this module",
+        "access": "Access to this module",
+        "noModules": "The businesses this person is in have no modules yet.",
         "noBusiness": "This person is not in any business yet. Place them in a business first.",
-        "saveFailed": "Could not save. You may not manage this icon."
+        "saveFailed": "Could not save. You may not manage this module."
       },
       "addTitle": "Add user",
       "editTitle": "Edit user",
@@ -393,7 +400,7 @@ window.GW_LANG["en"] = {
       "roleHint": "Roles are set up under Master Manage → Roles. A User has no management rights."
     },
     "groups": {
-      "description": "Groups decide which icons a set of people can use.",
+      "description": "Groups decide which modules a set of people can use.",
       "add": "Add group",
       "addTitle": "Add group",
       "editTitle": "Edit group",
@@ -402,7 +409,7 @@ window.GW_LANG["en"] = {
       "deleteTitle": "Delete group",
       "deleteBody": "Delete “{name}”? Members will lose the access they had through this group.",
       "empty": "No groups yet.",
-      "counts": "{members} members · {icons} icons",
+      "counts": "{members} members · {modules} modules",
       "name": "Name",
       "descriptionLabel": "Description",
       "sortOrder": "Sort order",
@@ -412,12 +419,12 @@ window.GW_LANG["en"] = {
       "save": "Save"
     },
     "modules": {
-      "description": "Every icon people can open from MJM Connect. System = a system under MJM Connect (e.g. Diesel). Link = an existing system or any outside website. Tag each icon with its businesses (and companies) so it shows in the right place when you give access.",
-      "add": "Add icon",
-      "addTitle": "Add icon",
-      "editTitle": "Edit icon",
+      "description": "Every module people can open from MJM Connect. System = a system under MJM Connect (e.g. Diesel). Link = an existing system or any outside website. Tag each module with its businesses (and companies) so it shows in the right place when you give access.",
+      "add": "Add module",
+      "addTitle": "Add module",
+      "editTitle": "Edit module",
       "edit": "Edit",
-      "empty": "No icons yet.",
+      "empty": "No modules yet.",
       "active": "Active",
       "inactive": "Inactive",
       "activate": "Activate",
@@ -441,7 +448,7 @@ window.GW_LANG["en"] = {
       "status": "Status",
       "icon": "Icon",
       "badUrl": "Invalid address. A Link must start with https://.",
-      "duplicate": "This icon code already exists.",
+      "duplicate": "This module code already exists.",
       "badCode": "Invalid code format.",
       "saveFailed": "Could not save.",
       "apiKeySet": "API key: {prefix}…",
@@ -467,7 +474,7 @@ window.GW_LANG["en"] = {
       "businessTags": "Business tags",
       "businessTagsHint": "People in these businesses can be given access.",
       "companyTags": "Company tags",
-      "companyTagsHint": "Which companies this icon is for (shown when giving access).",
+      "companyTagsHint": "Which companies this module is for (shown when giving access).",
       "noTags": "No business tag yet — nobody can be given access.",
       "noOptions": "None yet."
     },
@@ -519,16 +526,16 @@ window.GW_LANG["en"] = {
         "groups": "Businesses",
         "group_members": "Business members",
         "companies": "Companies",
-        "modules": "Icons",
-        "group_modules": "Business icons",
+        "modules": "Modules",
+        "group_modules": "Business modules",
         "announcements": "Announcements",
         "roles": "Roles",
         "role_businesses": "Role businesses",
-        "role_modules": "Role icons",
-        "module_members": "Icon access",
+        "role_modules": "Role modules",
+        "module_members": "Module access",
         "business_companies": "Business companies",
         "company_mappings": "Company mappings",
-        "module_companies": "Icon company tags"
+        "module_companies": "Module company tags"
       },
       "filter": "Filter",
       "export": "Export Excel",
@@ -544,14 +551,14 @@ window.GW_LANG["en"] = {
       "page": "Page {page} of {pages}"
     },
     "access": {
-      "description": "Each icon lists the people in its businesses. Tick Access to let someone open it; tick Admin to make them the icon’s admin.",
+      "description": "Each module lists the people in its businesses. Tick Access to let someone open it; tick Admin to make them the module’s admin.",
       "counts": "{access} with access · {admins} admins",
       "noPeople": "Nobody in this business yet.",
       "noMatch": "No matching people.",
-      "empty": "No icons to manage. Icons are added to a business under Master Manage → Business."
+      "empty": "No modules to manage. Modules are added to a business under Master Manage → Business."
     },
     "roles": {
-      "description": "Name a role and choose what it can do. Tick the businesses it looks after (it can place people there), then the icons in each business whose access it manages.",
+      "description": "A role is a set of functions, limited to the businesses and modules you tick for it. Give the role to people in the user list.",
       "add": "Add role",
       "addTitle": "Add role",
       "editTitle": "Edit role",
@@ -559,17 +566,44 @@ window.GW_LANG["en"] = {
       "namePlaceholder": "e.g. HR, Admin",
       "canPost": "Can post notices",
       "canPostLabel": "Can post on the Notice Board (seen by the people in its businesses)",
-      "scope": "Businesses and icons",
-      "scopeHint": "Business ticked: can add or remove people in it. Icon ticked: can give or remove access to it, and choose its admins.",
-      "noModules": "This business has no icons yet.",
+      "scope": "Businesses and modules it covers",
+      "scopeHint": "The functions only work inside the businesses ticked here; module functions only for the modules ticked under each business.",
+      "noModules": "This business has no modules yet.",
       "people": "{count} people",
       "manages": "Manages access to: {list}",
-      "placeOnly": "Can place people; manages no icons",
+      "placeOnly": "Can place people; manages no modules",
       "noBusiness": "No businesses ticked yet.",
       "empty": "No roles yet. Add the first one, e.g. HR.",
       "deleteTitle": "Delete role",
       "deleteBody": "Delete “{name}”? People with this role become normal users.",
-      "duplicate": "A role with this name already exists."
+      "duplicate": "A role with this name already exists.",
+      "funcs": {
+        "can_post_notice": "Update notice board",
+        "can_delete_notice": "Delete notice board",
+        "can_grant_module": "Add user to module",
+        "can_revoke_module": "Remove user from module",
+        "can_set_module_admin": "Set module admin",
+        "can_place_users": "Place users in business",
+        "can_view_users": "View user list",
+        "can_view_audit": "View audit log"
+      },
+      "funcHints": {
+        "can_post_notice": "Post and edit notices for its businesses",
+        "can_delete_notice": "Delete notices of its businesses",
+        "can_grant_module": "Give people access to its modules",
+        "can_revoke_module": "Take module access away",
+        "can_set_module_admin": "Make someone the admin of its modules",
+        "can_place_users": "Add / remove people in its businesses and companies",
+        "can_view_users": "See the people in its businesses (read only)",
+        "can_view_audit": "See the audit log"
+      },
+      "colRole": "Role",
+      "colFunctions": "Role functions",
+      "colScope": "Businesses / modules",
+      "colPeople": "People",
+      "noFunctions": "No functions",
+      "functionsHint": "Tick what people with this role can do.",
+      "normalUserHint": "People without a role are normal users: they only use the modules opened for them. You don’t need to create a “User” role."
     }
   },
   "diesel": {

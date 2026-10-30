@@ -43,6 +43,10 @@ window.GWHome = (function () {
     const isSuper = profile.role === "super_admin";
     const isAdmin = isSuper || !!profile.manages;
     const canPost = isSuper || !!profile.canPost;
+    // 公告能不能改 / 删：super_admin 全部；角色只限它负责的 Business 的公告
+    const inScope = (a) => isSuper || (a.group_id && (profile.businessIds || []).includes(a.group_id));
+    const canEditNotice = (a) => !readOnly && canPost && inScope(a);
+    const canDeleteNotice = (a) => !readOnly && (isSuper || !!profile.canDeleteNotice) && inScope(a);
     const widgetsEnabled = !!(opts && Array.isArray(opts.widgets));
     const uninitialized = readOnly && !data.profile.layout_initialized;
 
@@ -259,7 +263,11 @@ window.GWHome = (function () {
               data.announcements.length
                 ? `<ul class="no-drag -mr-2 space-y-2 overflow-y-auto pr-2 h-[calc(100%-2.25rem)]">${data.announcements
                     .map(
-                      (a) => `<li class="flex gap-2.5 rounded-xl px-3 py-2 text-sm ${a.level === "warning" ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-slate-50 dark:bg-white/5"}">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<div class="min-w-0 flex-1"><p class="whitespace-pre-line break-words">${esc(a.message)}</p>${a.starts_at ? `<p class="mt-0.5 text-[11px] text-slate-400">${esc(when(a.starts_at))}</p>` : ""}</div></li>`,
+                      (a) => `<li class="flex gap-2.5 rounded-xl px-3 py-2 text-sm ${a.level === "warning" ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-slate-50 dark:bg-white/5"}">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<div class="min-w-0 flex-1"><p class="whitespace-pre-line break-words">${esc(a.message)}</p><p class="mt-0.5 text-[11px] text-slate-400">${esc([when(a.starts_at), a.author].filter(Boolean).join(" · "))}</p></div>${
+                        !editing && (canEditNotice(a) || canDeleteNotice(a))
+                          ? `<span class="flex shrink-0 items-start gap-0.5">${canEditNotice(a) ? `<button type="button" data-edit-notice="${a.id}" aria-label="${esc(t("widgets.editNotice"))}" title="${esc(t("widgets.editNotice"))}" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-white/10">${icon("pencil", "size-3.5")}</button>` : ""}${canDeleteNotice(a) ? `<button type="button" data-del-notice="${a.id}" aria-label="${esc(t("widgets.deleteNotice"))}" title="${esc(t("widgets.deleteNotice"))}" class="rounded p-1 text-slate-400 hover:bg-white hover:text-red-600 dark:hover:bg-white/10">${icon("trash-2", "size-3.5")}</button>` : ""}</span>`
+                          : ""
+                      }</li>`,
                     )
                     .join("")}</ul>`
                 : `<div class="flex h-[calc(100%-2.25rem)] flex-col items-center justify-center gap-1 text-center text-sm text-slate-400">${icon("inbox", "size-6")}<span>${esc(t("widgets.noAnnouncements"))}</span></div>`
@@ -532,26 +540,27 @@ window.GWHome = (function () {
       });
     }
 
-    // 在 Notice Board 直接发布公告：super_admin 可发全公司或某个 Business；角色只能发给自己管的 Business
-    async function postNotice() {
+    // 在 Notice Board 直接发布 / 修改公告：super_admin 可发全公司或某个 Business；角色只能发给自己负责的 Business
+    async function postNotice(notice) {
       const { data: groups } = await sb.from("gw_groups").select("id, name").order("sort_order").order("name");
       const targets = [
         ...(isSuper ? [["", t("widgets.postEveryone")]] : []),
         ...(groups || []).filter((g) => isSuper || (profile.businessIds || []).includes(g.id)).map((g) => [g.id, g.name]),
       ];
       if (!targets.length) return toast(t("widgets.postFailed"));
+      const cur = notice || { message: "", group_id: "", level: "info" };
       const dlg = modal(
-        t("widgets.postTitle"),
+        notice ? t("widgets.editNotice") : t("widgets.postTitle"),
         `<form class="space-y-4">
           <div data-err></div>
-          <textarea name="message" required maxlength="500" rows="4" placeholder="${esc(t("widgets.postPlaceholder"))}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900"></textarea>
+          <textarea name="message" required maxlength="500" rows="4" placeholder="${esc(t("widgets.postPlaceholder"))}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900">${esc(cur.message)}</textarea>
           <label class="block space-y-1.5"><span class="${cls.label}">${esc(t("widgets.postAudience"))}</span>
-            <select name="group_id" class="${cls.input}">${targets.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>
+            <select name="group_id" class="${cls.input}">${targets.map(([v, l]) => `<option value="${esc(v)}" ${v === (cur.group_id || "") ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
           </label>
-          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="important" class="size-4 accent-amber-500"> ${esc(t("widgets.postImportant"))}</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="important" ${cur.level === "warning" ? "checked" : ""} class="size-4 accent-amber-500"> ${esc(t("widgets.postImportant"))}</label>
           <div class="flex justify-end gap-2">
             <button type="button" data-cancel class="${btn("secondary")}">${esc(t("settings.cancel"))}</button>
-            <button type="submit" class="${btn("primary")}">${esc(t("widgets.post"))}</button>
+            <button type="submit" class="${btn("primary")}">${esc(notice ? t("widgets.save") : t("widgets.post"))}</button>
           </div>
         </form>`,
       );
@@ -560,13 +569,18 @@ window.GWHome = (function () {
         e.preventDefault();
         const f = e.target;
         const groupId = f.group_id.value || null;
-        const { data: row, error } = await sb
-          .from("gw_announcements")
-          .insert({ message: f.message.value.trim(), level: f.important.checked ? "warning" : "info", group_id: groupId, created_by: profile.id })
-          .select("id, message, level, starts_at")
-          .single();
+        const fields = { message: f.message.value.trim(), level: f.important.checked ? "warning" : "info", group_id: groupId };
+        const { data: row, error } = notice
+          ? await sb.from("gw_announcements").update(fields).eq("id", notice.id).select("id, message, level, starts_at, group_id, created_by").single()
+          : await sb.from("gw_announcements").insert({ ...fields, created_by: profile.id }).select("id, message, level, starts_at, group_id, created_by").single();
         if (error) return ($("[data-err]", dlg.el).innerHTML = GW.alertBox(t("widgets.postFailed")));
         dlg.close();
+        if (notice) {
+          Object.assign(notice, row);
+          draw();
+          return toast(t("widgets.saved"));
+        }
+        row.author = profile.full_name;
         // 发给自己不在的 Business 时，自己的公告栏不会显示，只提示已发布
         if (!groupId || (opts && opts.memberOf && opts.memberOf.includes(groupId))) {
           data.announcements = [row, ...data.announcements];
@@ -574,6 +588,14 @@ window.GWHome = (function () {
         }
         toast(t("widgets.posted"));
       });
+    }
+
+    async function deleteNotice(id) {
+      if (!(await confirmDialog(t("widgets.deleteNotice"), t("widgets.deleteNoticeBody"), t("widgets.delete"), t("settings.cancel")))) return;
+      const { error } = await sb.from("gw_announcements").delete().eq("id", id);
+      if (error) return toast(t("widgets.postFailed"));
+      data.announcements = data.announcements.filter((a) => a.id !== id);
+      draw();
     }
 
     function folderDialog(folder) {
@@ -654,6 +676,8 @@ window.GWHome = (function () {
       if (d.removeFolder) return deleteFolder(d.removeFolder);
       if (d.resize) return resizeWidget(d.resize);
       if ("post" in d) return postNotice();
+      if (d.editNotice) return postNotice(data.announcements.find((a) => a.id === d.editNotice));
+      if (d.delNotice) return deleteNotice(d.delNotice);
       if ("fabToggle" in d) return ((fabOpen = !fabOpen), draw());
       if (d.fab) {
         fabOpen = false;

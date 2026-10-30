@@ -68,9 +68,11 @@ window.GW = (function () {
       // 自订角色：管哪些 Business、能不能发公告（RLS 只给看自己的角色）
       profile.isSuper = profile.role === "super_admin";
       profile.roleName = null;
-      profile.canPost = profile.isSuper;
       profile.businessIds = [];
       profile.adminModules = 0;
+      // 角色功能（super_admin 全部都有）
+      const FLAGS = ["can_post_notice", "can_delete_notice", "can_grant_module", "can_revoke_module", "can_set_module_admin", "can_place_users", "can_view_users", "can_view_audit"];
+      profile.can = Object.fromEntries(FLAGS.map((f) => [f, profile.isSuper]));
       if (!profile.isSuper) {
         // 模块管理员：可以开 / 收回自己管理的模块的权限
         const { count } = await sb.from("gw_module_members").select("module_id", { count: "exact", head: true }).eq("user_id", profile.id).eq("is_admin", true);
@@ -78,15 +80,19 @@ window.GW = (function () {
       }
       if (!profile.isSuper && profile.role_id) {
         const [{ data: role }, { data: biz }] = await Promise.all([
-          sb.from("gw_roles").select("name, can_post_notice").eq("id", profile.role_id).maybeSingle(),
+          sb.from("gw_roles").select("*").eq("id", profile.role_id).maybeSingle(),
           sb.from("gw_role_businesses").select("group_id").eq("role_id", profile.role_id),
         ]);
         profile.roleName = role ? role.name : null;
-        profile.canPost = !!(role && role.can_post_notice);
+        if (role) FLAGS.forEach((f) => (profile.can[f] = !!role[f]));
         profile.businessIds = (biz || []).map((b) => b.group_id);
       }
-      // 有管理权（super_admin、角色管至少一个 Business、或是某个模块的管理员）→ 右上角齿轮进设置页
-      profile.manages = profile.isSuper || profile.businessIds.length > 0 || profile.adminModules > 0;
+      profile.canPost = profile.can.can_post_notice;
+      profile.canDeleteNotice = profile.can.can_delete_notice;
+      // 右上角齿轮（设置页）：super_admin、模块管理员、或角色有设置页里的功能（公告功能在首页 Notice Board，不需要进设置页）
+      const c = profile.can;
+      profile.manages =
+        profile.isSuper || profile.adminModules > 0 || c.can_grant_module || c.can_revoke_module || c.can_set_module_admin || c.can_place_users || c.can_view_users || c.can_view_audit;
     }
     return { session, profile };
   }

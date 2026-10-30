@@ -14,20 +14,21 @@
   /* 设置页（右上角齿轮进来）：
      super_admin → 两个大按钮：User & Group Manage（全部用户 / 群组列表 / 模块权限）、
                    Master Manage（角色、Business、Company、模块、公告、操作记录）
-     自订角色    → 群组列表（自己管的 Business）、模块权限、公告（角色可发公告时）
-     模块管理员  → 模块权限（自己管理的模块） */
+     自订角色    → 依角色功能：用户名单（只看）、群组列表、模块权限、操作记录
+     模块管理员  → 模块权限（自己管理的模块）
+     公告直接在首页的 Notice Board 发布、修改、删除 */
+  const C = me.can;
+  const canAccessPage = isSuper || C.can_grant_module || C.can_revoke_module || C.can_set_module_admin || me.adminModules > 0;
   const SECTIONS = isSuper
     ? [
         ["userGroup", "users-round", ["users", "groups", "access"]],
-        ["master", "database", ["roles", "business", "company", "modules", "announcements", "audit"]],
+        ["master", "database", ["roles", "business", "company", "modules"]],
+        ["audit", "scroll-text", ["audit"]],
       ]
     : [
-        [
-          "userGroup",
-          "users-round",
-          [...(me.businessIds.length ? ["groups"] : []), "access", ...(me.canPost ? ["announcements"] : [])],
-        ],
-      ];
+        ["userGroup", "users-round", [...(C.can_view_users ? ["users"] : []), ...(C.can_place_users ? ["groups"] : []), ...(canAccessPage ? ["access"] : [])]],
+        ...(C.can_view_audit ? [["audit", "scroll-text", ["audit"]]] : []),
+      ].filter(([, , tabs]) => tabs.length);
   const TABS = SECTIONS.flatMap(([, , tabs]) => tabs);
 
   main.innerHTML = `<div class="space-y-5">
@@ -103,8 +104,12 @@
     const roleHas = (gid, mid) => mine.some((x) => x.group_id === gid && x.module_id === mid);
     const locked = (u) => u.id === me.id || u.role === "super_admin";
     // 在某个 Business 里，我能不能改这个人这个模块的 Access / Admin
-    ctx.canAccess = (u, gid, mid) => !locked(u) && (isSuper || roleHas(gid, mid) || (myAdmin(mid) && inGroup(me.id, gid) && groupHas(gid, mid)));
-    ctx.canAdmin = (u, gid, mid) => !locked(u) && (isSuper || roleHas(gid, mid));
+    // 角色功能：加进模块 / 从模块移除 / 设定模块 Admin（模块 Admin 加、移除都可以）
+    const adminReach = (gid, mid) => myAdmin(mid) && inGroup(me.id, gid) && groupHas(gid, mid);
+    ctx.canGrant = (u, gid, mid) => !locked(u) && (isSuper || (me.can.can_grant_module && roleHas(gid, mid)) || adminReach(gid, mid));
+    ctx.canRevoke = (u, gid, mid) => !locked(u) && (isSuper || (me.can.can_revoke_module && roleHas(gid, mid)) || adminReach(gid, mid));
+    ctx.canAccess = (u, gid, mid) => (ctx.rows.has(u.id + ":" + mid) ? ctx.canRevoke(u, gid, mid) : ctx.canGrant(u, gid, mid));
+    ctx.canAdmin = (u, gid, mid) => !locked(u) && (isSuper || (me.can.can_set_module_admin && roleHas(gid, mid)));
     ctx.inGroup = inGroup;
     ctx.companyTags = (mid) => coTags.filter((x) => x.module_id === mid).map((x) => coName.get(x.company_id)).filter(Boolean);
     ctx.groupHas = groupHas;
@@ -278,7 +283,7 @@
     draw();
   }
 
-  // ================================================================ 全部用户（只限 super_admin）
+  // ================================================================ 用户名单（super_admin 可以管理；角色有「看名单」只能看，而且只看得到它负责的 Business 的人）
   async function usersTab() {
     const seq = routeSeq;
     const tu = (k, v) => t("admin.users." + k, v);
@@ -309,8 +314,8 @@
             <option value="active">${esc(tu("status.active"))}</option>
             <option value="disabled">${esc(tu("status.disabled"))}</option>
           </select>
-          <button id="import" class="${btn("secondary")}">${icon("upload")} ${esc(tu("import.button"))}</button>
-          <button id="add" class="${btn("primary")}">${icon("user-plus")} ${esc(tu("add"))}</button>
+          ${isSuper ? `<button id="import" class="${btn("secondary")}">${icon("upload")} ${esc(tu("import.button"))}</button>
+          <button id="add" class="${btn("primary")}">${icon("user-plus")} ${esc(tu("add"))}</button>` : ""}
         </div>
       </div>
       <div id="list"></div>
@@ -340,12 +345,16 @@
                 </div>
                 <div class="flex flex-wrap gap-1.5">
                   <a href="#preview=${u.id}" class="${btn("ghost", "sm")}">${icon("eye")} ${esc(tu("preview"))}</a>
-                  ${u.role !== "super_admin" ? `<button data-access="${u.id}" class="${btn("secondary", "sm")}">${icon("layout-grid")} ${esc(tu("access"))}</button>` : ""}
+                  ${
+                    isSuper
+                      ? `${u.role !== "super_admin" ? `<button data-access="${u.id}" class="${btn("secondary", "sm")}">${icon("layout-grid")} ${esc(tu("access"))}</button>` : ""}
                   <button data-edit="${u.id}" class="${btn("ghost", "sm")}">${icon("pencil")} ${esc(tu("edit"))}</button>
                   <button data-reset="${u.id}" class="${btn("ghost", "sm")}">${icon("key-round")} ${esc(tu("resetPassword"))}</button>
                   ${
                     u.id !== me.id
                       ? `<button data-status="${u.id}" class="${btn(u.status === "active" ? "ghost" : "secondary", "sm")} ${u.status === "active" ? "text-red-600 dark:text-red-400" : ""}">${esc(u.status === "active" ? tu("disable") : tu("enable"))}</button>`
+                      : ""
+                  }`
                       : ""
                   }
                 </div>
@@ -520,8 +529,10 @@
     $("#q").addEventListener("input", (e) => ((filter.q = e.target.value), drawList()));
     $("#role-filter").addEventListener("change", (e) => ((filter.role = e.target.value), drawList()));
     $("#status").addEventListener("change", (e) => ((filter.status = e.target.value), drawList()));
-    $("#add").onclick = () => userDialog(null);
-    $("#import").onclick = importDialog;
+    if (isSuper) {
+      $("#add").onclick = () => userDialog(null);
+      $("#import").onclick = importDialog;
+    }
     $("#list").addEventListener("click", async (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -760,44 +771,52 @@
     const groupName = new Map(groups.map((g) => [g.id, g.name]));
     const modsOf = (gid) => gm.filter((x) => x.group_id === gid && modById.has(x.module_id)).map((x) => modById.get(x.module_id));
 
+    // 角色功能（顺序 = 表格和弹出视窗里的顺序）
+    const FUNCS = ["can_post_notice", "can_delete_notice", "can_grant_module", "can_revoke_module", "can_set_module_admin", "can_place_users", "can_view_users", "can_view_audit"];
+    const th = (text, extra) => `<th class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase ${extra || ""}">${esc(text)}</th>`;
+
     view.innerHTML = `<div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-sm text-slate-500">${esc(tr("description"))}</p>
-        <button id="role-add" class="${btn("primary")}">${icon("plus")} ${esc(tr("add"))}</button>
+        <p class="max-w-3xl text-sm text-slate-500">${esc(tr("description"))}</p>
+        <button id="role-add" class="${btn("primary")} shrink-0">${icon("plus")} ${esc(tr("add"))}</button>
       </div>
       ${
         roles.length
-          ? `<div class="grid gap-4 xl:grid-cols-2">${roles
-              .map((r) => {
-                const biz = rb.filter((x) => x.role_id === r.id);
-                return `<div class="${cls.card} p-4">
-                  <div class="flex items-start gap-2">
-                    <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">${icon("shield-check", "size-5")}</span>
-                    <div class="min-w-0 flex-1">
-                      <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">${esc(r.name)}</span>${r.can_post_notice ? badge(tr("canPost"), "green") : ""}</div>
-                      <p class="text-xs text-slate-500">${esc(tr("people", { count: users.filter((u) => u.role_id === r.id).length }))}${r.description ? " · " + esc(r.description) : ""}</p>
-                    </div>
-                    <button data-edit="${r.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
-                    <button data-del="${r.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
-                  </div>
-                  <div class="mt-3 space-y-2">${
-                    biz.length
-                      ? biz
-                          .map((b) => {
-                            const ms = rm.filter((x) => x.role_id === r.id && x.group_id === b.group_id).map((x) => modById.get(x.module_id)).filter(Boolean);
-                            return `<div class="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
-                              <p class="flex items-center gap-1.5 text-sm font-medium">${icon("briefcase-business", "size-4 text-brand-600")}${esc(groupName.get(b.group_id) || "")}</p>
-                              <p class="mt-0.5 text-xs text-slate-500">${ms.length ? esc(tr("manages", { list: ms.map((m) => m.name).join(", ") })) : esc(tr("placeOnly"))}</p>
-                            </div>`;
-                          })
-                          .join("")
-                      : `<p class="text-sm text-slate-400">${esc(tr("noBusiness"))}</p>`
-                  }</div>
-                </div>`;
-              })
-              .join("")}</div>`
+          ? `<div class="${cls.card} overflow-x-auto">
+              <table class="w-full min-w-[760px] text-sm">
+                <thead class="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-white/5"><tr>
+                  ${th(tr("colRole"))}${th(tr("colFunctions"))}${th(tr("colScope"))}${th(tr("colPeople"), "text-right")}<th class="w-24"></th>
+                </tr></thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">${roles
+                  .map((r) => {
+                    const biz = rb.filter((x) => x.role_id === r.id);
+                    const funcs = FUNCS.filter((f) => r[f]);
+                    return `<tr class="align-top">
+                      <td class="px-4 py-3"><div class="font-semibold">${esc(r.name)}</div>${r.description ? `<div class="text-xs text-slate-500">${esc(r.description)}</div>` : ""}</td>
+                      <td class="px-4 py-3"><div class="flex max-w-xs flex-wrap gap-1">${funcs.length ? funcs.map((f) => badge(tr("funcs." + f), "green")).join("") : `<span class="text-xs text-slate-400">${esc(tr("noFunctions"))}</span>`}</div></td>
+                      <td class="px-4 py-3">${
+                        biz.length
+                          ? biz
+                              .map((b) => {
+                                const ms = rm.filter((x) => x.role_id === r.id && x.group_id === b.group_id).map((x) => modById.get(x.module_id)).filter(Boolean);
+                                return `<div class="mb-1 last:mb-0"><span class="font-medium">${esc(groupName.get(b.group_id) || "")}</span>${ms.length ? `<span class="text-xs text-slate-500"> · ${esc(ms.map((m) => m.name).join(", "))}</span>` : ""}</div>`;
+                              })
+                              .join("")
+                          : `<span class="text-xs text-slate-400">${esc(tr("noBusiness"))}</span>`
+                      }</td>
+                      <td class="px-4 py-3 text-right">${users.filter((u) => u.role_id === r.id).length}</td>
+                      <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <button data-edit="${r.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
+                        <button data-del="${r.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                      </td>
+                    </tr>`;
+                  })
+                  .join("")}</tbody>
+              </table>
+            </div>`
           : empty(tr("empty"))
       }
+      <p class="text-xs text-slate-500">${esc(tr("normalUserHint"))}</p>
     </div>`;
     refreshIcons();
 
@@ -810,7 +829,13 @@
           <div data-err></div>
           ${field(tr("name"), `<input name="name" required maxlength="60" value="${esc(r ? r.name : "")}" placeholder="${esc(tr("namePlaceholder"))}" class="${cls.input}">`)}
           ${field(tg("descriptionLabel"), `<input name="description" value="${esc(r ? r.description || "" : "")}" class="${cls.input}">`)}
-          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="can_post_notice" ${r && r.can_post_notice ? "checked" : ""} class="size-4 accent-emerald-600"> ${esc(tr("canPostLabel"))}</label>
+          <div>
+            <p class="${cls.label}">${esc(tr("colFunctions"))}</p>
+            <p class="mb-2 text-xs text-slate-500">${esc(tr("functionsHint"))}</p>
+            <div class="grid gap-x-4 gap-y-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 dark:border-slate-800">${FUNCS.map(
+              (f) => `<label class="flex items-start gap-2 text-sm"><input type="checkbox" name="${f}" ${r && r[f] ? "checked" : ""} class="mt-0.5 size-4 shrink-0 accent-emerald-600"><span><span class="font-medium">${esc(tr("funcs." + f))}</span><span class="block text-xs text-slate-500">${esc(tr("funcHints." + f))}</span></span></label>`,
+            ).join("")}</div>
+          </div>
           <div>
             <p class="${cls.label}">${esc(tr("scope"))}</p>
             <p class="mb-2 text-xs text-slate-500">${esc(tr("scopeHint"))}</p>
@@ -856,7 +881,7 @@
         e.preventDefault();
         const f = e.target;
         const fail = (error) => ($("[data-err]", m.el).innerHTML = alertBox(error && error.code === "23505" ? tr("duplicate") : tg("saveFailed")));
-        const row = { name: f.name.value.trim(), description: f.description.value.trim() || null, can_post_notice: f.can_post_notice.checked };
+        const row = { name: f.name.value.trim(), description: f.description.value.trim() || null, ...Object.fromEntries(FUNCS.map((k) => [k, f[k].checked])) };
         const saved = r ? await sb.from("gw_roles").update(row).eq("id", r.id).select().single() : await sb.from("gw_roles").insert(row).select().single();
         if (saved.error) return fail(saved.error);
         const id = saved.data.id;
@@ -1416,102 +1441,6 @@
     refreshIcons();
   }
 
-  // ================================================================ 公告
-  async function announcementsTab() {
-    const seq = routeSeq;
-    const ta = (k, v) => t("admin.announcements." + k, v);
-    const [announcements, allGroups] = await Promise.all([
-      sb.from("gw_announcements").select("*").order("created_at", { ascending: false }).then((r) => r.data || []),
-      sb.from("gw_groups").select("id, name").order("sort_order").order("name").then((r) => r.data || []),
-    ]);
-    // 可以发给谁：super_admin 全公司或任何 Business；角色只能发给自己管的 Business
-    const groups = allGroups.filter((g) => isSuper || (me.businessIds || []).includes(g.id));
-    const groupName = new Map(allGroups.map((g) => [g.id, g.name]));
-    const now = Date.now();
-    const status = (a) =>
-      !a.is_active ? badge(ta("off"))
-      : new Date(a.starts_at).getTime() > now ? badge(ta("scheduled"), "amber")
-      : a.ends_at && new Date(a.ends_at).getTime() <= now ? badge(ta("ended"))
-      : badge(ta("live"), "green");
-    // datetime-local 使用浏览器时区
-    const toLocalInput = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-
-    if (stale(seq)) return;
-    view.innerHTML = `<div class="space-y-4">
-      <div class="flex items-center justify-between gap-2">
-        <p class="text-sm text-slate-500">${esc(isSuper ? ta("descriptionSuper") : ta("descriptionAdmin"))}</p>
-        <button id="add" class="${btn("primary")}">${icon("plus")} ${esc(ta("add"))}</button>
-      </div>
-      ${
-        announcements.length
-          ? `<div class="${cls.card} divide-y divide-slate-200 dark:divide-slate-800">${announcements
-              .map(
-                (a) => `<div class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
-                  <div class="min-w-0 flex-1">
-                    <div class="mb-1 flex flex-wrap items-center gap-2">${status(a)}${badge(ta("levels." + a.level), a.level === "warning" ? "amber" : "blue")}${badge(a.group_id ? groupName.get(a.group_id) || "—" : ta("allCompany"))}</div>
-                    <p class="text-sm whitespace-pre-line">${esc(a.message)}</p>
-                    <p class="mt-1 text-xs text-slate-400">${esc(fmtDateTime(a.starts_at))} → ${esc(a.ends_at ? fmtDateTime(a.ends_at) : ta("noEnd"))}</p>
-                  </div>
-                  <div class="flex gap-1.5">
-                    <button data-toggle="${a.id}" class="${btn("secondary", "sm")}">${esc(a.is_active ? ta("turnOff") : ta("turnOn"))}</button>
-                    <button data-del="${a.id}" aria-label="${esc(ta("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
-                  </div>
-                </div>`,
-              )
-              .join("")}</div>`
-          : empty(ta("empty"))
-      }
-    </div>`;
-
-    $("#add").onclick = () => {
-      const m = modal(
-        ta("addTitle"),
-        `<form class="space-y-4">
-          <div data-err></div>
-          ${field(ta("message"), `<textarea name="message" required maxlength="500" rows="3" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900"></textarea>`)}
-          <div class="grid gap-4 sm:grid-cols-2">
-            ${field(ta("level"), select("level", [["info", ta("levels.info")], ["warning", ta("levels.warning")]], "info"))}
-            ${field(
-              ta("audience"),
-              select("group_id", [...(isSuper ? [["", ta("allCompany")]] : []), ...groups.map((g) => [g.id, g.name])], ""),
-            )}
-            ${field(ta("startsAt"), `<input name="starts_at" type="datetime-local" required value="${toLocalInput(new Date())}" class="${cls.input}">`)}
-            ${field(ta("endsAt"), `<input name="ends_at" type="datetime-local" class="${cls.input}">`)}
-          </div>
-          <div class="flex justify-end gap-2">
-            <button type="button" data-cancel class="${btn("secondary")}">${esc(ta("cancel"))}</button>
-            <button type="submit" class="${btn("primary")}">${esc(ta("publish"))}</button>
-          </div>
-        </form>`,
-      );
-      $("[data-cancel]", m.el).onclick = m.close;
-      $("form", m.el).addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const f = e.target;
-        const { error } = await sb.from("gw_announcements").insert({
-          message: f.message.value.trim(),
-          level: f.level.value,
-          group_id: f.group_id.value || null,
-          starts_at: new Date(f.starts_at.value).toISOString(),
-          ends_at: f.ends_at.value ? new Date(f.ends_at.value).toISOString() : null,
-          created_by: me.id,
-        });
-        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(ta("saveFailed")));
-        m.close();
-        announcementsTab();
-      });
-    };
-    view.onclick = async (e) => {
-      const b = e.target.closest("[data-toggle],[data-del]");
-      if (!b) return;
-      const a = announcements.find((x) => x.id === (b.dataset.toggle || b.dataset.del));
-      if (b.dataset.toggle) await sb.from("gw_announcements").update({ is_active: !a.is_active }).eq("id", a.id);
-      else await sb.from("gw_announcements").delete().eq("id", a.id);
-      announcementsTab();
-    };
-    refreshIcons();
-  }
-
   // ================================================================ 操作记录
   async function auditTab() {
     const seq = routeSeq;
@@ -1664,7 +1593,7 @@
   }
 
   // ---------------------------------------------------------------- 分页切换（#users、#groups、#preview=id …）
-  const HANDLERS = { users: usersTab, groups: groupsTab, access: accessTab, roles: rolesTab, business: businessTab, company: companyTab, modules: modulesTab, announcements: announcementsTab, audit: auditTab };
+  const HANDLERS = { users: usersTab, groups: groupsTab, access: accessTab, roles: rolesTab, business: businessTab, company: companyTab, modules: modulesTab, audit: auditTab };
   async function route() {
     const hash = location.hash.slice(1) || TABS[0];
     const [name, arg] = hash.split("=");
@@ -1680,6 +1609,7 @@
             }">${icon(ic, "size-5")}${esc(t("admin.sections." + k))}</a>`,
           ).join("")
         : "";
+    $("#tabs").parentElement.classList.toggle("hidden", section[2].length < 2);
     $("#tabs").innerHTML = section[2]
       .map(
         (k) => `<a href="#${k}" class="rounded-lg px-3.5 py-1.5 text-sm font-medium whitespace-nowrap ${

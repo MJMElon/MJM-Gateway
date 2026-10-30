@@ -17,7 +17,7 @@ login.html               登录封面（MJM 字标 assets/mjm-logo 落下，接�
 library.html             模块库
 settings.html            个人设置（语言、浅色/深色、重设首页、改密码）
 diesel/index.html        Diesel Claims 模块：车辆、加油报销（收据照片）、审核、统计（说明见 docs/diesel.md）
-admin.html               设置页（右上角齿轮）：User & Group Manage（全部用户、群组列表、模块权限）＋ Master Manage（角色、Business、Company、模块、公告、操作记录）
+admin.html               设置页（右上角齿轮）：User & Group Manage（用户名单、群组列表、模块权限）＋ Master Manage（Role、Business、Company、Module）＋ Audit Log；公告在首页 Notice Board 直接发布 / 修改 / 删除
 shared/head.js           每页第一个载入：主题、Tailwind、共用函式库（版本在这里统一改）
 shared/config.js         Supabase 网址与 anon key
 shared/core.js           登录检查、页面外框、对话框、Edge Function 调用、Excel
@@ -47,10 +47,10 @@ docs/                    目标系统接入说明、上线步骤
 - **权限和版面分开存**：权限关掉的模块不显示，但 `gw_user_layout` 记录保留；权限开回来，原位置还在
 - 谁能管
   - `super_admin`：全部（用户、角色、Business、Company、模块、公告、操作记录）
-  - **自订角色**（`gw_roles`，例如 HR）：super_admin 命名并设定
-    - 负责哪些 Business（`gw_role_businesses`）：可以把人放进 / 移出、换 Company
-    - 负责这些 Business 的哪些模块（`gw_role_modules`）：可以开 / 收回 Access，也可以指定模块 Admin
-    - 可否在 Notice Board 发公告（只给它负责的 Business 的人看）
+  - **自订角色**（`gw_roles`，例如 HR）：super_admin 命名，勾选功能，并勾选负责的范围
+    - 功能：更新公告栏、删除公告、把人加进模块、把人从模块移除、设定模块 Admin、把人放进 Business、看用户名单、看操作记录
+    - 范围：负责哪些 Business（`gw_role_businesses`）＋ 每个 Business 底下哪些模块（`gw_role_modules`）；功能只在范围内有效
+    - 没有角色的人 = 一般用户
   - **模块 Admin**：可以把这个模块开给 / 收回同一个 Business 的人，但不能指定别人当 Admin
   - 都不能改自己的权限，也不能动 super_admin
 - 操作记录 `gw_audit_logs` 由触发器自动写入，不能修改、不能删除（连 service_role 也不行）；只有 super_admin 看得到
