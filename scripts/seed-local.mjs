@@ -125,6 +125,30 @@ await must(
     ["WIKI", "HR"].map((m) => ({ role_id: hrRole.id, group_id: grp["全体员工"], module_id: mod[m] })),
   ),
 );
+// Diesel 模块（migration 已建立 DIESEL 模块）：放进「总部车队」；车队组长是 Admin，陈司机、新同事可以报销
+const [diesel] = await must(db.from("gw_modules").select("id").eq("code", "DIESEL"));
+if (diesel) {
+  await must(db.from("gw_group_modules").upsert({ group_id: grp["总部车队"], module_id: diesel.id }));
+  await must(
+    db.from("gw_module_members").upsert(
+      [
+        ["fleet.lead@mjm.local", true],
+        ["driver@mjm.local", false],
+        ["new@mjm.local", false],
+      ].map(([e, admin]) => ({ user_id: ids[e], module_id: diesel.id, is_admin: admin })),
+    ),
+  );
+  await must(
+    db.from("diesel_vehicles").upsert(
+      [
+        { plate_no: "WXY 1234", name: "Toyota Hilux", vehicle_type: "pickup", tank_capacity_l: 80, group_id: grp["总部车队"], driver_id: ids["driver@mjm.local"] },
+        { plate_no: "BKT 5678", name: "Isuzu NPR", vehicle_type: "lorry", tank_capacity_l: 100, group_id: grp["总部车队"] },
+        { plate_no: "EXC 01", name: "Excavator PC200", vehicle_type: "machinery", tank_capacity_l: 400, group_id: grp["总部车队"] },
+      ],
+      { onConflict: "plate_no" },
+    ),
+  );
+}
 await must(db.from("gw_announcements").insert({ message: "欢迎使用 MJM Gateway！所有公司系统都可以从这里打开。", level: "info" }));
 
 console.log(`完成。所有测试帐号的密码：${PASSWORD}`);

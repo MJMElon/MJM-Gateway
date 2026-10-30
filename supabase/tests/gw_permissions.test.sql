@@ -19,7 +19,7 @@ insert into auth.users (id, email, instance_id, aud, role) values
   ('00000000-0000-0000-0000-0000000000a6', 'pending@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated');
 
 insert into public.gw_modules (id, code, name, url) values
-  ('00000000-0000-0000-0000-0000000000b1', 'DIESEL', 'Diesel', 'https://diesel.example.com'),
+  ('00000000-0000-0000-0000-0000000000b1', 'FUEL', 'Fuel', 'https://fuel.example.com'),
   ('00000000-0000-0000-0000-0000000000b2', 'HR', '人事系统', 'https://hr.example.com'),
   ('00000000-0000-0000-0000-0000000000b3', 'WIKI', '公司知识库', 'https://wiki.example.com'),
   ('00000000-0000-0000-0000-0000000000b4', 'OLD', '旧系统', 'https://old.example.com');
@@ -80,7 +80,7 @@ $$;
 -- ---------------------------------------------------------------------
 select set_eq(
   $$ select code from public.gw_modules where id in (select public.gw__effective_module_ids('00000000-0000-0000-0000-0000000000a3')) $$,
-  array['DIESEL', 'WIKI'],
+  array['FUEL', 'WIKI'],
   '两个 Business 都在：开给他的模块都看得到'
 );
 select set_eq(
@@ -97,7 +97,7 @@ select is(
 -- 2. 一般用户
 -- ---------------------------------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
-select set_eq($$ select code from public.gw_modules $$, array['DIESEL', 'WIKI'], '用户只看到自己有权限的模块（连名字都看不到其他的）');
+select set_eq($$ select code from public.gw_modules $$, array['FUEL', 'WIKI'], '用户只看到自己有权限的模块（连名字都看不到其他的）');
 select is((select count(*) from public.gw_profiles)::int, 1, '用户只看到自己的资料');
 select is((select count(*) from public.gw_audit_logs)::int, 0, '一般用户看不到操作记录');
 select throws_ok(
@@ -288,7 +288,7 @@ select throws_ok(
 select pg_temp.logout();
 select set_eq(
   $$ select code from public.gw_modules where id in (select public.gw__effective_module_ids('00000000-0000-0000-0000-0000000000a6')) $$,
-  array['WIKI', 'DIESEL'], '两个角色各自开的模块都生效'
+  array['WIKI', 'FUEL'], '两个角色各自开的模块都生效'
 );
 
 -- 移出 Business：那个 Business 的模块自动收回
@@ -316,7 +316,7 @@ select pg_temp.logout();
 select ok((select count(*) from public.gw_audit_logs) > 0, '权限改动自动写入操作记录');
 select is(
   (select target_label from public.gw_audit_logs where target_type = 'module_members' and action = 'insert' order by id desc limit 1),
-  'DIESEL → pending@test.local', '开模块的操作记录有可读的对象说明'
+  'FUEL → pending@test.local', '开模块的操作记录有可读的对象说明'
 );
 select throws_ok($$ delete from public.gw_audit_logs $$, '42501', null, '操作记录不能删除（连数据库管理员也不行）');
 

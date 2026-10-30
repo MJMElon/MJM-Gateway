@@ -16,12 +16,14 @@ index.html               主画面（像 iPhone）：App、小工具、文件夹
 login.html               登录封面（MJM 字标 assets/mjm-logo 落下，接着出现白色玻璃登录框）、忘记密码、改密码
 library.html             模块库
 settings.html            个人设置（语言、浅色/深色、重设首页、改密码）
+diesel/index.html        Diesel Claims 模块：车辆、加油报销（收据照片）、审核、统计（说明见 docs/diesel.md）
 admin.html               设置页（右上角齿轮）：User & Group Manage（全部用户、群组列表、模块权限）＋ Master Manage（角色、Business、Company、模块、公告、操作记录）
 shared/head.js           每页第一个载入：主题、Tailwind、共用函式库（版本在这里统一改）
 shared/config.js         Supabase 网址与 anon key
 shared/core.js           登录检查、页面外框、对话框、Edge Function 调用、Excel
 shared/home.js           主画面（首页与后台预览共用）；小工具资料存 gw_user_widgets
 shared/admin.js          权限后台
+shared/diesel.js         Diesel Claims 模块
 lang/en.js lang/zh-CN.js  界面文字（英文 / 简体中文）
 supabase/migrations/     数据库 migration（只新增 gw_* 对象）
 supabase/functions/      Edge Functions：gw-auth、gw-admin、gw-issue-token、gw-check-access、gw-jwks
