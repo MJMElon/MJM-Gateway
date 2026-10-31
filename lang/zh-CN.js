@@ -115,7 +115,12 @@ window.GW_LANG["zh-CN"] = {
     "cancel": "取消",
     "delete": "删除",
     "save": "保存",
-    "close": "关闭"
+    "close": "关闭",
+    "editLink": "修改图示",
+    "linkName": "名称",
+    "linkUrl": "网址",
+    "linkIcon": "图示",
+    "badUrl": "网址要以 https:// 开头"
   },
   "library": {
     "title": "模块库",
@@ -166,7 +171,8 @@ window.GW_LANG["zh-CN"] = {
     "homeScreen": "主画面（不放文件夹）",
     "moveOut": "移回主画面",
     "emptyFolder": "这个文件夹是空的。在「编辑主画面」用 App 的 … 选单把它移进来。",
-    "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。"
+    "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。",
+    "addLink": "新增图示（连结）"
   },
   "widgets": {
     "unavailable": "小工具要等下次系统更新后才能使用。",
@@ -242,7 +248,8 @@ window.GW_LANG["zh-CN"] = {
       "access": "这个 Business 的模块",
       "counts": "{companies} 个 Company · {members} 人",
       "code": "Business 代码",
-      "badCode": "代码格式不对，请用 2–20 个大写英文、数字、- 或 _。"
+      "badCode": "代码格式不对，请用 2–20 个大写英文、数字、- 或 _。",
+      "noModules": "还没有连结模块，请到"
     },
     "company": {
       "description": "Company 是所有系统共用的主资料，一个 Company 可以属于多个 Business。Company 代码固定不变，用来对应现有系统里的公司。",
@@ -311,14 +318,15 @@ window.GW_LANG["zh-CN"] = {
       "noCompanies": "这个 Business 还没有 Company，请到这里新增：",
       "noBusiness": "还没有 Business，请先到这里设定：",
       "appsCount": "{count} 个 App",
-      "apps": "模块权限"
+      "apps": "模块权限",
+      "pendingCompany": "待分配 Company"
     },
     "title": "权限后台",
     "pageTitle": "User Setting",
     "backToPortal": "返回 Portal",
     "tabs": {
       "users": "全部用户",
-      "groups": "群组列表",
+      "groups": "群组管理",
       "business": "Business",
       "company": "Company",
       "modules": "模块",
@@ -404,7 +412,9 @@ window.GW_LANG["zh-CN"] = {
         }
       },
       "allRoles": "全部角色",
-      "roleHint": "角色在 Master Manage → 角色 设定。一般用户没有管理权。"
+      "roleHint": "角色在 Master Manage → 角色 设定。一般用户没有管理权。",
+      "allModules": "全部模块",
+      "details": "资料"
     },
     "groups": {
       "description": "群组决定一群人能用哪些模块。",
@@ -429,9 +439,9 @@ window.GW_LANG["zh-CN"] = {
       "description": "大家可以从 MJM Connect 打开的每一个 模块。System = MJM Connect 旗下的系统（例如 Diesel）；Link = 现有系统或任何外部网站。给每个 模块 标上 Business（和 Company），开权限时就会出现在对的地方。",
       "add": "新增模块",
       "addTitle": "新增模块",
-      "editTitle": "编辑模块",
+      "editTitle": "修改模块",
       "edit": "编辑",
-      "empty": "还没有模块。",
+      "empty": "还没有系统模块。",
       "active": "上架",
       "inactive": "下架",
       "activate": "上架",
@@ -445,7 +455,7 @@ window.GW_LANG["zh-CN"] = {
       "codeHint": "大写英文、数字、- 或 _，例如 DIESEL-HQ。",
       "name": "名称",
       "url": "网址",
-      "descriptionLabel": "一行说明",
+      "descriptionLabel": "说明",
       "category": "类别",
       "accessLevel": "接入级别",
       "openMode": "打开方式",
@@ -483,7 +493,11 @@ window.GW_LANG["zh-CN"] = {
       "companyTags": "Company 标签",
       "companyTagsHint": "这个 模块 是给哪些 Company 用的（开权限时显示）。",
       "noTags": "还没有 Business 标签，没办法开权限给任何人。",
-      "noOptions": "还没有。"
+      "noOptions": "还没有。",
+      "uploadPhoto": "上传照片",
+      "uploadFailed": "照片上传失败。",
+      "tickAll": "全选",
+      "noCompanies": "这个 Business 还没有 Company。"
     },
     "preview": {
       "banner": "正在以 {name}（{email}）的身份预览首页（只读）",
@@ -594,7 +608,9 @@ window.GW_LANG["zh-CN"] = {
         "can_remove_business_user": "把人移出 Business",
         "can_view_user_group": "看 User & Group Manage",
         "can_view_users": "看全部用户名单",
-        "can_view_audit": "看操作记录"
+        "can_view_audit": "看操作记录",
+        "can_edit_module_name": "改模块名称",
+        "can_manage_module_access": "管理模块内用户权限"
       },
       "colRole": "角色",
       "colFunctions": "角色功能",
@@ -605,8 +621,17 @@ window.GW_LANG["zh-CN"] = {
       "normalUserHint": "没有角色的人就是一般用户：只能用开给他的模块。不需要另外建立「User」角色。",
       "groups": {
         "noticeBoard": "公告栏",
-        "userAccess": "用户权限"
+        "module": "模块",
+        "business": "Business",
+        "view": "查看"
       }
+    },
+    "userWindow": {
+      "modules": "这个用户可以用的模块",
+      "noModules": "还没有模块。",
+      "noBusiness": "还没放进任何 Business。",
+      "noPermission": "看得到这个用户有 {name}，但你的角色不能管理它里面的权限。",
+      "tickAccessFirst": "先勾 Access 才能设定其他项目。"
     }
   },
   "diesel": {

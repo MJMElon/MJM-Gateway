@@ -115,7 +115,12 @@ window.GW_LANG["en"] = {
     "cancel": "Cancel",
     "delete": "Delete",
     "save": "Save",
-    "close": "Close"
+    "close": "Close",
+    "editLink": "Edit icon",
+    "linkName": "Name",
+    "linkUrl": "Website address",
+    "linkIcon": "Icon",
+    "badUrl": "The address must start with https://"
   },
   "library": {
     "title": "Library",
@@ -166,7 +171,8 @@ window.GW_LANG["en"] = {
     "homeScreen": "Home screen (no folder)",
     "moveOut": "Move to home screen",
     "emptyFolder": "This folder is empty. Use an app’s … menu in Edit Home Screen to move it here.",
-    "emptyHome": "Your home screen is empty. Tap the + button to add apps and widgets."
+    "emptyHome": "Your home screen is empty. Tap the + button to add apps and widgets.",
+    "addLink": "Add Icon (link)"
   },
   "widgets": {
     "unavailable": "Widgets will be available after the next system update.",
@@ -242,7 +248,8 @@ window.GW_LANG["en"] = {
       "access": "Modules in this business",
       "counts": "{companies} companies · {members} people",
       "code": "Business code",
-      "badCode": "Invalid code. Use 2–20 capital letters, numbers, - or _."
+      "badCode": "Invalid code. Use 2–20 capital letters, numbers, - or _.",
+      "noModules": "No modules linked yet. Link them under"
     },
     "company": {
       "description": "Companies are master data shared by every system. A company can belong to several businesses. Its code never changes and is used to match the company in existing systems.",
@@ -311,14 +318,15 @@ window.GW_LANG["en"] = {
       "noCompanies": "No companies in this business yet. Add them under",
       "noBusiness": "No businesses yet. Set them up in",
       "appsCount": "Apps: {count}",
-      "apps": "Module access"
+      "apps": "Module access",
+      "pendingCompany": "Pending allocation to company"
     },
     "title": "Admin",
     "pageTitle": "User Setting",
     "backToPortal": "Back to Portal",
     "tabs": {
-      "users": "Full user list",
-      "groups": "Group list",
+      "users": "All users",
+      "groups": "Group Manage",
       "business": "Business",
       "company": "Company",
       "modules": "Module",
@@ -404,7 +412,9 @@ window.GW_LANG["en"] = {
         }
       },
       "allRoles": "All roles",
-      "roleHint": "Roles are set up under Master Manage → Roles. A User has no management rights."
+      "roleHint": "Roles are set up under Master Manage → Roles. A User has no management rights.",
+      "allModules": "All modules",
+      "details": "Details"
     },
     "groups": {
       "description": "Groups decide which modules a set of people can use.",
@@ -431,7 +441,7 @@ window.GW_LANG["en"] = {
       "addTitle": "Add module",
       "editTitle": "Edit module",
       "edit": "Edit",
-      "empty": "No modules yet.",
+      "empty": "No system modules yet.",
       "active": "Active",
       "inactive": "Inactive",
       "activate": "Activate",
@@ -445,7 +455,7 @@ window.GW_LANG["en"] = {
       "codeHint": "Capital letters, numbers, - or _, e.g. DIESEL-HQ.",
       "name": "Name",
       "url": "URL",
-      "descriptionLabel": "One-line description",
+      "descriptionLabel": "Description",
       "category": "Category",
       "accessLevel": "Access level",
       "openMode": "Open in",
@@ -483,7 +493,11 @@ window.GW_LANG["en"] = {
       "companyTags": "Company tags",
       "companyTagsHint": "Which companies this module is for (shown when giving access).",
       "noTags": "No business tag yet — nobody can be given access.",
-      "noOptions": "None yet."
+      "noOptions": "None yet.",
+      "uploadPhoto": "Upload photo",
+      "uploadFailed": "Could not upload the photo.",
+      "tickAll": "Tick all",
+      "noCompanies": "This business has no companies yet."
     },
     "preview": {
       "banner": "Previewing the home page of {name} ({email}) — read only",
@@ -594,7 +608,9 @@ window.GW_LANG["en"] = {
         "can_remove_business_user": "Remove user from a business",
         "can_view_user_group": "View User & Group Manage",
         "can_view_users": "View full user list",
-        "can_view_audit": "View audit log"
+        "can_view_audit": "View audit log",
+        "can_edit_module_name": "Edit module name",
+        "can_manage_module_access": "Manage module user access"
       },
       "colRole": "Role",
       "colFunctions": "Role functions",
@@ -605,8 +621,17 @@ window.GW_LANG["en"] = {
       "normalUserHint": "People without a role are normal users: they only use the modules opened for them. You don’t need to create a “User” role.",
       "groups": {
         "noticeBoard": "Notice Board",
-        "userAccess": "User Access"
+        "module": "Module",
+        "business": "Business",
+        "view": "View"
       }
+    },
+    "userWindow": {
+      "modules": "Modules this user can access",
+      "noModules": "No modules yet.",
+      "noBusiness": "Not in any business yet.",
+      "noPermission": "You can see that this user has {name}, but your role cannot manage access inside it.",
+      "tickAccessFirst": "Tick Access first to set the other options."
     }
   },
   "diesel": {

@@ -17,7 +17,8 @@ login.html               登录封面（MJM 字标 assets/mjm-logo 落下，接�
 library.html             模块库
 settings.html            个人设置（语言、浅色/深色、重设首页、改密码）
 diesel/index.html        Diesel Claims 模块：车辆、加油报销（收据照片）、审核、统计（说明见 docs/diesel.md）
-admin.html               设置页（右上角齿轮）：User & Group Manage（用户名单、群组列表、模块权限）＋ Master Manage（Role、Business、Company、Module）＋ Audit Log；公告在首页 Notice Board 直接发布 / 修改 / 删除
+admin.html               设置页（右上角齿轮）：User & Group Manage（Group Manage、All users）＋ Master Manage（Role、Business、Company、Module）＋ Audit Log；公告在首页 Notice Board 直接发布 / 修改 / 删除
+                         Module 只列系统模块（照片、Business / Company 标签）；外部网站由用户在主画面「Add Icon」自己加（gw_user_links）
 shared/head.js           每页第一个载入：主题、Tailwind、共用函式库（版本在这里统一改）
 shared/config.js         Supabase 网址与 anon key
 shared/core.js           登录检查、页面外框、对话框、Edge Function 调用、Excel

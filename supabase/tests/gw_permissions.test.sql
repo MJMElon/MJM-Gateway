@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(92);
+select plan(98);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -324,6 +324,19 @@ select lives_ok($$ update public.gw_announcements set message = 'Plantation 后�
 select lives_ok($$ delete from public.gw_announcements where group_id = '00000000-0000-0000-0000-0000000000c1' $$, '有「删除」功能可以删除公告');
 select is((select count(*) from public.gw_announcements)::int, 0, '公告已删除');
 select pg_temp.logout();
+-- 角色功能：改模块名称、管理模块内用户权限
+update public.gw_roles set can_edit_module_name = true, can_manage_module_access = true where id = '00000000-0000-0000-0000-0000000000f2';
+select pg_temp.login('00000000-0000-0000-0000-0000000000a5');
+select lives_ok($$ select public.gw_rename_module('00000000-0000-0000-0000-0000000000b1', 'Fuel 2', 'renamed') $$, '有「改模块名称」的角色可以改范围内模块的名称');
+select throws_ok($$ select public.gw_rename_module('00000000-0000-0000-0000-0000000000b3', 'X', null) $$, '42501', null, '不能改范围外的模块');
+select ok(exists (select 1 from public.gw_my_admin_module_ids() m where m = '00000000-0000-0000-0000-0000000000b1'), '有「管理模块用户权限」= 范围内模块的管理员');
+select pg_temp.logout();
+select is((select name from public.gw_modules where id = '00000000-0000-0000-0000-0000000000b1'), 'Fuel 2', '模块名称已改');
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+select lives_ok($$ insert into public.gw_user_links (user_id, name, url) values ('00000000-0000-0000-0000-0000000000a3', 'Google', 'https://google.com') $$, '用户可以加自己的连结图示');
+select throws_ok($$ insert into public.gw_user_links (user_id, name, url) values ('00000000-0000-0000-0000-0000000000a4', 'X', 'https://x.com') $$, '42501', null, '不能替别人加连结');
+select pg_temp.logout();
+
 select pg_temp.login('00000000-0000-0000-0000-0000000000a7');
 select set_eq($$ select email from public.gw_profiles $$, array['viewer@test.local', 'user.both@test.local'], '「看名单」只看得到角色负责的 Business 的人');
 select ok((select count(*) from public.gw_audit_logs) > 0, '有「看操作记录」功能可以看操作记录');

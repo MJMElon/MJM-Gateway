@@ -53,6 +53,8 @@ window.GWHome = (function () {
     const modules = new Map(data.modules.map((m) => [m.id, m]));
     let folders = data.folders.map((f) => ({ ...f }));
     let widgets = widgetsEnabled ? opts.widgets.map((w) => ({ ...w })) : [];
+    // 个人连结图示（用户自己加的网址）
+    let links = ((opts && opts.links) || []).map((l) => ({ ...l }));
     // App 位置（只记录目前有权限的）
     let layout = new Map(data.layout.map((l) => [l.module_id, { folder_id: l.folder_id, sort_order: l.sort_order }]));
     if (uninitialized) data.modules.forEach((m, i) => layout.set(m.id, { folder_id: null, sort_order: i + 1 }));
@@ -76,6 +78,7 @@ window.GWHome = (function () {
     function rootItems() {
       const items = [];
       layout.forEach((l, id) => modules.has(id) && !l.folder_id && items.push({ kind: "app", id, slot: l.sort_order, w: 1, h: 1 }));
+      links.forEach((l) => items.push({ kind: "link", id: l.id, slot: l.sort_order, w: 1, h: 1 }));
       folders.forEach((f) => items.push({ kind: "folder", id: f.id, slot: f.sort_order, w: 1, h: 1 }));
       widgets.filter((w) => !isPinned(w)).forEach((w) => items.push({ kind: "widget", id: w.id, slot: w.sort_order, w: SIZES[w.size][0], h: SIZES[w.size][1] }));
       return items.sort((a, b) => a.slot - b.slot || a.kind.localeCompare(b.kind));
@@ -140,6 +143,11 @@ window.GWHome = (function () {
         const f = folders.find((x) => x.id === id);
         if (f) f.sort_order = slot;
         return sb.from("gw_user_folders").update({ sort_order: slot }).eq("id", id);
+      }
+      if (kind === "link") {
+        const l = links.find((x) => x.id === id);
+        if (l) l.sort_order = slot;
+        return sb.from("gw_user_links").update({ sort_order: slot }).eq("id", id);
       }
       const w = widgets.find((x) => x.id === id);
       if (w) w.sort_order = slot;
@@ -210,9 +218,22 @@ window.GWHome = (function () {
       `<button type="button" ${attr} aria-label="${esc(label)}" class="no-drag absolute ${pos} z-10 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon(ic, "size-3.5")}</button>`;
 
     function appIcon(m, size) {
+      if (m.image_url)
+        return `<span class="relative flex ${size || "size-14 sm:size-16"} overflow-hidden rounded-[26%] bg-white shadow-md shadow-slate-900/10"><img src="${esc(m.image_url)}" alt="" class="size-full object-cover">${newDot(m)}</span>`;
       return `<span class="relative flex ${size || "size-14 sm:size-16"} items-center justify-center rounded-[26%] bg-gradient-to-br ${tileColor(m.code)} text-white shadow-md shadow-slate-900/10">
-        ${moduleIcon(m.icon, "size-7 sm:size-8")}${newDot(m)}
+        ${m.icon === "link" ? icon("link", "size-7 sm:size-8") : moduleIcon(m.icon, "size-7 sm:size-8")}${newDot(m)}
       </span>`;
+    }
+
+    // 个人连结图示
+    function linkTile(l) {
+      return `<div data-kind="link" data-id="${l.id}" class="gw-item relative flex flex-col items-center gap-1.5 pt-1">
+        <button type="button" data-open-link="${l.id}" class="flex flex-col items-center gap-1.5" title="${esc(l.url)}">
+          ${appIcon({ code: l.name, icon: l.icon, image_url: l.image_url })}
+          <span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(l.name)}</span>
+        </button>
+        ${editing ? badge(`data-remove-link="${l.id}"`, "minus", t("home.removeFromHome"), "top-0 left-1/2 -translate-x-[2.4rem]") + badge(`data-edit-link="${l.id}"`, "pencil", t("home.editLink"), "top-0 left-1/2 translate-x-[1rem]") : ""}
+      </div>`;
     }
 
     function appTile(id) {
@@ -395,6 +416,7 @@ window.GWHome = (function () {
         return `<button type="button" data-done class="fixed right-5 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-40 flex h-12 items-center gap-2 rounded-full bg-slate-900 px-5 font-semibold text-white shadow-xl sm:bottom-8 dark:bg-white dark:text-slate-900">${icon("check")} ${esc(t("fab.done"))}</button>`;
       }
       const items = [
+        ["add-link", "link", t("fab.addLink")],
         ["add-widget", "layout-dashboard", t("fab.addWidget")],
         ["add-apps", "layout-grid", t("fab.addApps")],
         ["new-folder", "folder-plus", t("fab.newFolder")],
@@ -437,6 +459,7 @@ window.GWHome = (function () {
         const at = `style="grid-column:${p.c + 1} / span ${p.w};grid-row:${p.r + 1} / span ${p.h}"`;
         if (it.kind === "app") return appTile(it.id).replace('class="gw-item', at + ' class="gw-item');
         if (it.kind === "folder") return folderTile(folders.find((f) => f.id === it.id)).replace('class="gw-item', at + ' class="gw-item');
+        if (it.kind === "link") return linkTile(links.find((l) => l.id === it.id)).replace('class="gw-item', at + ' class="gw-item');
         return widgetTile(widgets.find((w) => w.id === it.id), p);
       };
       root.innerHTML = `
@@ -618,6 +641,63 @@ window.GWHome = (function () {
     root.addEventListener("contextmenu", (e) => (drag || press) && e.preventDefault());
 
     // ------------------------------------------------------------ App 选单 / 文件夹
+    // 个人连结图示：名称、网址、图示
+    function linkDialog(link) {
+      let chosen = link ? link.icon : "link";
+      const dlg = modal(
+        link ? t("home.editLink") : t("fab.addLink"),
+        `<form class="space-y-4">
+          <div data-err></div>
+          <label class="block space-y-1.5"><span class="${cls.label}">${esc(t("home.linkName"))}</span><input name="name" required maxlength="40" value="${esc(link ? link.name : "")}" class="${cls.input}"></label>
+          <label class="block space-y-1.5"><span class="${cls.label}">${esc(t("home.linkUrl"))}</span><input name="url" type="url" required value="${esc(link ? link.url : "https://")}" class="${cls.input}"></label>
+          <div>
+            <p class="mb-1.5 ${cls.label}">${esc(t("home.linkIcon"))}</p>
+            <div class="flex flex-wrap gap-1.5">${["link", ...Object.keys(GW.MODULE_ICONS)].filter((v, i, a) => a.indexOf(v) === i).map((k) => `<button type="button" data-pick-icon="${k}" class="flex size-9 items-center justify-center rounded-lg border"></button>`).join("")}</div>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button type="button" data-cancel class="${btn("secondary")}">${esc(t("home.cancel"))}</button>
+            <button type="submit" class="${btn("primary")}">${esc(t("home.save"))}</button>
+          </div>
+        </form>`,
+      );
+      const paint = () =>
+        $$("[data-pick-icon]", dlg.el).forEach((b) => {
+          b.className = `flex size-9 items-center justify-center rounded-lg border ${b.dataset.pickIcon === chosen ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-700/20 dark:text-brand-100" : "border-slate-200 text-slate-500 dark:border-slate-700"}`;
+          b.innerHTML = b.dataset.pickIcon === "link" ? icon("link", "size-4") : moduleIcon(b.dataset.pickIcon, "size-4");
+        });
+      paint();
+      refreshIcons();
+      $$("[data-pick-icon]", dlg.el).forEach((b) => b.addEventListener("click", () => ((chosen = b.dataset.pickIcon), paint(), refreshIcons())));
+      $("[data-cancel]", dlg.el).onclick = dlg.close;
+      $("form", dlg.el).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const row = { name: f.name.value.trim(), url: f.url.value.trim(), icon: chosen };
+        if (!/^https?:\/\//i.test(row.url)) return ($("[data-err]", dlg.el).innerHTML = GW.alertBox(t("home.badUrl")));
+        if (link) {
+          const { error } = await sb.from("gw_user_links").update(row).eq("id", link.id);
+          if (error) return ($("[data-err]", dlg.el).innerHTML = GW.alertBox(t("home.saveFailed")));
+          Object.assign(link, row);
+        } else {
+          const { data: created, error } = await sb
+            .from("gw_user_links")
+            .insert({ ...row, user_id: data.profile.id, sort_order: nextSlot(1, 1) })
+            .select()
+            .single();
+          if (error) return ($("[data-err]", dlg.el).innerHTML = GW.alertBox(t("home.saveFailed")));
+          links.push(created);
+        }
+        dlg.close();
+        draw();
+      });
+    }
+
+    async function removeLink(id) {
+      links = links.filter((l) => l.id !== id);
+      draw();
+      await sb.from("gw_user_links").delete().eq("id", id);
+    }
+
     function appMenu(id) {
       const m = modules.get(id);
       const current = layout.get(id).folder_id || "";
@@ -827,6 +907,13 @@ window.GWHome = (function () {
       }
       const d = b.dataset;
       if (d.open) return open(d.open);
+      if (d.openLink) {
+        if (editing || Date.now() - lastDragEnd < 300) return;
+        const l = links.find((x) => x.id === d.openLink);
+        return l && window.open(l.url, "_blank", "noopener,noreferrer");
+      }
+      if (d.editLink) return linkDialog(links.find((x) => x.id === d.editLink));
+      if (d.removeLink) return removeLink(d.removeLink);
       if (d.folder) return editing ? null : openFolder(d.folder);
       if (d.appMenu) return appMenu(d.appMenu);
       if (d.removeApp) return removeApp(d.removeApp);
@@ -843,6 +930,7 @@ window.GWHome = (function () {
         else if (d.fab === "add-apps") sheet = "apps";
         else if (d.fab === "edit") ((editing = true), (sheet = null));
         else if (d.fab === "new-folder") return draw(), folderDialog(null);
+        else if (d.fab === "add-link") return draw(), linkDialog(null);
         return draw();
       }
       if ("done" in d) return ((editing = false), draw());

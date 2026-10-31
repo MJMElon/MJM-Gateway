@@ -69,6 +69,8 @@ window.GW = (function () {
       profile.isSuper = profile.role === "super_admin";
       profile.roleName = null;
       profile.businessIds = [];
+      profile.roleModules = [];
+      profile.adminModuleIds = [];
       profile.adminModules = 0;
       // 角色功能（super_admin 全部都有）
       const FLAGS = [
@@ -82,21 +84,26 @@ window.GW = (function () {
         "can_view_user_group",
         "can_view_users",
         "can_view_audit",
+        "can_edit_module_name",
+        "can_manage_module_access",
       ];
       profile.can = Object.fromEntries(FLAGS.map((f) => [f, profile.isSuper]));
       if (!profile.isSuper) {
         // 模块管理员：可以开 / 收回自己管理的模块的权限
-        const { count } = await sb.from("gw_module_members").select("module_id", { count: "exact", head: true }).eq("user_id", profile.id).eq("is_admin", true);
-        profile.adminModules = count || 0;
+        const { data: adm } = await sb.from("gw_module_members").select("module_id").eq("user_id", profile.id).eq("is_admin", true);
+        profile.adminModuleIds = (adm || []).map((x) => x.module_id);
+        profile.adminModules = profile.adminModuleIds.length;
       }
       if (!profile.isSuper && profile.role_id) {
-        const [{ data: role }, { data: biz }] = await Promise.all([
+        const [{ data: role }, { data: biz }, { data: mods }] = await Promise.all([
           sb.from("gw_roles").select("*").eq("id", profile.role_id).maybeSingle(),
           sb.from("gw_role_businesses").select("group_id").eq("role_id", profile.role_id),
+          sb.from("gw_role_modules").select("module_id").eq("role_id", profile.role_id),
         ]);
         profile.roleName = role ? role.name : null;
         if (role) FLAGS.forEach((f) => (profile.can[f] = !!role[f]));
         profile.businessIds = (biz || []).map((b) => b.group_id);
+        profile.roleModules = [...new Set((mods || []).map((m) => m.module_id))];
       }
       profile.canPost = profile.can.can_post_notice;
       profile.canDeleteNotice = profile.can.can_delete_notice;
@@ -105,7 +112,7 @@ window.GW = (function () {
       profile.manages =
         profile.isSuper ||
         profile.adminModules > 0 ||
-        ["can_grant_module", "can_revoke_module", "can_set_module_admin", "can_add_business_user", "can_remove_business_user", "can_view_user_group", "can_view_users", "can_view_audit"].some((k) => c[k]);
+        ["can_grant_module", "can_revoke_module", "can_set_module_admin", "can_add_business_user", "can_remove_business_user", "can_view_user_group", "can_view_users", "can_view_audit", "can_edit_module_name", "can_manage_module_access"].some((k) => c[k]);
     }
     return { session, profile };
   }

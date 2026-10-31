@@ -21,12 +21,18 @@
   const firstVisit = !profile.layout_initialized;
   // 第一次登录：按群组自动排好预设版面
   if (firstVisit) await GW.sb.rpc("gw_init_layout");
-  const [{ data, error }, widgetRes, memberRes] = await Promise.all([
+  const [{ data, error }, widgetRes, memberRes, linkRes, imgRes] = await Promise.all([
     GW.sb.rpc("gw_get_home"),
     GW.sb.from("gw_user_widgets").select("*").order("sort_order"),
     GW.sb.from("gw_group_members").select("group_id").eq("user_id", profile.id),
+    GW.sb.from("gw_user_links").select("*").order("sort_order"),
+    GW.sb.from("gw_modules").select("id, image_url"),
   ]);
   if (error) return (main.innerHTML = GW.alertBox(t("errors.description")));
+  // 模块照片
+  const imgs = new Map(((imgRes && imgRes.data) || []).map((m) => [m.id, m.image_url]));
+  data.modules.forEach((m) => (m.image_url = imgs.get(m.id) || null));
+  const links = (linkRes && linkRes.data) || [];
 
   // 小工具资料表还没建立（资料库尚未更新）时，主画面照常运作，只是不能加小工具
   let widgets = widgetRes.error ? null : widgetRes.data;
@@ -72,7 +78,7 @@
     }
   }
   main.innerHTML = '<div id="board" class="mx-auto max-w-5xl"></div>';
-  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending, memberOf });
+  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending, memberOf, links });
 })();
 </script>
 </body>
