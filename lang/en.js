@@ -285,7 +285,12 @@ window.GW_LANG["en"] = {
       "unlinkBody": "{count} people are placed in this company in this business. They will stay in the business without a company.",
       "unlink": "Remove",
       "empty": "No companies yet. Add the first one.",
-      "noMatch": "No matching companies."
+      "noMatch": "No matching companies.",
+      "descriptionLabel": "Description",
+      "area": "Area",
+      "noBusinessYet": "Not in any business yet.",
+      "dragOrder": "Drag to change the order",
+      "orderSaved": "Order saved"
     },
     "userGroups": {
       "description": "Drag people from the left into a company under a business. Each business decides which apps its people can open.",

@@ -285,7 +285,12 @@ window.GW_LANG["zh-CN"] = {
       "unlinkBody": "这个 Business 有 {count} 人放在这个 Company，他们会留在 Business 里，只是没有 Company。",
       "unlink": "拿掉",
       "empty": "还没有 Company，先新增一个。",
-      "noMatch": "没有符合的 Company。"
+      "noMatch": "没有符合的 Company。",
+      "descriptionLabel": "说明",
+      "area": "面积",
+      "noBusinessYet": "还没有属于任何 Business。",
+      "dragOrder": "拖拉改顺序",
+      "orderSaved": "顺序已储存"
     },
     "userGroups": {
       "description": "把左边的人拖进某个 Business 底下的 Company。每个 Business 决定里面的人可以打开哪些 App。",

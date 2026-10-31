@@ -598,7 +598,7 @@
         ${extra || ""}
       </div>`;
     const zone = (g, c, mems) => `<div>
-        <p class="mb-1 flex items-center gap-1.5 text-xs font-semibold ${c ? "text-slate-700 dark:text-slate-200" : "text-slate-400"}">${icon(c ? "building-2" : "circle-dashed", "size-3.5")}${esc(c ? c.name : tu2("noCompany"))}<span class="font-normal text-slate-400">(${mems.length})</span></p>
+        <p class="mb-1 flex items-center gap-1.5 text-xs font-semibold ${c ? "text-slate-700 dark:text-slate-200" : "text-slate-400"}">${icon(c ? "building-2" : "circle-dashed", "size-3.5")}${c ? `<button data-info="${c.id}" data-from="${g.id}" class="no-drag hover:underline">${esc(c.name)}</button>` : esc(tu2("noCompany"))}<span class="font-normal text-slate-400">(${mems.length})</span></p>
         <div data-drop="${g.id}" data-company="${c ? c.id : ""}" class="gw-drop min-h-14 space-y-1.5 rounded-xl border-2 border-dashed border-slate-200 p-2 dark:border-slate-700">
           ${mems.length ? mems.map((u) => chip(u, `${canApps ? `<button data-apps="${g.id}:${u.id}" aria-label="${esc(tu2("apps"))}" title="${esc(tu2("apps"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">${icon("layout-grid")}</button>` : ""}${canRemove ? `<button data-out="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>` : ""}`)).join("") : `<p class="ug-empty py-2 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}
         </div>
@@ -737,6 +737,7 @@
       if (!b) return;
       const d = b.dataset;
       if (d.left) return ((leftMode = d.left), draw());
+      if (d.info) return companyInfo(d.info, d.from || null);
       if (d.apps) {
         const [gid, uid] = d.apps.split(":");
         return moduleAccessDialog(userById.get(uid), gid);
@@ -944,14 +945,17 @@
     const seq = routeSeq;
     const tb = (k, v) => t("admin.business." + k, v);
     const tg = (k, v) => t("admin.groups." + k, v);
-    const [groups, members, companies, modules, grantRows] = await Promise.all([
+    const [groups, members, companies, modules, grantRows, companyRows] = await Promise.all([
       sb.from("gw_groups").select("*").order("sort_order").order("name"),
       sb.from("gw_group_members").select("group_id, user_id"),
-      sb.from("gw_business_companies").select("group_id, company_id"),
+      sb.from("gw_business_companies").select("group_id, company_id, area, area_unit"),
       sb.from("gw_modules").select("id, code, name, icon, is_active").order("sort_order").order("name"),
       sb.from("gw_group_modules").select("group_id, module_id"),
+      sb.from("gw_companies").select("id, name, code"),
     ]).then((r) => r.map((x) => (Array.isArray(x) ? x : x.data || [])));
     if (stale(seq)) return;
+    const coName = new Map(companyRows.map((c) => [c.id, c.name]));
+    const areaText = (l) => (l.area != null ? ` · ${Number(l.area).toLocaleString(GW.LOCALE)} ${l.area_unit || ""}` : "");
     let grantSet = new Set(grantRows.map((g) => g.group_id + ":" + g.module_id));
 
     function draw() {
@@ -962,10 +966,11 @@
         </div>
         ${
           groups.length
-            ? `<div class="grid gap-4 xl:grid-cols-2">${groups
+            ? `<div id="biz-cards" class="grid gap-4 xl:grid-cols-2">${groups
                 .map(
-                  (g) => `<div class="${cls.card} p-4">
+                  (g) => `<div data-card="${g.id}" class="${cls.card} p-4">
                     <div class="flex items-start gap-2">
+                      ${grip()}
                       <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200">${icon("briefcase-business", "size-5")}</span>
                       <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">${esc(g.name)}</span>${g.code ? `<span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">${esc(g.code)}</span>` : badge(t("admin.company.noCode"), "amber")}</div>
@@ -974,6 +979,15 @@
                       <button data-edit="${g.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
                       <button data-del="${g.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
                     </div>
+                    <p class="mt-3 mb-1.5 text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(t("admin.tabs.company"))}</p>
+                    <div class="flex flex-wrap gap-1.5">${
+                      companies.filter((l) => l.group_id === g.id).length
+                        ? companies
+                            .filter((l) => l.group_id === g.id)
+                            .map((l) => `<button data-info="${l.company_id}" data-from="${g.id}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">${icon("building-2", "size-3")}${esc(coName.get(l.company_id) || "")}${esc(areaText(l))}</button>`)
+                            .join("")
+                        : `<span class="text-xs text-slate-400">${esc(t("admin.userGroups.noCompanies"))} <a href="#company" class="underline">${esc(t("admin.tabs.company"))}</a></span>`
+                    }</div>
                     <p class="mt-3 mb-1.5 text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(tb("access"))}</p>
                     <div class="flex flex-wrap gap-1.5">
                       ${
@@ -996,6 +1010,7 @@
         }
       </div>`;
       refreshIcons();
+      sortableCards($("#biz-cards"), "gw_groups", () => toast(t("admin.company.orderSaved")));
     }
 
     function dialog(g) {
@@ -1031,6 +1046,7 @@
       if (!b) return;
       const d = b.dataset;
       if (b.id === "biz-add") return dialog(null);
+      if (d.info) return companyInfo(d.info, d.from || null);
       if (d.edit) return dialog(groups.find((x) => x.id === d.edit));
       if (d.del) {
         const g = groups.find((x) => x.id === d.del);
@@ -1053,6 +1069,76 @@
     draw();
   }
 
+  // ---------------------------------------------------------------- Company 资料窗（Company 页、Business 页、群组列表共用）
+  /* 永远显示同一组基本资料：名称、代码、说明、注册号码，以及它属于的每个 Business 和面积。
+     fromGroupId：从某个 Business 点进来时，那个 Business 当标题、先显示，其他 Business 放后面。 */
+  async function companyInfo(companyId, fromGroupId) {
+    const tc = (k, v) => t("admin.company." + k, v);
+    const m = modal("", GW.spinner());
+    const [{ data: c }, { data: links }, { data: groups }, { data: mems }] = await Promise.all([
+      sb.from("gw_companies").select("*").eq("id", companyId).maybeSingle(),
+      sb.from("gw_business_companies").select("group_id, area, area_unit").eq("company_id", companyId),
+      sb.from("gw_groups").select("id, name, code").order("sort_order").order("name"),
+      sb.from("gw_group_members").select("group_id").eq("company_id", companyId),
+    ]);
+    if (!c) return m.close();
+    const gName = new Map((groups || []).map((g) => [g.id, g]));
+    const rows = (links || [])
+      .map((l) => ({ ...l, g: gName.get(l.group_id) }))
+      .filter((l) => l.g)
+      .sort((a, b) => (a.group_id === fromGroupId ? -1 : b.group_id === fromGroupId ? 1 : 0));
+    const area = (l) => (l.area != null ? `${Number(l.area).toLocaleString(GW.LOCALE)} ${esc(l.area_unit || "")}` : "—");
+    const people = (gid) => (mems || []).filter((x) => x.group_id === gid).length;
+    const from = fromGroupId ? gName.get(fromGroupId) : null;
+    const h = m.el.parentElement.querySelector("h2");
+    if (h) h.textContent = from ? from.name : c.name;
+    m.el.innerHTML = `<div class="space-y-4">
+      <div class="flex items-start gap-3">
+        <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">${icon("building-2", "size-6")}</span>
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2"><span class="text-lg font-semibold">${esc(c.name)}</span>${c.code ? `<span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">${esc(c.code)}</span>` : ""}${c.is_active ? "" : badge(tc("inactive"))}</div>
+          <p class="text-sm text-slate-500">${esc([c.short_name, c.registration_no].filter(Boolean).join(" · "))}</p>
+          ${c.description ? `<p class="mt-1 text-sm">${esc(c.description)}</p>` : ""}
+        </div>
+      </div>
+      <div class="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+        ${
+          rows.length
+            ? rows
+                .map(
+                  (l, i) => `<div class="flex items-center gap-3 px-3 py-2.5 ${i === 0 && from ? "bg-brand-50/60 dark:bg-brand-900/20" : ""}">
+                    ${icon("briefcase-business", "size-4 shrink-0 text-brand-600")}
+                    <span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium">${esc(l.g.name)}</span><span class="block text-xs text-slate-500">${esc(tc("members", { count: people(l.group_id) }))}</span></span>
+                    <span class="text-sm"><span class="text-xs text-slate-500">${esc(tc("area"))} </span><span class="font-medium">${area(l)}</span></span>
+                  </div>`,
+                )
+                .join("")
+            : `<p class="px-3 py-4 text-center text-sm text-slate-400">${esc(tc("noBusinessYet"))}</p>`
+        }
+      </div>
+      <div class="flex justify-end"><button data-done class="${btn("primary")}">${esc(t("admin.users.done"))}</button></div>
+    </div>`;
+    refreshIcons();
+    $("[data-done]", m.el).onclick = m.close;
+  }
+
+  // 拖拉排顺序（Business、Company 卡片）：拖完把新的顺序存进 sort_order
+  function sortableCards(container, table, onSaved) {
+    if (!isSuper || !container || !window.Sortable) return;
+    window.Sortable.create(container, {
+      handle: "[data-grip]",
+      animation: 150,
+      delay: 150,
+      delayOnTouchOnly: true,
+      onEnd: async () => {
+        const ids = $$("[data-card]", container).map((el) => el.dataset.card);
+        await Promise.all(ids.map((id, i) => sb.from(table).update({ sort_order: i }).eq("id", id)));
+        if (onSaved) onSaved();
+      },
+    });
+  }
+  const grip = () => `<span data-grip title="${esc(t("admin.company.dragOrder"))}" class="cursor-grab touch-none rounded p-1 text-slate-300 hover:text-slate-500 active:cursor-grabbing">${icon("grip-vertical", "size-4")}</span>`;
+
   // ================================================================ Company（Master Manage；独立主资料，可以属于多个 Business，对应到现有系统）
   async function companyTab() {
     const seq = routeSeq;
@@ -1061,7 +1147,7 @@
     const [companies, groups, links, members, mappings, modules] = await Promise.all([
       sb.from("gw_companies").select("*").order("sort_order").order("name"),
       sb.from("gw_groups").select("id, name").order("sort_order").order("name"),
-      sb.from("gw_business_companies").select("group_id, company_id"),
+      sb.from("gw_business_companies").select("group_id, company_id, area, area_unit"),
       sb.from("gw_group_members").select("company_id"),
       sb.from("gw_company_mappings").select("*").order("created_at"),
       sb.from("gw_modules").select("id, code, name, kind").order("sort_order").order("name"),
@@ -1069,7 +1155,9 @@
     if (stale(seq)) return;
     const modById = new Map(modules.map((m) => [m.id, m]));
     const count = (cid) => members.filter((m) => m.company_id === cid).length;
-    let linkSet = new Set(links.map((l) => l.group_id + ":" + l.company_id));
+    const linksOf = (cid) => links.filter((l) => l.company_id === cid);
+    const gName = new Map(groups.map((g) => [g.id, g.name]));
+    const areaText = (l) => (l.area != null ? ` · ${Number(l.area).toLocaleString(GW.LOCALE)} ${l.area_unit || ""}` : "");
     let query = "";
 
     function draw() {
@@ -1083,34 +1171,31 @@
         </div>
         ${
           list.length
-            ? `<div class="grid gap-4 xl:grid-cols-2">${list
+            ? `<div id="co-cards" class="grid gap-4 xl:grid-cols-2">${list
                 .map((c) => {
                   const maps = mappings.filter((m) => m.company_id === c.id);
-                  return `<div class="${cls.card} p-4 ${c.is_active ? "" : "opacity-60"}">
+                  return `<div data-card="${c.id}" class="${cls.card} p-4 ${c.is_active ? "" : "opacity-60"}">
                     <div class="flex items-start gap-2">
+                      ${q ? "" : grip()}
                       <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">${icon("building-2", "size-5")}</span>
                       <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                          <span class="font-semibold">${esc(c.name)}</span>
+                          <button data-info="${c.id}" class="font-semibold hover:underline">${esc(c.name)}</button>
                           ${c.code ? `<span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">${esc(c.code)}</span>` : badge(tc("noCode"), "amber")}
                           ${c.is_active ? "" : badge(tc("inactive"))}
                         </div>
                         <p class="text-xs text-slate-500">${esc([c.short_name, c.registration_no, tc("members", { count: count(c.id) })].filter(Boolean).join(" · "))}</p>
+                        ${c.description ? `<p class="mt-0.5 text-xs text-slate-500">${esc(c.description)}</p>` : ""}
                       </div>
                       <button data-edit="${c.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
                     </div>
                     <p class="mt-3 mb-1.5 text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(tc("businesses"))}</p>
                     <div class="flex flex-wrap gap-1.5">${
-                      groups.length
-                        ? groups
-                            .map((g) => {
-                              const on = linkSet.has(g.id + ":" + c.id);
-                              return `<button data-link="${g.id}:${c.id}" aria-pressed="${on}" class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                                on ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-700/20 dark:text-brand-100" : "border-slate-300 text-slate-500 dark:border-slate-700"
-                              }">${icon(on ? "check" : "plus", "size-3")}${esc(g.name)}</button>`;
-                            })
+                      linksOf(c.id).length
+                        ? linksOf(c.id)
+                            .map((l) => `<button data-info="${c.id}" data-from="${l.group_id}" class="inline-flex items-center gap-1.5 rounded-full border border-brand-500 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:bg-brand-700/20 dark:text-brand-100">${icon("briefcase-business", "size-3")}${esc(gName.get(l.group_id) || "")}${esc(areaText(l))}</button>`)
                             .join("")
-                        : `<span class="text-xs text-slate-400">${esc(tc("noBusiness"))}</span>`
+                        : `<span class="text-xs text-slate-400">${esc(tc("noBusinessYet"))}</span>`
                     }</div>
                     <div class="mt-3 mb-1.5 flex items-center justify-between">
                       <p class="text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(tc("mappings"))}</p>
@@ -1136,6 +1221,7 @@
         }
       </div>`;
       refreshIcons();
+      if (!q) sortableCards($("#co-cards"), "gw_companies", () => toast(tc("orderSaved")));
       $("#co-q").addEventListener("input", (e) => {
         query = e.target.value;
         const pos = e.target.selectionStart;
@@ -1147,7 +1233,9 @@
     }
 
     function dialog(c) {
-      const v = c || { code: "", name: "", short_name: "", registration_no: "", is_active: true, sort_order: companies.length };
+      const v = c || { code: "", name: "", short_name: "", registration_no: "", description: "", is_active: true, sort_order: companies.length };
+      const mine = c ? linksOf(c.id) : [];
+      const link = (gid) => mine.find((l) => l.group_id === gid);
       const m = modal(
         c ? tc("editTitle") : tc("addTitle"),
         `<form class="space-y-4"><div data-err></div>
@@ -1157,6 +1245,25 @@
             ${field(tc("shortName"), `<input name="short_name" maxlength="40" value="${esc(v.short_name || "")}" class="${cls.input}">`)}
             ${field(tc("registrationNo"), `<input name="registration_no" maxlength="40" value="${esc(v.registration_no || "")}" class="${cls.input}">`)}
             ${field(tc("status"), select("is_active", [["1", tc("active")], ["0", tc("inactive")]], v.is_active ? "1" : "0"))}
+          </div>
+          ${field(tc("descriptionLabel"), `<input name="description" maxlength="300" value="${esc(v.description || "")}" class="${cls.input}">`)}
+          <div>
+            <p class="mb-1.5 ${cls.label}">${esc(tc("businesses"))}</p>
+            ${
+              groups.length
+                ? `<div class="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">${groups
+                    .map((g) => {
+                      const l = link(g.id);
+                      return `<div class="flex flex-wrap items-center gap-3 px-3 py-2">
+                        <label class="flex min-w-0 flex-1 items-center gap-2 text-sm"><input type="checkbox" data-biz="${g.id}" ${l ? "checked" : ""} class="size-4 accent-emerald-600"><span class="truncate font-medium">${esc(g.name)}</span></label>
+                        <span class="flex items-center gap-1.5"><span class="text-xs text-slate-500">${esc(tc("area"))}</span>
+                          <input data-area="${g.id}" type="number" min="0" step="0.01" value="${l && l.area != null ? esc(String(l.area)) : ""}" class="${cls.input} h-8 w-28">
+                          <input data-unit="${g.id}" maxlength="10" value="${esc(l ? l.area_unit || "ha" : "ha")}" class="${cls.input} h-8 w-16"></span>
+                      </div>`;
+                    })
+                    .join("")}</div>`
+                : `<p class="text-sm text-slate-400">${esc(tc("noBusiness"))}</p>`
+            }
           </div>
           <div class="flex justify-between gap-2">
             ${c ? `<button type="button" data-del class="${btn("ghost")} text-red-600 dark:text-red-400">${icon("trash-2")} ${esc(tg("delete"))}</button>` : "<span></span>"}
@@ -1183,10 +1290,30 @@
           name: f.name.value.trim(),
           short_name: f.short_name.value.trim() || null,
           registration_no: f.registration_no.value.trim() || null,
+          description: f.description.value.trim() || null,
           is_active: f.is_active.value === "1",
         };
-        const { error } = c ? await sb.from("gw_companies").update(row).eq("id", c.id) : await sb.from("gw_companies").insert(row);
-        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(tc(error.code === "23505" ? "duplicate" : error.code === "23514" ? "badCode" : "saveFailed")));
+        const fail = (error) => ($("[data-err]", m.el).innerHTML = alertBox(tc(error.code === "23505" ? "duplicate" : error.code === "23514" ? "badCode" : "saveFailed")));
+        const saved = c ? await sb.from("gw_companies").update(row).eq("id", c.id).select().single() : await sb.from("gw_companies").insert(row).select().single();
+        if (saved.error) return fail(saved.error);
+        const id = saved.data.id;
+        // Business 连结 + 面积：勾的新增 / 更新，没勾的拿掉（拿掉前先确认有没有人放在里面）
+        const want = $$("[data-biz]", m.el).filter((x) => x.checked).map((x) => x.dataset.biz);
+        const drop = mine.filter((l) => !want.includes(l.group_id)).map((l) => l.group_id);
+        if (drop.length) {
+          const { count: n } = await sb.from("gw_group_members").select("user_id", { count: "exact", head: true }).eq("company_id", id).in("group_id", drop);
+          if (n && !(await confirmDialog(tc("unlinkTitle"), tc("unlinkBody", { count: n }), tc("unlink"), tg("cancel")))) return;
+          const { error } = await sb.from("gw_business_companies").delete().eq("company_id", id).in("group_id", drop);
+          if (error) return fail(error);
+        }
+        if (want.length) {
+          const rows = want.map((gid) => {
+            const a = $(`[data-area="${gid}"]`, m.el).value;
+            return { group_id: gid, company_id: id, area: a === "" ? null : Number(a), area_unit: $(`[data-unit="${gid}"]`, m.el).value.trim() || "ha" };
+          });
+          const { error } = await sb.from("gw_business_companies").upsert(rows, { onConflict: "group_id,company_id" });
+          if (error) return fail(error);
+        }
         m.close();
         companyTab();
       });
@@ -1227,6 +1354,7 @@
       if (!b) return;
       const d = b.dataset;
       if (b.id === "co-add") return dialog(null);
+      if (d.info) return companyInfo(d.info, d.from || null);
       if (d.edit) return dialog(companies.find((x) => x.id === d.edit));
       if (d.mapAdd) {
         if (!modules.length) return toast(tc("noSystems"));
@@ -1236,21 +1364,6 @@
         const { error } = await sb.from("gw_company_mappings").delete().eq("id", d.mapDel);
         if (error) return setMsg(tg("saveFailed"));
         return companyTab();
-      }
-      if (d.link) {
-        const [gid, cid] = d.link.split(":");
-        const on = linkSet.has(d.link);
-        if (on && members.length) {
-          // 拿掉连结时，原本放在这个 Business 的这个 Company 的人会变成「没有 Company」
-          const { count: n } = await sb.from("gw_group_members").select("user_id", { count: "exact", head: true }).eq("group_id", gid).eq("company_id", cid);
-          if (n && !(await confirmDialog(tc("unlinkTitle"), tc("unlinkBody", { count: n }), tc("unlink"), tg("cancel")))) return;
-        }
-        const { error } = on
-          ? await sb.from("gw_business_companies").delete().eq("group_id", gid).eq("company_id", cid)
-          : await sb.from("gw_business_companies").insert({ group_id: gid, company_id: cid });
-        if (error) return setMsg(tg("saveFailed"));
-        on ? linkSet.delete(d.link) : linkSet.add(d.link);
-        return draw();
       }
     };
     draw();

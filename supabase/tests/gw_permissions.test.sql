@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(91);
+select plan(92);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -388,6 +388,11 @@ select lives_ok(
        ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000e2'),
        ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000e1') $$,
   '同一个 Company 可以属于多个 Business'
+);
+select lives_ok(
+  $$ update public.gw_business_companies set area = 1250.5, area_unit = 'ha'
+     where group_id = '00000000-0000-0000-0000-0000000000c1' and company_id = '00000000-0000-0000-0000-0000000000e1' $$,
+  '每个 Business 底下的 Company 可以记面积'
 );
 select throws_ok(
   $$ insert into public.gw_companies (code, name) values ('bad code', 'Bad') $$,
