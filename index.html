@@ -31,7 +31,7 @@
   // 小工具资料表还没建立（资料库尚未更新）时，主画面照常运作，只是不能加小工具
   let widgets = widgetRes.error ? null : widgetRes.data;
   // Notice Board（公告栏）：每个人都一定有一个，固定在最上面
-  const notice = { widget_type: "announcements", size: "large", sort_order: -1, user_id: profile.id, config: {} };
+  const notice = { widget_type: "announcements", size: "medium", sort_order: -1, user_id: profile.id, config: {} };
   // 旧版预设的 Greeting / Search 换成 Notice Board（每人一次）
   const noticeKey = "gw_widgets_notice_" + profile.id;
   let cleaned = false;

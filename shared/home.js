@@ -1,8 +1,8 @@
 /* ================================================================
    MJM Connect — 主画面（像 iPhone 的主画面）
-   App 图标、小工具（widget）、文件夹放在同一个格子里，拖拉可排版（SortableJS，手机长按）。
+   Notice Board 固定在最上面；下面是固定格子的棋盘，App 图标、小工具、文件夹可以拖到任何空格（手机长按），会自动对齐。
    右下角浮动按钮：Add Widget、Add Apps（把 App 拖到想放的位置）、New Folder、Edit Home Screen。
-   位置：App 存 gw_user_layout、文件夹存 gw_user_folders、小工具存 gw_user_widgets，三者共用同一个顺序。
+   位置：App 存 gw_user_layout、文件夹存 gw_user_folders、小工具存 gw_user_widgets，sort_order = 第几格（slot）。
    权限关掉的 App 不显示，但位置记录保留。
    ================================================================ */
 window.GWHome = (function () {
@@ -61,80 +61,99 @@ window.GWHome = (function () {
     let sheet = null; // "apps" | "widgets" | null
     let fabOpen = false;
     let lastDragEnd = 0;
-    let sortables = [];
     let clockTimer = null;
 
-    // ------------------------------------------------------------ 资料
+    // ------------------------------------------------------------ 资料：格子位置（slot）
+    /* 主画面是一个固定格子的棋盘（手机 4 栏、平板 6 栏、电脑 8 栏）。
+       每个东西记一个 slot（= 第几格，从 0 开始）：row = slot ÷ 栏数，col = slot mod 栏数。
+       App / 文件夹占 1×1；小工具 small 2×2、medium 4×2、large 4×4。
+       Notice Board 固定在棋盘上方，不在格子里。 */
     const isPinned = (w) => !!(w && WIDGETS[w.widget_type] && WIDGETS[w.widget_type].pinned);
+    const board = () => widgets.find(isPinned) || null;
+    const SIZES = { small: [2, 2], medium: [4, 2], large: [4, 4] };
+    const cols = () => (matchMedia("(min-width: 1024px)").matches ? 8 : matchMedia("(min-width: 640px)").matches ? 6 : 4);
+
     function rootItems() {
       const items = [];
-      layout.forEach((l, id) => modules.has(id) && !l.folder_id && items.push({ kind: "app", id, order: l.sort_order }));
-      folders.forEach((f) => items.push({ kind: "folder", id: f.id, order: f.sort_order }));
-      widgets.forEach((w) => items.push({ kind: "widget", id: w.id, order: w.sort_order }));
-      const pinned = (i) => (i.kind === "widget" && isPinned(widgets.find((w) => w.id === i.id)) ? 0 : 1);
-      return items.sort((a, b) => pinned(a) - pinned(b) || a.order - b.order);
+      layout.forEach((l, id) => modules.has(id) && !l.folder_id && items.push({ kind: "app", id, slot: l.sort_order, w: 1, h: 1 }));
+      folders.forEach((f) => items.push({ kind: "folder", id: f.id, slot: f.sort_order, w: 1, h: 1 }));
+      widgets.filter((w) => !isPinned(w)).forEach((w) => items.push({ kind: "widget", id: w.id, slot: w.sort_order, w: SIZES[w.size][0], h: SIZES[w.size][1] }));
+      return items.sort((a, b) => a.slot - b.slot || a.kind.localeCompare(b.kind));
     }
     const folderApps = (fid) =>
       [...layout.entries()]
         .filter(([id, l]) => l.folder_id === fid && modules.has(id))
         .sort((a, b) => a[1].sort_order - b[1].sort_order)
         .map(([id]) => id);
-    const maxOrder = () => Math.max(0, ...[...layout.values()].map((l) => l.sort_order), ...folders.map((f) => f.sort_order), ...widgets.map((w) => w.sort_order));
+
+    // 把 slot 换算成实际位置；重叠的（例如换了装置、栏数不同）往后找空位，只影响显示不改资料
+    function positions(skip) {
+      const n = cols();
+      const taken = new Set();
+      const free = (c, r, w, h) => {
+        for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (taken.has(y * n + x)) return false;
+        return true;
+      };
+      const take = (c, r, w, h) => {
+        for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) taken.add(y * n + x);
+      };
+      const pos = new Map();
+      rootItems().forEach((it) => {
+        if (skip && skip.kind === it.kind && skip.id === it.id) return;
+        let slot = Math.max(0, it.slot || 0);
+        let c = Math.min(slot % n, n - it.w);
+        let r = Math.floor(slot / n);
+        while (!free(c, r, it.w, it.h)) {
+          slot++;
+          c = Math.min(slot % n, n - it.w);
+          r = Math.floor(slot / n);
+        }
+        take(c, r, it.w, it.h);
+        pos.set(it.kind + ":" + it.id, { c, r, w: it.w, h: it.h, slot: r * n + c });
+      });
+      return { pos, taken, n, free, take };
+    }
+    const rowsUsed = (P) => Math.max(0, ...[...P.pos.values()].map((p) => p.r + p.h));
+    // 第一个放得下的空位
+    function nextSlot(w, h, P) {
+      P = P || positions();
+      for (let slot = 0; ; slot++) {
+        const c = slot % P.n, r = Math.floor(slot / P.n);
+        if (c + w > P.n) continue;
+        if (P.free(c, r, w, h)) return r * P.n + c;
+      }
+    }
 
     async function saveApps(items) {
       if (readOnly || !items.length) return;
       const { error } = await sb.rpc("gw_save_layout", { p_items: items.map((i) => ({ ...i, card_size: "large" })) });
       if (error) toast(t("home.saveFailed"));
     }
-
-    // 拖拉之后：依画面顺序重新编号并保存
-    async function saveOrder() {
-      const els = $$("#gw-grid > [data-kind]", root);
-      const apps = [];
-      const folderUpdates = [];
-      const widgetRows = [];
-      els.forEach((el, i) => {
-        const order = i + 1;
-        const { kind, id } = el.dataset;
-        if (kind === "app") {
-          layout.set(id, { folder_id: null, sort_order: order });
-          apps.push({ module_id: id, folder_id: null, sort_order: order });
-        } else if (kind === "folder") {
-          const f = folders.find((x) => x.id === id);
-          if (f && f.sort_order !== order) folderUpdates.push(sb.from("gw_user_folders").update({ sort_order: order }).eq("id", id));
-          if (f) f.sort_order = order;
-        } else if (kind === "widget") {
-          const w = widgets.find((x) => x.id === id);
-          if (w) {
-            w.sort_order = order;
-            widgetRows.push(w);
-          }
-        }
-      });
-      await Promise.all([
-        saveApps(apps),
-        ...folderUpdates,
-        widgetRows.length ? sb.from("gw_user_widgets").upsert(widgetRows.map(({ id, user_id, widget_type, size, sort_order, config }) => ({ id, user_id, widget_type, size, sort_order, config }))) : null,
-      ]);
+    // 记住某个东西的位置
+    async function saveSlot(kind, id, slot) {
+      if (readOnly) return;
+      if (kind === "app") {
+        layout.set(id, { folder_id: null, sort_order: slot });
+        return saveApps([{ module_id: id, folder_id: null, sort_order: slot }]);
+      }
+      if (kind === "folder") {
+        const f = folders.find((x) => x.id === id);
+        if (f) f.sort_order = slot;
+        return sb.from("gw_user_folders").update({ sort_order: slot }).eq("id", id);
+      }
+      const w = widgets.find((x) => x.id === id);
+      if (w) w.sort_order = slot;
+      return sb.from("gw_user_widgets").update({ sort_order: slot }).eq("id", id);
     }
 
-    async function addApp(id, beforeIndex) {
+    async function addApp(id, slot) {
       if (layout.has(id) && modules.has(id)) return;
-      layout.set(id, { folder_id: null, sort_order: maxOrder() + 1 });
+      if (slot == null) slot = nextSlot(1, 1);
+      layout.set(id, { folder_id: null, sort_order: slot });
       draw();
-      if (beforeIndex != null) {
-        // 拖进来的：移到放下的位置再存整体顺序
-        const grid = $("#gw-grid", root);
-        const el = grid.querySelector(`[data-kind="app"][data-id="${id}"]`);
-        const ref = grid.children[beforeIndex];
-        if (el && ref && ref !== el) grid.insertBefore(el, ref);
-        await saveOrder();
-      } else {
-        await saveApps([{ module_id: id, folder_id: null, sort_order: layout.get(id).sort_order }]);
-      }
+      await saveApps([{ module_id: id, folder_id: null, sort_order: slot }]);
       sb.rpc("gw_mark_seen", { p_modules: [id] });
       toast(t("home.added"));
-      draw();
     }
 
     async function removeApp(id) {
@@ -144,11 +163,19 @@ window.GWHome = (function () {
       if (error) toast(t("home.saveFailed"));
     }
 
+    async function moveIntoFolder(id, fid) {
+      const order = folderApps(fid).length + 1;
+      layout.set(id, { folder_id: fid, sort_order: order });
+      draw();
+      await saveApps([{ module_id: id, folder_id: fid, sort_order: order }]);
+    }
+
     async function addWidget(type, size) {
       if (!widgetsEnabled) return toast(t("widgets.unavailable"));
+      const [w, h] = SIZES[size];
       const { data: row, error } = await sb
         .from("gw_user_widgets")
-        .insert({ user_id: data.profile.id, widget_type: type, size, sort_order: maxOrder() + 1, config: {} })
+        .insert({ user_id: data.profile.id, widget_type: type, size, sort_order: nextSlot(w, h), config: {} })
         .select()
         .single();
       if (error) return toast(t("home.saveFailed"));
@@ -300,12 +327,21 @@ window.GWHome = (function () {
       return "";
     }
 
-    function widgetTile(w) {
-      const pinned = isPinned(w);
-      return `<div data-kind="widget" data-id="${w.id}" class="${pinned ? "gw-pinned" : "gw-item"} relative ${SPAN[w.size]}">
+    function widgetTile(w, p) {
+      return `<div data-kind="widget" data-id="${w.id}" class="gw-item relative" style="grid-column:${p.c + 1} / span ${p.w};grid-row:${p.r + 1} / span ${p.h}">
         <div class="${glass}">${widgetBody(w)}</div>
-        ${editing && !pinned ? badge(`data-remove-widget="${w.id}"`, "minus", t("widgets.remove"), "-top-2 -left-2") : ""}
+        ${editing ? badge(`data-remove-widget="${w.id}"`, "minus", t("widgets.remove"), "-top-2 -left-2") : ""}
         ${editing && WIDGETS[w.widget_type].sizes.length > 1 ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
+      </div>`;
+    }
+
+    // Notice Board：固定在最上面、占满整行；只能调高度
+    function boardHtml() {
+      const w = board();
+      if (!w) return "";
+      return `<div data-kind="widget" data-id="${w.id}" class="gw-pinned relative mb-4 ${w.size === "large" ? "h-[22rem]" : "h-[13rem]"}">
+        <div class="${glass}">${widgetBody(w)}</div>
+        ${editing ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
       </div>`;
     }
 
@@ -381,8 +417,6 @@ window.GWHome = (function () {
     // ------------------------------------------------------------ 整页
 
     function draw() {
-      sortables.forEach((s) => s.destroy());
-      sortables = [];
       clearInterval(clockTimer);
       // 还没被分配到任何群组：主画面什么都不显示，只显示等待分配
       if (opts && opts.pending) {
@@ -394,14 +428,25 @@ window.GWHome = (function () {
         </div>`;
         return refreshIcons();
       }
+      const P = positions();
       const items = rootItems();
+      // 棋盘下面多留两行空位，可以把东西拖到更下面
+      const rows = rowsUsed(P) + (readOnly ? 0 : 2);
+      const tile = (it) => {
+        const p = P.pos.get(it.kind + ":" + it.id);
+        const at = `style="grid-column:${p.c + 1} / span ${p.w};grid-row:${p.r + 1} / span ${p.h}"`;
+        if (it.kind === "app") return appTile(it.id).replace('class="gw-item', at + ' class="gw-item');
+        if (it.kind === "folder") return folderTile(folders.find((f) => f.id === it.id)).replace('class="gw-item', at + ' class="gw-item');
+        return widgetTile(widgets.find((w) => w.id === it.id), p);
+      };
       root.innerHTML = `
         ${uninitialized ? `<div class="mb-4 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">${esc(t("home.previewUninitialized"))}</div>` : ""}
+        ${boardHtml()}
         ${editing ? `<p class="mb-3 text-center text-xs text-slate-500">${esc(t("fab.editHint"))}</p>` : ""}
-        <div id="gw-grid" class="${editing ? "gw-editing" : ""} grid grid-flow-row-dense grid-cols-4 gap-x-2 gap-y-4 [grid-auto-rows:5.25rem] sm:grid-cols-6 sm:[grid-auto-rows:5.75rem] lg:grid-cols-8">
-          ${items
-            .map((i) => (i.kind === "app" ? appTile(i.id) : i.kind === "folder" ? folderTile(folders.find((f) => f.id === i.id)) : widgetTile(widgets.find((w) => w.id === i.id))))
-            .join("")}
+        <div id="gw-grid" data-cols="${P.n}" class="${editing ? "gw-editing" : ""} relative grid gap-x-2 gap-y-4 [grid-auto-rows:5.25rem] sm:[grid-auto-rows:5.75rem]"
+             style="grid-template-columns:repeat(${P.n},minmax(0,1fr));grid-template-rows:repeat(${Math.max(rows, 1)},var(--gw-row,5.25rem))">
+          ${items.map(tile).join("")}
+          <div data-drop-hint class="pointer-events-none hidden rounded-2xl border-2 border-dashed"></div>
         </div>
         ${items.length === 0 ? `<div class="${cls.empty} mt-2 bg-white/60 dark:bg-slate-900/40">${esc(data.modules.length ? t("fab.emptyHome") : t("home.noModules"))}</div>` : ""}
         ${
@@ -411,7 +456,6 @@ window.GWHome = (function () {
         }
         ${fabHtml()}`;
       refreshIcons();
-      if (!readOnly) setupSortable();
       if ($("[data-clock]", root)) {
         clockTimer = setInterval(() => {
           const now = new Intl.DateTimeFormat(GW.LOCALE, { timeZone: GW_CONFIG.timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
@@ -419,56 +463,159 @@ window.GWHome = (function () {
         }, 15000);
       }
     }
+    // 栏数随视窗宽度变（手机 4、平板 6、电脑 8）
+    let lastCols = cols();
+    addEventListener("resize", () => {
+      if (cols() !== lastCols) ((lastCols = cols()), draw());
+    });
 
-    // ------------------------------------------------------------ 拖拉
-    function setupSortable() {
-      const grid = $("#gw-grid", root);
-      const start = () => document.body.classList.add("gw-dragging");
-      const end = () => {
-        document.body.classList.remove("gw-dragging");
-        lastDragEnd = Date.now();
+    // ------------------------------------------------------------ 拖拉（像 iPhone：长按拿起，放到任何空格；格子会对齐）
+    /* 规则：放到空格 → 移过去；App 放到文件夹上 → 收进文件夹；
+             1×1 的东西放到另一个 1×1 上 → 两个交换；小工具要整块空位才放得下。
+       从「Add Apps」面板也可以直接拖到想放的格子。 */
+    let drag = null;
+    const cellOf = (grid, x, y) => {
+      const rect = grid.getBoundingClientRect();
+      const cs = getComputedStyle(grid);
+      const n = Number(grid.dataset.cols);
+      const gx = parseFloat(cs.columnGap) || 0, gy = parseFloat(cs.rowGap) || 0;
+      const rowH = parseFloat(cs.gridTemplateRows.split(" ")[0]) || 84;
+      const cellW = (rect.width - gx * (n - 1)) / n;
+      const rows = cs.gridTemplateRows.split(" ").length;
+      return {
+        c: Math.max(0, Math.min(n - 1, Math.floor((x - rect.left) / (cellW + gx)))),
+        r: Math.max(0, Math.min(rows - 1, Math.floor((y - rect.top) / (rowH + gy)))),
+        n, rows, cellW, rowH, gx, gy, rect,
       };
-      sortables.push(
-        window.Sortable.create(grid, {
-          group: { name: "gw", pull: false, put: true },
-          animation: 180,
-          delay: 250,
-          delayOnTouchOnly: true,
-          filter: ".no-drag, .gw-pinned",
-          preventOnFilter: false,
-          // 不能把东西放到 Notice Board 前面
-          onMove: (evt) => !(evt.related.classList.contains("gw-pinned") && !evt.willInsertAfter),
-          onStart: start,
-          onAdd: (evt) => {
-            // 从「Add Apps」面板拖进来
-            const id = evt.item.dataset.lib;
-            const index = evt.newIndex;
-            evt.item.remove();
-            end();
-            if (id) addApp(id, index);
-          },
-          onEnd: () => {
-            end();
-            saveOrder();
-          },
-        }),
-      );
-      const lib = $(".gw-sheet-apps", root);
-      if (lib) {
-        sortables.push(
-          window.Sortable.create(lib, {
-            group: { name: "gw", pull: "clone", put: false },
-            sort: false,
-            animation: 150,
-            delay: 200,
-            delayOnTouchOnly: true,
-            filter: ".no-drag, .gw-added",
-            onStart: start,
-            onEnd: end,
-          }),
-        );
+    };
+    function dragTarget(e) {
+      const grid = $("#gw-grid", root);
+      const g = cellOf(grid, e.clientX, e.clientY);
+      let c = Math.max(0, Math.min(g.n - drag.w, g.c - drag.offC));
+      let r = Math.max(0, g.r - drag.offR);
+      const P = positions(drag.kind === "lib" ? null : { kind: drag.kind, id: drag.id });
+      // 这个位置上有什么
+      const hits = new Set();
+      P.pos.forEach((p, key) => {
+        if (c < p.c + p.w && c + drag.w > p.c && r < p.r + p.h && r + drag.h > p.r) hits.add(key);
+      });
+      let action = null;
+      if (!hits.size) action = { type: "place", slot: r * g.n + c };
+      else if (hits.size === 1) {
+        const key = [...hits][0];
+        const [kind, id] = key.split(":");
+        const p = P.pos.get(key);
+        if (kind === "folder" && (drag.kind === "app" || drag.kind === "lib")) action = { type: "folder", fid: id };
+        else if (drag.w === 1 && drag.h === 1 && p.w === 1 && p.h === 1 && drag.kind !== "lib") action = { type: "swap", kind, id, theirSlot: p.slot, mySlot: drag.slot };
       }
+      return { c, r, g, action };
     }
+    function showHint(tg) {
+      const hint = $("[data-drop-hint]", root);
+      if (!hint) return;
+      hint.classList.remove("hidden");
+      hint.className = `pointer-events-none rounded-2xl border-2 border-dashed ${tg.action ? "border-brand-500/70 bg-brand-500/10" : "border-rose-400/70 bg-rose-400/10"}`;
+      hint.style.gridColumn = `${tg.c + 1} / span ${drag.w}`;
+      hint.style.gridRow = `${tg.r + 1} / span ${drag.h}`;
+    }
+    function startDrag(e, el) {
+      const lib = el.dataset.lib;
+      const rect = el.getBoundingClientRect();
+      const grid = $("#gw-grid", root);
+      const g = cellOf(grid, rect.left, rect.top);
+      let w = 1, h = 1;
+      if (el.dataset.kind === "widget") [w, h] = SIZES[widgets.find((x) => x.id === el.dataset.id).size];
+      const cur = lib ? null : positions().pos.get(el.dataset.kind + ":" + el.dataset.id);
+      drag = {
+        kind: lib ? "lib" : el.dataset.kind,
+        id: lib || el.dataset.id,
+        slot: cur ? cur.slot : null,
+        el, w, h,
+        // 手指抓在东西的第几格（宽的小工具才有差）
+        offC: lib ? 0 : Math.min(w - 1, Math.floor((e.clientX - rect.left) / (g.cellW + g.gx))),
+        offR: lib ? 0 : Math.min(h - 1, Math.floor((e.clientY - rect.top) / (g.rowH + g.gy))),
+        dx: e.clientX - rect.left,
+        dy: e.clientY - rect.top,
+        target: null,
+      };
+      const ghost = el.cloneNode(true);
+      ghost.removeAttribute("data-kind");
+      ghost.style.cssText = `position:fixed;left:0;top:0;width:${rect.width}px;height:${rect.height}px;z-index:60;pointer-events:none;transform:translate(${rect.left}px,${rect.top}px) scale(1.08);opacity:.95;transition:none;margin:0`;
+      ghost.className = ghost.className.replace("gw-item", "gw-ghost");
+      document.body.appendChild(ghost);
+      drag.ghost = ghost;
+      el.classList.add("opacity-30");
+      document.body.classList.add("gw-dragging");
+      if (sheet) $(".gw-sheet", root).classList.add("opacity-40", "pointer-events-none");
+    }
+    function moveDrag(e) {
+      drag.ghost.style.transform = `translate(${e.clientX - drag.dx}px,${e.clientY - drag.dy}px) scale(1.08)`;
+      // 靠近上下边缘时自动卷动
+      if (e.clientY < 90) scrollBy(0, -14);
+      else if (e.clientY > innerHeight - 90) scrollBy(0, 14);
+      drag.target = dragTarget(e);
+      showHint(drag.target);
+    }
+    async function endDrag(cancelled) {
+      const d = drag;
+      drag = null;
+      d.ghost.remove();
+      d.el.classList.remove("opacity-30");
+      document.body.classList.remove("gw-dragging");
+      lastDragEnd = Date.now();
+      const a = !cancelled && d.target && d.target.action;
+      if (!a) return draw();
+      if (d.kind === "lib") {
+        if (a.type === "folder") {
+          if (layout.has(d.id)) return draw();
+          layout.set(d.id, { folder_id: a.fid, sort_order: folderApps(a.fid).length + 1 });
+          draw();
+          await saveApps([{ module_id: d.id, folder_id: a.fid, sort_order: layout.get(d.id).sort_order }]);
+          sb.rpc("gw_mark_seen", { p_modules: [d.id] });
+          return toast(t("home.added"));
+        }
+        return addApp(d.id, a.slot);
+      }
+      if (a.type === "place") {
+        const saving = saveSlot(d.kind, d.id, a.slot); // 先改记忆中的位置再重画
+        draw();
+        return saving;
+      }
+      if (a.type === "folder") return moveIntoFolder(d.id, a.fid);
+      if (a.type === "swap") {
+        const saving = Promise.all([saveSlot(d.kind, d.id, a.theirSlot), saveSlot(a.kind, a.id, a.mySlot)]);
+        draw();
+        return saving;
+      }
+      draw();
+    }
+    // 长按（手机）或拖动（滑鼠）开始
+    let press = null;
+    root.addEventListener("pointerdown", (e) => {
+      if (readOnly || drag || e.button !== 0) return;
+      const el = e.target.closest("#gw-grid > .gw-item, .gw-sheet-apps [data-lib]:not(.gw-added)");
+      if (!el || e.target.closest(".no-drag")) return;
+      const touch = e.pointerType !== "mouse";
+      press = { el, x: e.clientX, y: e.clientY, id: e.pointerId, touch };
+      if (touch) press.timer = setTimeout(() => press && ((press.hold = true), startDrag(e, el), moveDrag(e)), 280);
+    });
+    root.addEventListener("pointermove", (e) => {
+      if (drag) return moveDrag(e);
+      if (!press || e.pointerId !== press.id) return;
+      const far = Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8;
+      if (press.touch && far) ((clearTimeout(press.timer)), (press = null)); // 手指在滑动页面，不是要拖
+      else if (!press.touch && far) ((startDrag(e, press.el)), moveDrag(e), (press = null));
+    });
+    const up = (e) => {
+      if (press) ((clearTimeout(press.timer)), (press = null));
+      if (drag) endDrag(e.type === "pointercancel");
+    };
+    root.addEventListener("pointerup", up);
+    root.addEventListener("pointercancel", up);
+    addEventListener("pointerup", (e) => drag && up(e));
+    // 拖拉中不让页面跟着手指卷动；长按不要跳出系统选单
+    document.addEventListener("touchmove", (e) => drag && e.preventDefault(), { passive: false });
+    root.addEventListener("contextmenu", (e) => (drag || press) && e.preventDefault());
 
     // ------------------------------------------------------------ App 选单 / 文件夹
     function appMenu(id) {
@@ -488,7 +635,7 @@ window.GWHome = (function () {
       );
       $("[data-move]", dlg.el).addEventListener("change", async (e) => {
         const folderId = e.target.value || null;
-        const order = folderId ? folderApps(folderId).length + 1 : maxOrder() + 1;
+        const order = folderId ? folderApps(folderId).length + 1 : nextSlot(1, 1);
         layout.set(id, { folder_id: folderId, sort_order: order });
         dlg.close();
         draw();
@@ -497,44 +644,53 @@ window.GWHome = (function () {
       $("[data-remove]", dlg.el).onclick = () => (dlg.close(), removeApp(id));
     }
 
+    // 文件夹：像 iPhone 一样放大成一个浮动窗，名字在上面
     function openFolder(fid) {
       const f = folders.find((x) => x.id === fid);
       const ids = folderApps(fid);
-      const dlg = modal(
-        f.name,
-        `<div class="space-y-4">
+      const wrap = document.createElement("div");
+      wrap.setAttribute("role", "dialog");
+      wrap.className = "fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/40 p-6 backdrop-blur-md";
+      wrap.innerHTML = `
+        <h2 class="mb-5 max-w-full truncate px-4 text-3xl font-bold text-white drop-shadow sm:text-4xl">${esc(f.name)}</h2>
+        <div data-win class="w-full max-w-md rounded-[2rem] border border-white/60 bg-white/75 p-6 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/75">
           ${
             ids.length
-              ? `<div class="grid grid-cols-3 gap-4 sm:grid-cols-4">${ids
+              ? `<div class="grid grid-cols-3 gap-5 sm:grid-cols-4">${ids
                   .map(
-                    (id) => `<div class="relative flex flex-col items-center gap-1">
-                      <button type="button" data-open="${id}" class="flex flex-col items-center gap-1">${appIcon(modules.get(id), "size-14")}<span class="w-20 truncate text-center text-xs">${esc(modules.get(id).name)}</span></button>
-                      ${readOnly ? "" : `<button type="button" data-out="${id}" title="${esc(t("fab.moveOut"))}" aria-label="${esc(t("fab.moveOut"))}" class="absolute -top-1 right-2 flex size-6 items-center justify-center rounded-full bg-slate-700 text-white">${icon("arrow-up-right", "size-3.5")}</button>`}
+                    (id) => `<div class="relative flex flex-col items-center gap-1.5">
+                      <button type="button" data-open="${id}" class="flex flex-col items-center gap-1.5">${appIcon(modules.get(id), "size-14 sm:size-16")}<span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(modules.get(id).name)}</span></button>
+                      ${readOnly ? "" : `<button type="button" data-out="${id}" title="${esc(t("fab.moveOut"))}" aria-label="${esc(t("fab.moveOut"))}" class="absolute -top-1 right-1 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon("arrow-up-right", "size-3.5")}</button>`}
                     </div>`,
                   )
                   .join("")}</div>`
-              : `<p class="text-center text-sm text-slate-500">${esc(t("fab.emptyFolder"))}</p>`
+              : `<p class="py-6 text-center text-sm text-slate-500">${esc(t("fab.emptyFolder"))}</p>`
           }
-          ${readOnly ? "" : `<div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-            <button data-rename class="${btn("ghost", "sm")}">${icon("pencil")} ${esc(t("home.editFolder"))}</button>
-          </div>`}
-        </div>`,
-      );
-      dlg.el.addEventListener("click", async (e) => {
+        </div>
+        ${readOnly ? "" : `<button type="button" data-rename class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow backdrop-blur dark:bg-slate-800/80 dark:text-slate-200">${icon("pencil", "size-4")} ${esc(t("home.editFolder"))}</button>`}`;
+      document.body.appendChild(wrap);
+      refreshIcons();
+      const close = () => wrap.remove();
+      const onKey = (e) => e.key === "Escape" && (close(), document.removeEventListener("keydown", onKey));
+      document.addEventListener("keydown", onKey);
+      wrap.addEventListener("click", async (e) => {
         const b = e.target.closest("button");
-        if (!b) return;
-        if (b.dataset.open) return dlg.close(), open(b.dataset.open);
+        if (!b) {
+          if (!e.target.closest("[data-win]")) close();
+          return;
+        }
+        if (b.dataset.open) return close(), open(b.dataset.open);
         if (b.dataset.out) {
           const id = b.dataset.out;
-          const order = maxOrder() + 1;
-          layout.set(id, { folder_id: null, sort_order: order });
-          dlg.close();
+          const slot = nextSlot(1, 1);
+          layout.set(id, { folder_id: null, sort_order: slot });
+          close();
           draw();
-          await saveApps([{ module_id: id, folder_id: null, sort_order: order }]);
+          await saveApps([{ module_id: id, folder_id: null, sort_order: slot }]);
           return openFolder(fid);
         }
         if ("rename" in b.dataset) {
-          dlg.close();
+          close();
           folderDialog(f);
         }
       });
@@ -622,7 +778,7 @@ window.GWHome = (function () {
         } else {
           const { data: created, error } = await sb
             .from("gw_user_folders")
-            .insert({ user_id: data.profile.id, name, color: "slate", sort_order: maxOrder() + 1 })
+            .insert({ user_id: data.profile.id, name, color: "slate", sort_order: nextSlot(1, 1) })
             .select("id, name, color, sort_order, collapsed")
             .single();
           if (error) return toast(t("home.saveFailed"));
@@ -637,13 +793,14 @@ window.GWHome = (function () {
       const f = folders.find((x) => x.id === fid);
       const ok = await confirmDialog(t("home.deleteFolderTitle"), t("home.deleteFolderBody", { name: f.name }), t("home.delete"), t("home.cancel"));
       if (!ok) return;
-      // 文件夹里的 App 回到主画面最后面
-      let order = maxOrder();
-      const moved = folderApps(fid).map((id) => {
-        layout.set(id, { folder_id: null, sort_order: ++order });
-        return { module_id: id, folder_id: null, sort_order: order };
-      });
+      // 文件夹里的 App 回到主画面的空格
+      const ids = folderApps(fid);
       folders = folders.filter((x) => x.id !== fid);
+      const moved = ids.map((id) => {
+        const slot = nextSlot(1, 1);
+        layout.set(id, { folder_id: null, sort_order: slot });
+        return { module_id: id, folder_id: null, sort_order: slot };
+      });
       draw();
       const { error } = await sb.from("gw_user_folders").delete().eq("id", fid);
       if (error) return toast(t("home.saveFailed"));
@@ -662,6 +819,7 @@ window.GWHome = (function () {
     // ------------------------------------------------------------ 事件（委派）
     let noteTimer;
     root.addEventListener("click", (e) => {
+      if (Date.now() - lastDragEnd < 400) return; // 刚拖完，不算点击
       const b = e.target.closest("button");
       if (!b || !root.contains(b)) {
         if (fabOpen && !e.target.closest("[data-fab-toggle]")) ((fabOpen = false), draw());

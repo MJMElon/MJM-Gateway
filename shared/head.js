@@ -39,6 +39,11 @@ body.gw-dragging .gw-folder-body { display: block !important; min-height: 3rem; 
 /* 主画面背景 */
 body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #e0ecff 0%, transparent 60%), radial-gradient(900px 500px at 100% 0%, #eef2f7 0%, transparent 55%), #f6f8fb; background-attachment: fixed; }
 .dark body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #12233f 0%, transparent 60%), #020617; }
+/* 主画面棋盘：格子高度（手机 / 平板以上）；拖拉时不要选取文字、不要跳出长按选单 */
+#gw-grid { --gw-row: 5.25rem; }
+@media (min-width: 640px) { #gw-grid { --gw-row: 5.75rem; } }
+.gw-item, .gw-ghost, .gw-sheet-apps [data-lib] { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+body.gw-dragging { cursor: grabbing; }
 /* 编辑主画面时轻轻抖动（像 iPhone） */
 @keyframes gw-jiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
 .gw-editing > .gw-item { animation: gw-jiggle .14s ease-in-out infinite alternate; }
