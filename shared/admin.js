@@ -18,7 +18,8 @@
      模块管理员  → 模块权限（自己管理的模块）
      公告直接在首页的 Notice Board 发布、修改、删除 */
   const C = me.can;
-  const canAccessPage = isSuper || C.can_grant_module || C.can_revoke_module || C.can_set_module_admin || me.adminModules > 0;
+  const canAccessPage = isSuper || C.can_view_user_group || C.can_grant_module || C.can_revoke_module || C.can_set_module_admin || me.adminModules > 0;
+  const canGroupsPage = isSuper || C.can_view_user_group || C.can_add_business_user || C.can_remove_business_user;
   const SECTIONS = isSuper
     ? [
         ["userGroup", "users-round", ["users", "groups", "access"]],
@@ -26,7 +27,7 @@
         ["audit", "scroll-text", ["audit"]],
       ]
     : [
-        ["userGroup", "users-round", [...(C.can_view_users ? ["users"] : []), ...(C.can_place_users ? ["groups"] : []), ...(canAccessPage ? ["access"] : [])]],
+        ["userGroup", "users-round", [...(C.can_view_users ? ["users"] : []), ...(canGroupsPage ? ["groups"] : []), ...(canAccessPage ? ["access"] : [])]],
         ...(C.can_view_audit ? [["audit", "scroll-text", ["audit"]]] : []),
       ].filter(([, , tabs]) => tabs.length);
   const TABS = SECTIONS.flatMap(([, , tabs]) => tabs);
@@ -170,7 +171,6 @@
 
     function draw() {
       m.el.innerHTML = `<div class="space-y-4">
-        <p class="text-sm text-slate-500">${esc(ta("hint"))}</p>
         ${
           sections.length
             ? sections
@@ -222,7 +222,7 @@
       const q = query.trim().toLowerCase();
       view.innerHTML = `<div class="space-y-4">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <p class="flex-1 text-sm text-slate-500">${esc(ta("description"))}</p>
+          <div class="flex-1"></div>
           <input id="acc-q" type="search" value="${esc(query)}" placeholder="${esc(t("admin.users.search"))}" class="${cls.input} h-9 sm:w-64">
         </div>
         ${
@@ -373,7 +373,7 @@
           <div data-err></div>
           ${field("Email", `<input name="email" type="email" required value="${esc(user ? user.email : "")}" ${user ? "disabled" : ""} class="${cls.input}">`)}
           ${field(tu("name"), `<input name="full_name" required value="${esc(user ? user.full_name : "")}" class="${cls.input}">`)}
-          ${field(tu("role"), select("role", roleOptions, user ? roleValue(user) : "user", user && user.id === me.id ? "disabled" : ""), tu("roleHint"))}
+          ${field(tu("role"), select("role", roleOptions, user ? roleValue(user) : "user", user && user.id === me.id ? "disabled" : ""))}
           <div>
             <p class="mb-1.5 ${cls.label}">${esc(tu("groups"))}</p>
             ${
@@ -382,7 +382,7 @@
                 : `<p class="text-sm text-slate-500">${esc(tu("noGroups"))}</p>`
             }
           </div>
-          ${user ? "" : `<p class="text-xs text-slate-500">${esc(tu("passwordHint"))}</p>`}
+          
           <div class="flex justify-end gap-2">
             <button type="button" data-cancel class="${btn("secondary")}">${esc(tu("cancel"))}</button>
             <button type="submit" class="${btn("primary")}">${esc(user ? tu("save") : tu("create"))}</button>
@@ -452,7 +452,6 @@
       const m = modal(
         ti("title"),
         `<form class="space-y-4">
-          <p class="text-sm text-slate-600 dark:text-slate-300">${esc(ti("description"))}</p>
           <button type="button" data-template class="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:underline dark:text-brand-100">${icon("download")} ${esc(ti("template"))}</button>
           <div data-err></div>
           <input type="file" name="file" accept=".xlsx" required class="${cls.input} h-auto py-2">
@@ -576,6 +575,10 @@
     ]).then((r) => r.map((x) => (Array.isArray(x) ? x : x.data || [])));
     if (stale(seq)) return;
 
+    // 角色功能：加人（拖拉、点名字）、移出、模块权限
+    const canAdd = isSuper || C.can_add_business_user;
+    const canRemove = isSuper || C.can_remove_business_user;
+    const canApps = canAccessPage;
     // 角色只看到自己管的 Business（自己是成员的其他 Business 不能在这里管）
     const groups = allGroups.filter((g) => isSuper || (me.businessIds || []).includes(g.id));
     const userById = new Map(users.map((u) => [u.id, u]));
@@ -597,7 +600,7 @@
     const zone = (g, c, mems) => `<div>
         <p class="mb-1 flex items-center gap-1.5 text-xs font-semibold ${c ? "text-slate-700 dark:text-slate-200" : "text-slate-400"}">${icon(c ? "building-2" : "circle-dashed", "size-3.5")}${esc(c ? c.name : tu2("noCompany"))}<span class="font-normal text-slate-400">(${mems.length})</span></p>
         <div data-drop="${g.id}" data-company="${c ? c.id : ""}" class="gw-drop min-h-14 space-y-1.5 rounded-xl border-2 border-dashed border-slate-200 p-2 dark:border-slate-700">
-          ${mems.length ? mems.map((u) => chip(u, `<button data-apps="${g.id}:${u.id}" aria-label="${esc(tu2("apps"))}" title="${esc(tu2("apps"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">${icon("layout-grid")}</button><button data-out="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>`)).join("") : `<p class="ug-empty py-2 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}
+          ${mems.length ? mems.map((u) => chip(u, `${canApps ? `<button data-apps="${g.id}:${u.id}" aria-label="${esc(tu2("apps"))}" title="${esc(tu2("apps"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">${icon("layout-grid")}</button>` : ""}${canRemove ? `<button data-out="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>` : ""}`)).join("") : `<p class="ug-empty py-2 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}
         </div>
       </div>`;
 
@@ -608,14 +611,13 @@
       const q = query.trim().toLowerCase();
       const leftList = (leftMode === "pending" ? pending : users).filter((u) => !q || (u.full_name + " " + u.email).toLowerCase().includes(q));
 
-      view.innerHTML = `<div class="grid gap-5 lg:grid-cols-[18rem_1fr]">
-        <aside class="space-y-3 lg:sticky lg:top-20 lg:self-start">
+      view.innerHTML = `<div class="grid gap-5 ${canAdd ? "lg:grid-cols-[18rem_1fr]" : ""}">
+        ${canAdd ? `<aside class="space-y-3 lg:sticky lg:top-20 lg:self-start">
           <div class="${cls.card} p-3">
             <div class="mb-2 inline-flex w-full rounded-lg border border-slate-300 p-0.5 dark:border-slate-700">
               <button data-left="pending" class="flex-1 rounded-md px-2 py-1 text-sm font-medium ${leftMode === "pending" ? "bg-amber-500 text-white" : "text-slate-600 dark:text-slate-300"}">${esc(tu2("pending"))} (${pending.length})</button>
               <button data-left="all" class="flex-1 rounded-md px-2 py-1 text-sm font-medium ${leftMode === "all" ? "bg-slate-700 text-white" : "text-slate-600 dark:text-slate-300"}">${esc(tu2("allUsers"))}</button>
             </div>
-            <p class="mb-2 text-xs text-slate-500">${esc(tu2(leftMode === "pending" ? "pendingHint" : "allUsersHint"))}</p>
             <input id="ug-q" type="search" value="${esc(query)}" placeholder="${esc(t("admin.users.search"))}" class="${cls.input} mb-2 h-9">
             <div id="ug-left" class="max-h-[60vh] space-y-2 overflow-y-auto">
               ${
@@ -625,9 +627,8 @@
               }
             </div>
           </div>
-        </aside>
+        </aside>` : ""}
         <section class="space-y-4">
-          <p class="text-sm text-slate-500">${esc(tu2("description"))}</p>
           ${
             groups.length
               ? `<div class="grid gap-4 xl:grid-cols-2">${groups
@@ -656,7 +657,8 @@
       </div>`;
       refreshIcons();
 
-      // 拖拉：左边名单 → Company；Company 之间也可以拖（只限同一个 Business）
+      // 拖拉：左边名单 → Company；Company 之间也可以拖（只限同一个 Business）；没有「加人」功能就只能看
+      if (!canAdd) return;
       sortables.push(window.Sortable.create($("#ug-left"), { group: { name: "ug", pull: "clone", put: false }, sort: false, delay: 200, delayOnTouchOnly: true, filter: ".no-drag", animation: 150 }));
       $$(".gw-drop").forEach((el) =>
         sortables.push(
@@ -747,7 +749,7 @@
         return draw();
       }
       // 点名单里的名字：选 Business / Company（手机不方便拖拉时用）
-      if (d.user && !e.target.closest(".no-drag")) return pick(d.user);
+      if (canAdd && d.user && !e.target.closest(".no-drag")) return pick(d.user);
     };
     draw();
   }
@@ -772,12 +774,19 @@
     const modsOf = (gid) => gm.filter((x) => x.group_id === gid && modById.has(x.module_id)).map((x) => modById.get(x.module_id));
 
     // 角色功能（顺序 = 表格和弹出视窗里的顺序）
-    const FUNCS = ["can_post_notice", "can_delete_notice", "can_grant_module", "can_revoke_module", "can_set_module_admin", "can_place_users", "can_view_users", "can_view_audit"];
+    const FUNC_GROUPS = [
+      ["noticeBoard", ["can_post_notice", "can_delete_notice"]],
+      [
+        "userAccess",
+        ["can_grant_module", "can_revoke_module", "can_set_module_admin", "can_add_business_user", "can_remove_business_user", "can_view_user_group", "can_view_users", "can_view_audit"],
+      ],
+    ];
+    const FUNCS = FUNC_GROUPS.flatMap(([, fs]) => fs);
     const th = (text, extra) => `<th class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase ${extra || ""}">${esc(text)}</th>`;
 
     view.innerHTML = `<div class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="max-w-3xl text-sm text-slate-500">${esc(tr("description"))}</p>
+        <div></div>
         <button id="role-add" class="${btn("primary")} shrink-0">${icon("plus")} ${esc(tr("add"))}</button>
       </div>
       ${
@@ -816,7 +825,6 @@
             </div>`
           : empty(tr("empty"))
       }
-      <p class="text-xs text-slate-500">${esc(tr("normalUserHint"))}</p>
     </div>`;
     refreshIcons();
 
@@ -831,14 +839,17 @@
           ${field(tg("descriptionLabel"), `<input name="description" value="${esc(r ? r.description || "" : "")}" class="${cls.input}">`)}
           <div>
             <p class="${cls.label}">${esc(tr("colFunctions"))}</p>
-            <p class="mb-2 text-xs text-slate-500">${esc(tr("functionsHint"))}</p>
-            <div class="grid gap-x-4 gap-y-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 dark:border-slate-800">${FUNCS.map(
-              (f) => `<label class="flex items-start gap-2 text-sm"><input type="checkbox" name="${f}" ${r && r[f] ? "checked" : ""} class="mt-0.5 size-4 shrink-0 accent-emerald-600"><span><span class="font-medium">${esc(tr("funcs." + f))}</span><span class="block text-xs text-slate-500">${esc(tr("funcHints." + f))}</span></span></label>`,
+            <div class="space-y-3">${FUNC_GROUPS.map(
+              ([g, fs]) => `<div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                <p class="mb-2 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(tr("groups." + g))}</p>
+                <div class="grid gap-x-4 gap-y-2 sm:grid-cols-2">${fs
+                  .map((f) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="${f}" ${r && r[f] ? "checked" : ""} class="size-4 shrink-0 accent-emerald-600">${esc(tr("funcs." + f))}</label>`)
+                  .join("")}</div>
+              </div>`,
             ).join("")}</div>
           </div>
           <div>
             <p class="${cls.label}">${esc(tr("scope"))}</p>
-            <p class="mb-2 text-xs text-slate-500">${esc(tr("scopeHint"))}</p>
             ${
               groups.length
                 ? `<div class="space-y-2">${groups
@@ -946,7 +957,7 @@
     function draw() {
       view.innerHTML = `<div class="space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="text-sm text-slate-500">${esc(tb("description"))}</p>
+          <div></div>
           <button id="biz-add" class="${btn("primary")}">${icon("plus")} ${esc(tb("add"))}</button>
         </div>
         ${
@@ -957,7 +968,7 @@
                     <div class="flex items-start gap-2">
                       <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200">${icon("briefcase-business", "size-5")}</span>
                       <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">${esc(g.name)}</span></div>
+                        <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">${esc(g.name)}</span>${g.code ? `<span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">${esc(g.code)}</span>` : badge(t("admin.company.noCode"), "amber")}</div>
                         <p class="text-xs text-slate-500">${esc(tb("counts", { companies: companies.filter((c) => c.group_id === g.id).length, members: members.filter((m) => m.group_id === g.id).length }))}${g.description ? " · " + esc(g.description) : ""}</p>
                       </div>
                       <button data-edit="${g.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
@@ -992,9 +1003,11 @@
         g ? tb("editTitle") : tb("addTitle"),
         `<form class="space-y-4">
           <div data-err></div>
-          ${field(tg("name"), `<input name="name" required value="${esc(g ? g.name : "")}" class="${cls.input}">`)}
+          <div class="grid gap-4 sm:grid-cols-[10rem_1fr]">
+            ${field(tb("code"), `<input name="code" required maxlength="20" value="${esc(g ? g.code || "" : "")}" ${g && g.code ? "readonly" : ""} class="${cls.input} font-mono uppercase">`)}
+            ${field(tg("name"), `<input name="name" required value="${esc(g ? g.name : "")}" class="${cls.input}">`)}
+          </div>
           ${field(tg("descriptionLabel"), `<input name="description" value="${esc(g ? g.description || "" : "")}" class="${cls.input}">`)}
-          ${field(tg("sortOrder"), `<input name="sort_order" type="number" value="${g ? g.sort_order : 0}" class="${cls.input}">`)}
           <div class="flex justify-end gap-2">
             <button type="button" data-cancel class="${btn("secondary")}">${esc(tg("cancel"))}</button>
             <button type="submit" class="${btn("primary")}">${esc(tg("save"))}</button>
@@ -1005,9 +1018,9 @@
       $("form", m.el).addEventListener("submit", async (e) => {
         e.preventDefault();
         const f = e.target;
-        const row = { name: f.name.value.trim(), description: f.description.value.trim() || null, sort_order: Number(f.sort_order.value) || 0 };
+        const row = { code: f.code.value.trim().toUpperCase(), name: f.name.value.trim(), description: f.description.value.trim() || null };
         const { error } = g ? await sb.from("gw_groups").update(row).eq("id", g.id) : await sb.from("gw_groups").insert(row);
-        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(error.code === "23505" ? tb("duplicate") : tg("saveFailed")));
+        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(error.code === "23505" ? tb("duplicate") : error.code === "23514" ? tb("badCode") : tg("saveFailed")));
         m.close();
         businessTab();
       });
@@ -1064,7 +1077,7 @@
       const list = companies.filter((c) => !q || [c.code, c.name, c.short_name, c.registration_no].filter(Boolean).join(" ").toLowerCase().includes(q));
       view.innerHTML = `<div class="space-y-4">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <p class="flex-1 text-sm text-slate-500">${esc(tc("description"))}</p>
+          <div class="flex-1"></div>
           <input id="co-q" type="search" value="${esc(query)}" placeholder="${esc(tc("search"))}" class="${cls.input} h-9 sm:w-56">
           <button id="co-add" class="${btn("primary")}">${icon("plus")} ${esc(tc("add"))}</button>
         </div>
@@ -1139,11 +1152,10 @@
         c ? tc("editTitle") : tc("addTitle"),
         `<form class="space-y-4"><div data-err></div>
           <div class="grid gap-4 sm:grid-cols-2">
-            ${field(tc("code"), `<input name="code" required maxlength="20" value="${esc(v.code || "")}" ${c && c.code ? "readonly" : ""} class="${cls.input} font-mono uppercase">`, c && c.code ? tc("codeLocked") : tc("codeHint"))}
+            ${field(tc("code"), `<input name="code" required maxlength="20" value="${esc(v.code || "")}" ${c && c.code ? "readonly" : ""} class="${cls.input} font-mono uppercase">`)}
             ${field(tc("name"), `<input name="name" required maxlength="100" value="${esc(v.name)}" class="${cls.input}">`)}
             ${field(tc("shortName"), `<input name="short_name" maxlength="40" value="${esc(v.short_name || "")}" class="${cls.input}">`)}
             ${field(tc("registrationNo"), `<input name="registration_no" maxlength="40" value="${esc(v.registration_no || "")}" class="${cls.input}">`)}
-            ${field(tg("sortOrder"), `<input name="sort_order" type="number" value="${v.sort_order || 0}" class="${cls.input}">`)}
             ${field(tc("status"), select("is_active", [["1", tc("active")], ["0", tc("inactive")]], v.is_active ? "1" : "0"))}
           </div>
           <div class="flex justify-between gap-2">
@@ -1171,7 +1183,6 @@
           name: f.name.value.trim(),
           short_name: f.short_name.value.trim() || null,
           registration_no: f.registration_no.value.trim() || null,
-          sort_order: Number(f.sort_order.value) || 0,
           is_active: f.is_active.value === "1",
         };
         const { error } = c ? await sb.from("gw_companies").update(row).eq("id", c.id) : await sb.from("gw_companies").insert(row);
@@ -1185,10 +1196,9 @@
       const m = modal(
         tc("mappingTitle", { name: c.name }),
         `<form class="space-y-4"><div data-err></div>
-          <p class="text-sm text-slate-500">${esc(tc("mappingHint"))}</p>
           ${field(tc("system"), select("module_id", modules.map((x) => [x.id, x.name + " (" + x.code + ")"]), ""))}
           <div class="grid gap-4 sm:grid-cols-2">
-            ${field(tc("externalId"), `<input name="external_id" required maxlength="100" class="${cls.input} font-mono">`, tc("externalIdHint"))}
+            ${field(tc("externalId"), `<input name="external_id" required maxlength="100" class="${cls.input} font-mono">`)}
             ${field(tc("externalName"), `<input name="external_name" maxlength="120" class="${cls.input}">`)}
           </div>
           ${field(tc("notes"), `<input name="notes" maxlength="300" class="${cls.input}">`)}
@@ -1273,7 +1283,7 @@
     if (stale(seq)) return;
     view.innerHTML = `<div class="space-y-4">
       <div class="flex items-center justify-between gap-2">
-        <p class="text-sm text-slate-500">${esc(tmod("description"))}</p>
+        <div></div>
         <button id="add" class="${btn("primary")} shrink-0 whitespace-nowrap">${icon("plus")} ${esc(tmod("add"))}</button>
       </div>
       ${
@@ -1320,11 +1330,11 @@
         `<form class="space-y-4">
           <div data-err></div>
           <div class="grid gap-4 sm:grid-cols-3">
-            ${field(tmod("kind"), select("kind", [["link", tmod("kinds.link")], ["system", tmod("kinds.system")]], v.kind), tmod("kindHint"))}
-            ${field(tmod("code"), `<input name="code" required value="${esc(v.code)}" class="${cls.input} uppercase">`, tmod("codeHint"))}
+            ${field(tmod("kind"), select("kind", [["link", tmod("kinds.link")], ["system", tmod("kinds.system")]], v.kind))}
+            ${field(tmod("code"), `<input name="code" required value="${esc(v.code)}" class="${cls.input} uppercase">`)}
             ${field(tmod("name"), `<input name="name" required value="${esc(v.name)}" class="${cls.input}">`)}
           </div>
-          ${field(tmod("url"), `<input name="url" required value="${esc(v.url)}" class="${cls.input}">`, tmod("urlHint"))}
+          ${field(tmod("url"), `<input name="url" required value="${esc(v.url)}" class="${cls.input}">`)}
           ${field(tmod("descriptionLabel"), `<input name="description" maxlength="120" value="${esc(v.description || "")}" class="${cls.input}">`)}
           <div class="grid gap-4 sm:grid-cols-2">
             ${field(tmod("category"), `<input name="category" value="${esc(v.category || "")}" class="${cls.input}">`)}
@@ -1334,8 +1344,8 @@
             ${field(tmod("status"), select("is_active", [["1", tmod("active")], ["0", tmod("inactive")]], v.is_active ? "1" : "0"))}
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
-            <div><p class="${cls.label}">${esc(tmod("businessTags"))}</p><p class="mb-1.5 text-xs text-slate-500">${esc(tmod("businessTagsHint"))}</p>${tagBox("biz", groups.map((g) => [g.id, g.name]), bizOn)}</div>
-            <div><p class="${cls.label}">${esc(tmod("companyTags"))}</p><p class="mb-1.5 text-xs text-slate-500">${esc(tmod("companyTagsHint"))}</p>${tagBox("co", companies.map((c) => [c.id, (c.code ? c.code + " · " : "") + c.name]), coOn)}</div>
+            <div><p class="${cls.label}">${esc(tmod("businessTags"))}</p><div class="mb-1.5"></div>${tagBox("biz", groups.map((g) => [g.id, g.name]), bizOn)}</div>
+            <div><p class="${cls.label}">${esc(tmod("companyTags"))}</p><div class="mb-1.5"></div>${tagBox("co", companies.map((c) => [c.id, (c.code ? c.code + " · " : "") + c.name]), coOn)}</div>
           </div>
           <div>
             <p class="mb-1.5 ${cls.label}">${esc(tmod("icon"))}</p>

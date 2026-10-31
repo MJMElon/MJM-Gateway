@@ -238,9 +238,11 @@ window.GW_LANG["en"] = {
       "deleteTitle": "Delete business",
       "deleteBody": "Delete “{name}”? Its companies are deleted too, and its people lose the apps they had through it.",
       "empty": "No businesses yet. Add the first one.",
-      "duplicate": "A business with this name already exists.",
+      "duplicate": "A business with this code or name already exists.",
       "access": "Modules in this business",
-      "counts": "{companies} companies · {members} people"
+      "counts": "{companies} companies · {members} people",
+      "code": "Business code",
+      "badCode": "Invalid code. Use 2–20 capital letters, numbers, - or _."
     },
     "company": {
       "description": "Companies are master data shared by every system. A company can belong to several businesses. Its code never changes and is used to match the company in existing systems.",
@@ -560,8 +562,8 @@ window.GW_LANG["en"] = {
     "roles": {
       "description": "A role is a set of functions, limited to the businesses and modules you tick for it. Give the role to people in the user list.",
       "add": "Add role",
-      "addTitle": "Add role",
-      "editTitle": "Edit role",
+      "addTitle": "Add New Role",
+      "editTitle": "Edit Role",
       "name": "Role name",
       "namePlaceholder": "e.g. HR, Admin",
       "canPost": "Can post notices",
@@ -578,24 +580,16 @@ window.GW_LANG["en"] = {
       "deleteBody": "Delete “{name}”? People with this role become normal users.",
       "duplicate": "A role with this name already exists.",
       "funcs": {
-        "can_post_notice": "Update notice board",
-        "can_delete_notice": "Delete notice board",
+        "can_post_notice": "Update news",
+        "can_delete_notice": "Delete news",
         "can_grant_module": "Add user to module",
         "can_revoke_module": "Remove user from module",
         "can_set_module_admin": "Set module admin",
-        "can_place_users": "Place users in business",
-        "can_view_users": "View user list",
+        "can_add_business_user": "Add user to a business",
+        "can_remove_business_user": "Remove user from a business",
+        "can_view_user_group": "View User & Group Manage",
+        "can_view_users": "View full user list",
         "can_view_audit": "View audit log"
-      },
-      "funcHints": {
-        "can_post_notice": "Post and edit notices for its businesses",
-        "can_delete_notice": "Delete notices of its businesses",
-        "can_grant_module": "Give people access to its modules",
-        "can_revoke_module": "Take module access away",
-        "can_set_module_admin": "Make someone the admin of its modules",
-        "can_place_users": "Add / remove people in its businesses and companies",
-        "can_view_users": "See the people in its businesses (read only)",
-        "can_view_audit": "See the audit log"
       },
       "colRole": "Role",
       "colFunctions": "Role functions",
@@ -603,7 +597,11 @@ window.GW_LANG["en"] = {
       "colPeople": "People",
       "noFunctions": "No functions",
       "functionsHint": "Tick what people with this role can do.",
-      "normalUserHint": "People without a role are normal users: they only use the modules opened for them. You don’t need to create a “User” role."
+      "normalUserHint": "People without a role are normal users: they only use the modules opened for them. You don’t need to create a “User” role.",
+      "groups": {
+        "noticeBoard": "Notice Board",
+        "userAccess": "User Access"
+      }
     }
   },
   "diesel": {

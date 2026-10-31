@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(90);
+select plan(91);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -36,10 +36,10 @@ insert into public.gw_group_modules (group_id, module_id) values
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b4'),
   ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000b1');
 
-insert into public.gw_roles (id, name, can_post_notice, can_delete_notice, can_grant_module, can_revoke_module, can_set_module_admin, can_place_users, can_view_users, can_view_audit) values
-  ('00000000-0000-0000-0000-0000000000f1', 'HR', true, true, true, true, true, true, true, false),
-  ('00000000-0000-0000-0000-0000000000f2', 'Diesel Admin', false, false, true, false, false, true, false, false),
-  ('00000000-0000-0000-0000-0000000000f3', 'Viewer', false, false, false, false, false, false, true, true);
+insert into public.gw_roles (id, name, can_post_notice, can_delete_notice, can_grant_module, can_revoke_module, can_set_module_admin, can_add_business_user, can_remove_business_user, can_view_user_group, can_view_users, can_view_audit) values
+  ('00000000-0000-0000-0000-0000000000f1', 'HR', true, true, true, true, true, true, true, true, true, false),
+  ('00000000-0000-0000-0000-0000000000f2', 'Diesel Admin', false, false, true, false, false, true, false, true, false, false),
+  ('00000000-0000-0000-0000-0000000000f3', 'Viewer', false, false, false, false, false, false, false, false, true, true);
 insert into public.gw_role_businesses (role_id, group_id) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1'),
   ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c2'),
@@ -281,6 +281,8 @@ select lives_ok(
   $$ insert into public.gw_module_members values ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000b1') $$,
   '放进 Fleet 后可以开 DIESEL'
 );
+delete from public.gw_group_members where group_id = '00000000-0000-0000-0000-0000000000c2' and user_id = '00000000-0000-0000-0000-0000000000a3';
+select is((select count(*) from public.gw_group_members where group_id = '00000000-0000-0000-0000-0000000000c2' and user_id = '00000000-0000-0000-0000-0000000000a3')::int, 1, '没有「移出 Business」功能不能把人移出');
 delete from public.gw_module_members where user_id = '00000000-0000-0000-0000-0000000000a6' and module_id = '00000000-0000-0000-0000-0000000000b1';
 select is((select count(*) from public.gw_module_members where user_id = '00000000-0000-0000-0000-0000000000a6' and module_id = '00000000-0000-0000-0000-0000000000b1')::int, 1, '没有「移除」功能的角色不能收回 Access');
 select is(

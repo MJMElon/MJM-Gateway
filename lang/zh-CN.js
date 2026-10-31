@@ -238,9 +238,11 @@ window.GW_LANG["zh-CN"] = {
       "deleteTitle": "删除 Business",
       "deleteBody": "确定删除「{name}」？它底下的 Company 也会删掉，里面的人会失去从这里拿到的 App。",
       "empty": "还没有 Business，先新增一个。",
-      "duplicate": "已经有同名的 Business。",
+      "duplicate": "已经有同样代码或名称的 Business。",
       "access": "这个 Business 的模块",
-      "counts": "{companies} 个 Company · {members} 人"
+      "counts": "{companies} 个 Company · {members} 人",
+      "code": "Business 代码",
+      "badCode": "代码格式不对，请用 2–20 个大写英文、数字、- 或 _。"
     },
     "company": {
       "description": "Company 是所有系统共用的主资料，一个 Company 可以属于多个 Business。Company 代码固定不变，用来对应现有系统里的公司。",
@@ -561,7 +563,7 @@ window.GW_LANG["zh-CN"] = {
       "description": "角色 = 一组功能，只在你勾选的 Business 和模块内有效。在用户名单把角色给人。",
       "add": "新增角色",
       "addTitle": "新增角色",
-      "editTitle": "编辑角色",
+      "editTitle": "修改角色",
       "name": "角色名称",
       "namePlaceholder": "例如 HR、Admin",
       "canPost": "可发公告",
@@ -578,23 +580,15 @@ window.GW_LANG["zh-CN"] = {
       "deleteBody": "确定删除「{name}」？有这个角色的人会变回一般用户。",
       "duplicate": "已经有同名的角色。",
       "funcs": {
-        "can_post_notice": "更新公告栏",
+        "can_post_notice": "更新公告",
         "can_delete_notice": "删除公告",
         "can_grant_module": "把人加进模块",
         "can_revoke_module": "把人从模块移除",
         "can_set_module_admin": "设定模块 Admin",
-        "can_place_users": "把人放进 Business",
-        "can_view_users": "看用户名单",
-        "can_view_audit": "看操作记录"
-      },
-      "funcHints": {
-        "can_post_notice": "发布、修改它负责的 Business 的公告",
-        "can_delete_notice": "删除它负责的 Business 的公告",
-        "can_grant_module": "把它负责的模块开给人",
-        "can_revoke_module": "收回它负责的模块的权限",
-        "can_set_module_admin": "指定它负责的模块的 Admin",
-        "can_place_users": "把人放进 / 移出它负责的 Business 和 Company",
-        "can_view_users": "看它负责的 Business 的人（只能看）",
+        "can_add_business_user": "把人加进 Business",
+        "can_remove_business_user": "把人移出 Business",
+        "can_view_user_group": "看 User & Group Manage",
+        "can_view_users": "看全部用户名单",
         "can_view_audit": "看操作记录"
       },
       "colRole": "角色",
@@ -603,7 +597,11 @@ window.GW_LANG["zh-CN"] = {
       "colPeople": "人数",
       "noFunctions": "没有功能",
       "functionsHint": "勾选有这个角色的人可以做什么。",
-      "normalUserHint": "没有角色的人就是一般用户：只能用开给他的模块。不需要另外建立「User」角色。"
+      "normalUserHint": "没有角色的人就是一般用户：只能用开给他的模块。不需要另外建立「User」角色。",
+      "groups": {
+        "noticeBoard": "公告栏",
+        "userAccess": "用户权限"
+      }
     }
   },
   "diesel": {

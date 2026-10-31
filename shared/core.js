@@ -71,7 +71,18 @@ window.GW = (function () {
       profile.businessIds = [];
       profile.adminModules = 0;
       // 角色功能（super_admin 全部都有）
-      const FLAGS = ["can_post_notice", "can_delete_notice", "can_grant_module", "can_revoke_module", "can_set_module_admin", "can_place_users", "can_view_users", "can_view_audit"];
+      const FLAGS = [
+        "can_post_notice",
+        "can_delete_notice",
+        "can_grant_module",
+        "can_revoke_module",
+        "can_set_module_admin",
+        "can_add_business_user",
+        "can_remove_business_user",
+        "can_view_user_group",
+        "can_view_users",
+        "can_view_audit",
+      ];
       profile.can = Object.fromEntries(FLAGS.map((f) => [f, profile.isSuper]));
       if (!profile.isSuper) {
         // 模块管理员：可以开 / 收回自己管理的模块的权限
@@ -92,7 +103,9 @@ window.GW = (function () {
       // 右上角齿轮（设置页）：super_admin、模块管理员、或角色有设置页里的功能（公告功能在首页 Notice Board，不需要进设置页）
       const c = profile.can;
       profile.manages =
-        profile.isSuper || profile.adminModules > 0 || c.can_grant_module || c.can_revoke_module || c.can_set_module_admin || c.can_place_users || c.can_view_users || c.can_view_audit;
+        profile.isSuper ||
+        profile.adminModules > 0 ||
+        ["can_grant_module", "can_revoke_module", "can_set_module_admin", "can_add_business_user", "can_remove_business_user", "can_view_user_group", "can_view_users", "can_view_audit"].some((k) => c[k]);
     }
     return { session, profile };
   }
