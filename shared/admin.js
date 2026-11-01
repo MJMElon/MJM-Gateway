@@ -94,7 +94,7 @@
       sb.from("gw_group_modules").select("group_id, module_id"),
       sb.from("gw_modules").select("id, code, name, icon, is_active").order("sort_order").order("name"),
       sb.from("gw_module_members").select("user_id, module_id, is_admin"),
-      isSuper || !me.role_id ? Promise.resolve({ data: [] }) : sb.from("gw_role_modules").select("group_id, module_id").eq("role_id", me.role_id),
+      Promise.resolve({ data: [] }),
       sb.from("gw_profiles").select("id, full_name, email, role, status").order("full_name"),
       sb.from("gw_module_companies").select("module_id, company_id"),
       sb.from("gw_companies").select("id, code, name"),
@@ -104,20 +104,20 @@
     const inGroup = (uid, gid) => members.some((m) => m.user_id === uid && m.group_id === gid);
     const groupHas = (gid, mid) => gm.some((x) => x.group_id === gid && x.module_id === mid);
     const myAdmin = (mid) => !!(ctx.rows.get(me.id + ":" + mid) || {}).is_admin;
-    const roleHas = (gid, mid) => mine.some((x) => x.group_id === gid && x.module_id === mid);
+    const roleHas = (gid, mid, flag) => me.bizCan(gid, flag) && groupHas(gid, mid);
     const locked = (u) => u.id === me.id || u.role === "super_admin";
     // 在某个 Business 里，我能不能改这个人这个模块的 Access / Admin
     // 角色功能：加进模块 / 从模块移除 / 设定模块 Admin（模块 Admin 加、移除都可以）
     const adminReach = (gid, mid) => myAdmin(mid) && inGroup(me.id, gid) && groupHas(gid, mid);
-    ctx.canGrant = (u, gid, mid) => !locked(u) && (isSuper || (me.can.can_grant_module && roleHas(gid, mid)) || adminReach(gid, mid));
-    ctx.canRevoke = (u, gid, mid) => !locked(u) && (isSuper || (me.can.can_revoke_module && roleHas(gid, mid)) || adminReach(gid, mid));
+    ctx.canGrant = (u, gid, mid) => !locked(u) && (isSuper || roleHas(gid, mid, "can_grant_module") || adminReach(gid, mid));
+    ctx.canRevoke = (u, gid, mid) => !locked(u) && (isSuper || roleHas(gid, mid, "can_revoke_module") || adminReach(gid, mid));
     ctx.canAccess = (u, gid, mid) => (ctx.rows.has(u.id + ":" + mid) ? ctx.canRevoke(u, gid, mid) : ctx.canGrant(u, gid, mid));
-    ctx.canAdmin = (u, gid, mid) => !locked(u) && (isSuper || (me.can.can_set_module_admin && roleHas(gid, mid)));
+    ctx.canAdmin = (u, gid, mid) => !locked(u) && (isSuper || roleHas(gid, mid, "can_set_module_admin"));
     ctx.inGroup = inGroup;
     ctx.companyTags = (mid) => coTags.filter((x) => x.module_id === mid).map((x) => coName.get(x.company_id)).filter(Boolean);
     ctx.groupHas = groupHas;
     // 我管得到的 (Business, 模块) 组合
-    ctx.managedPairs = gm.filter((x) => isSuper || roleHas(x.group_id, x.module_id) || (myAdmin(x.module_id) && inGroup(me.id, x.group_id)));
+    ctx.managedPairs = gm.filter((x) => isSuper || ["can_grant_module", "can_revoke_module", "can_set_module_admin"].some((f) => me.bizCan(x.group_id, f)) || (myAdmin(x.module_id) && inGroup(me.id, x.group_id)));
     return ctx;
   }
 
@@ -298,13 +298,14 @@
   async function userWindow(uid) {
     const tu = (k, v) => t("admin.userWindow." + k, v);
     const m = modal("", GW.spinner(), { wide: true });
-    const [{ data: u }, { data: mems }, { data: groups }, { data: companies }, { data: mm }, { data: mods }] = await Promise.all([
+    const [{ data: u }, { data: mems }, { data: groups }, { data: companies }, { data: mm }, { data: mods }, { data: gxRows }] = await Promise.all([
       sb.from("gw_profiles").select("id, full_name, email, status, role, role_id").eq("id", uid).maybeSingle(),
       sb.from("gw_group_members").select("group_id, company_id").eq("user_id", uid),
       sb.from("gw_groups").select("id, name").order("sort_order").order("name"),
       sb.from("gw_companies").select("id, name"),
       sb.from("gw_module_members").select("module_id, is_admin").eq("user_id", uid),
       sb.from("gw_modules").select("id, code, name, icon, image_url, is_active").order("sort_order").order("name"),
+      sb.from("gw_group_modules").select("group_id, module_id"),
     ]);
     if (!u) return m.close();
     const h = m.el.parentElement.querySelector("h2");
@@ -318,8 +319,10 @@
       const row = mine.find((r) => r.module_id === mid);
       const box = $("[data-detail]", m.el);
       // Gateway 的 Access / Admin：super_admin、模块管理员、角色有加 / 移除 / 设定 Admin 且模块在范围内
-      const inScope = (me.roleModules || []).includes(mid);
-      const canGw = isSuper || canManageModule(mid) || (inScope && (C.can_grant_module || C.can_revoke_module || C.can_set_module_admin));
+      // 角色：对方所在、而且有这个模块的 Business 里，我有加 / 移除 / 设定 Admin 的功能
+      const bizOf = (flag) => (mems || []).some((x) => me.bizCan(x.group_id, flag) && gxRows.some((g) => g.group_id === x.group_id && g.module_id === mid));
+      const canSetAdmin = isSuper || bizOf("can_set_module_admin");
+      const canGw = isSuper || canManageModule(mid) || bizOf("can_grant_module") || bizOf("can_revoke_module") || canSetAdmin;
       if (!canGw) {
         box.innerHTML = `<p class="rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-500 dark:bg-white/5">${esc(tu("noPermission", { name: mod.name }))}</p>`;
         return;
@@ -338,7 +341,7 @@
         <div class="mb-2 flex items-center gap-2">${modLogo(mod, "size-7")}<span class="font-semibold">${esc(mod.name)}</span></div>
         <div class="grid gap-2 sm:grid-cols-2">
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" data-gw="access" ${row ? "checked" : ""} class="size-4 accent-emerald-600">${esc(t("admin.users.accessDialog.access"))}</label>
-          <label class="flex items-center gap-2 text-sm"><input type="checkbox" data-gw="admin" ${row && row.is_admin ? "checked" : ""} ${isSuper || (C.can_set_module_admin && (me.roleModules || []).includes(mid)) ? "" : "disabled"} class="size-4 accent-emerald-600">${esc(t("admin.users.accessDialog.admin"))}</label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" data-gw="admin" ${row && row.is_admin ? "checked" : ""} ${canSetAdmin ? "" : "disabled"} class="size-4 accent-emerald-600">${esc(t("admin.users.accessDialog.admin"))}</label>
           ${extra}
         </div>
         ${row ? "" : `<p class="mt-2 text-xs text-slate-500">${esc(tu("tickAccessFirst"))}</p>`}
@@ -724,8 +727,9 @@
         .join("");
 
     // 角色功能：加人（拖拉、点名字）、移出、模块权限
-    const canAdd = isSuper || C.can_add_business_user;
-    const canRemove = isSuper || C.can_remove_business_user;
+    const canAdd = isSuper || C.can_add_business_user; // 任一 Business 可以加人 → 显示左边名单
+    const canAddTo = (gid) => me.bizCan(gid, "can_add_business_user");
+    const canRemoveFrom = (gid) => me.bizCan(gid, "can_remove_business_user");
     const canApps = canAccessPage;
     // 角色只看到自己管的 Business（自己是成员的其他 Business 不能在这里管）
     const groups = allGroups.filter((g) => isSuper || (me.businessIds || []).includes(g.id));
@@ -748,8 +752,8 @@
       </div>`;
     const zone = (g, c, mems) => `<div>
         <p class="mb-1 flex items-center gap-1.5 text-xs font-semibold ${c ? "text-slate-700 dark:text-slate-200" : "text-amber-600"}">${icon(c ? "building-2" : "circle-dashed", "size-3.5")}${c ? `<button data-info="${c.id}" data-from="${g.id}" class="no-drag hover:underline">${esc(c.name)}</button>` : esc(tu2("pendingCompany"))}<span class="font-normal text-slate-400">(${mems.length})</span></p>
-        <div data-drop="${g.id}" data-company="${c ? c.id : ""}" class="gw-drop min-h-14 space-y-1.5 rounded-xl border-2 border-dashed border-slate-200 p-2 dark:border-slate-700">
-          ${mems.length ? mems.map((u) => chip(u, `${canApps ? `<button data-apps="${g.id}:${u.id}" aria-label="${esc(tu2("apps"))}" title="${esc(tu2("apps"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">${icon("layout-grid")}</button>` : ""}${canRemove ? `<button data-out="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>` : ""}`, g.id)).join("") : `<p class="ug-empty py-2 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}
+        <div ${canAddTo(g.id) ? `data-drop="${g.id}"` : ""} data-company="${c ? c.id : ""}" class="${canAddTo(g.id) ? "gw-drop" : ""} min-h-14 space-y-1.5 rounded-xl border-2 border-dashed border-slate-200 p-2 dark:border-slate-700">
+          ${mems.length ? mems.map((u) => chip(u, `${canApps ? `<button data-apps="${g.id}:${u.id}" aria-label="${esc(tu2("apps"))}" title="${esc(tu2("apps"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">${icon("layout-grid")}</button>` : ""}${canRemoveFrom(g.id) ? `<button data-out="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>` : ""}`, g.id)).join("") : `<p class="ug-empty py-2 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}
         </div>
       </div>`;
 
@@ -861,8 +865,9 @@
       const u = userById.get(uid);
       const m = modal(
         tu2("addToGroup", { name: u.email }),
-        groups.length
+        groups.filter((g) => canAddTo(g.id)).length
           ? `<div class="space-y-4">${groups
+              .filter((g) => canAddTo(g.id))
               .map((g) => {
                 const opts = [...companiesOf(g.id).map((c) => [c.id, c.name]), ...(companiesOf(g.id).length ? [] : [["", tu2("noCompany")]])];
                 return `<div><p class="mb-1.5 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(g.name)}</p><div class="space-y-1.5">${opts
@@ -905,68 +910,54 @@
     draw();
   }
 
-  // ================================================================ 角色（Master Manage；super_admin 自己命名、设定每个角色能做什么）
+  // ================================================================ 角色（Master Manage；super_admin 命名角色，按 Business 勾功能）
+  /* 弹出视窗：
+       名称、说明
+       Notice Board：每个 Business 勾「更新 / 删除」
+       Module（全域，范围 = 负责的 Business 里的模块）：管理模块内用户权限、改模块名称
+       User & Group Manage：勾了才出现 Business 列表；每个 Business 勾：加人进模块、移除、设定模块 Admin、加人进 Business、移出、看全部用户名单
+         （勾了任何一项就自动算有 User & Group Manage）
+       View audit log */
   async function rolesTab() {
     const seq = routeSeq;
     const tr = (k, v) => t("admin.roles." + k, v);
     const tg = (k, v) => t("admin.groups." + k, v);
-    const [roles, rb, rm, groups, gm, mods, users] = await Promise.all([
+    const [roles, rb, groups] = await Promise.all([
       sb.from("gw_roles").select("*").order("sort_order").order("name"),
-      sb.from("gw_role_businesses").select("role_id, group_id"),
-      sb.from("gw_role_modules").select("role_id, group_id, module_id"),
+      sb.from("gw_role_businesses").select("*"),
       sb.from("gw_groups").select("id, name").order("sort_order").order("name"),
-      sb.from("gw_group_modules").select("group_id, module_id"),
-      sb.from("gw_modules").select("id, name, icon").order("sort_order").order("name"),
-      sb.from("gw_profiles").select("id, role_id"),
     ]).then((r) => r.map((x) => x.data || []));
     if (stale(seq)) return;
-    const modById = new Map(mods.map((m) => [m.id, m]));
     const groupName = new Map(groups.map((g) => [g.id, g.name]));
-    const modsOf = (gid) => gm.filter((x) => x.group_id === gid && modById.has(x.module_id)).map((x) => modById.get(x.module_id));
-
-    // 角色功能（顺序 = 表格和弹出视窗里的顺序）
-    const FUNC_GROUPS = [
-      ["noticeBoard", ["can_post_notice", "can_delete_notice"]],
-      ["module", ["can_grant_module", "can_revoke_module", "can_set_module_admin", "can_manage_module_access", "can_edit_module_name"]],
-      ["business", ["can_add_business_user", "can_remove_business_user"]],
-      ["view", ["can_view_user_group", "can_view_users", "can_view_audit"]],
-    ];
-    const FUNCS = FUNC_GROUPS.flatMap(([, fs]) => fs);
+    const NOTICE = ["can_post_notice", "can_delete_notice"];
+    const UG = ["can_grant_module", "can_revoke_module", "can_set_module_admin", "can_add_business_user", "can_remove_business_user", "can_view_users"];
+    const GLOBAL_MOD = ["can_manage_module_access", "can_edit_module_name"];
+    const bizRows = (rid) => rb.filter((x) => x.role_id === rid);
+    const hasAny = (row, keys) => keys.some((k) => row[k]);
     const th = (text, extra) => `<th class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase ${extra || ""}">${esc(text)}</th>`;
 
     view.innerHTML = `<div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div></div>
+      <div class="flex items-center justify-end">
         <button id="role-add" class="${btn("primary")} shrink-0">${icon("plus")} ${esc(tr("add"))}</button>
       </div>
       ${
         roles.length
           ? `<div class="${cls.card} overflow-x-auto">
-              <table class="w-full min-w-[760px] text-sm">
+              <table class="w-full min-w-[640px] text-sm">
                 <thead class="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-white/5"><tr>
-                  ${th(tr("colRole"))}${th(tr("colFunctions"))}${th(tr("colScope"))}${th(tr("colPeople"), "text-right")}<th class="w-24"></th>
+                  ${th(tr("colRole"))}${th(tr("colBusiness"))}${th(tr("colDescription"))}<th class="w-32"></th>
                 </tr></thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">${roles
                   .map((r) => {
-                    const biz = rb.filter((x) => x.role_id === r.id);
-                    const funcs = FUNCS.filter((f) => r[f]);
+                    const biz = bizRows(r.id).filter((x) => hasAny(x, [...NOTICE, ...UG]));
                     return `<tr class="align-top">
-                      <td class="px-4 py-3"><div class="font-semibold">${esc(r.name)}</div>${r.description ? `<div class="text-xs text-slate-500">${esc(r.description)}</div>` : ""}</td>
-                      <td class="px-4 py-3"><div class="flex max-w-xs flex-wrap gap-1">${funcs.length ? funcs.map((f) => badge(tr("funcs." + f), "green")).join("") : `<span class="text-xs text-slate-400">${esc(tr("noFunctions"))}</span>`}</div></td>
-                      <td class="px-4 py-3">${
-                        biz.length
-                          ? biz
-                              .map((b) => {
-                                const ms = rm.filter((x) => x.role_id === r.id && x.group_id === b.group_id).map((x) => modById.get(x.module_id)).filter(Boolean);
-                                return `<div class="mb-1 last:mb-0"><span class="font-medium">${esc(groupName.get(b.group_id) || "")}</span>${ms.length ? `<span class="text-xs text-slate-500"> · ${esc(ms.map((m) => m.name).join(", "))}</span>` : ""}</div>`;
-                              })
-                              .join("")
-                          : `<span class="text-xs text-slate-400">${esc(tr("noBusiness"))}</span>`
-                      }</td>
-                      <td class="px-4 py-3 text-right">${users.filter((u) => u.role_id === r.id).length}</td>
+                      <td class="px-4 py-3 font-semibold">${esc(r.name)}</td>
+                      <td class="px-4 py-3">${biz.length ? `<div class="flex flex-wrap gap-1">${biz.map((x) => badge(groupName.get(x.group_id) || "—", "blue")).join("")}</div>` : `<span class="text-xs text-slate-400">${esc(tr("noBusiness"))}</span>`}</td>
+                      <td class="px-4 py-3 text-slate-600 dark:text-slate-300">${esc(r.description || "")}</td>
                       <td class="px-2 py-2 text-right whitespace-nowrap">
-                        <button data-edit="${r.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
-                        <button data-del="${r.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                        <button data-view="${r.id}" aria-label="${esc(tr("view"))}" title="${esc(tr("view"))}" class="${btn("ghost", "sm")}">${icon("eye")}</button>
+                        <button data-edit="${r.id}" aria-label="${esc(tg("edit"))}" title="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
+                        <button data-del="${r.id}" aria-label="${esc(tg("delete"))}" title="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
                       </td>
                     </tr>`;
                   })
@@ -978,49 +969,78 @@
     </div>`;
     refreshIcons();
 
+    // 角色设定的内容（readOnly = 查看）
+    function body(r, readOnly) {
+      const rows = r ? bizRows(r.id) : [];
+      const row = (gid) => rows.find((x) => x.group_id === gid) || {};
+      const dis = readOnly ? "disabled" : "";
+      const box = (name, gid, checked) => `<input type="checkbox" name="${name}" data-g="${gid || ""}" ${checked ? "checked" : ""} ${dis} class="size-4 shrink-0 accent-emerald-600">`;
+      const ugOn = r ? r.can_view_user_group || rows.some((x) => hasAny(x, UG)) : false;
+      return `<div class="space-y-4">
+        ${
+          readOnly
+            ? `<div><p class="text-lg font-semibold">${esc(r.name)}</p>${r.description ? `<p class="text-sm text-slate-500">${esc(r.description)}</p>` : ""}</div>`
+            : `${field(tr("name"), `<input name="name" required maxlength="60" value="${esc(r ? r.name : "")}" placeholder="${esc(tr("namePlaceholder"))}" class="${cls.input}">`)}
+               ${field(tg("descriptionLabel"), `<input name="description" value="${esc(r ? r.description || "" : "")}" class="${cls.input}">`)}`
+        }
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <p class="mb-2 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(tr("groups.noticeBoard"))}</p>
+          ${
+            groups.length
+              ? `<div class="divide-y divide-slate-100 dark:divide-slate-800">${groups
+                  .map(
+                    (g) => `<div class="flex flex-wrap items-center gap-x-4 gap-y-1 py-1.5">
+                      <span class="w-40 truncate text-sm font-medium">${esc(g.name)}</span>
+                      ${NOTICE.map((k) => `<label class="flex items-center gap-1.5 text-sm">${box(k, g.id, row(g.id)[k])}${esc(tr("funcs." + k))}</label>`).join("")}
+                    </div>`,
+                  )
+                  .join("")}</div>`
+              : `<p class="text-sm text-slate-400">${esc(tr("noBusinessYet"))}</p>`
+          }
+        </div>
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <p class="mb-2 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(tr("groups.module"))}</p>
+          <div class="grid gap-x-4 gap-y-2 sm:grid-cols-2">${GLOBAL_MOD.map((k) => `<label class="flex items-center gap-2 text-sm">${box(k, "", r && r[k])}${esc(tr("funcs." + k))}</label>`).join("")}</div>
+        </div>
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <label class="flex items-center gap-2 text-sm font-semibold">${box("can_view_user_group", "", ugOn)}${esc(tr("funcs.can_view_user_group"))}</label>
+          <div data-ug class="mt-3 ${ugOn ? "" : "hidden"}">
+            ${
+              groups.length
+                ? `<div class="divide-y divide-slate-100 dark:divide-slate-800">${groups
+                    .map(
+                      (g) => `<div class="py-2">
+                        <p class="mb-1 text-sm font-medium">${esc(g.name)}</p>
+                        <div class="grid gap-x-4 gap-y-1 sm:grid-cols-2">${UG.map((k) => `<label class="flex items-center gap-1.5 text-sm">${box(k, g.id, row(g.id)[k])}${esc(tr("funcs." + k))}</label>`).join("")}</div>
+                      </div>`,
+                    )
+                    .join("")}</div>`
+                : `<p class="text-sm text-slate-400">${esc(tr("noBusinessYet"))}</p>`
+            }
+          </div>
+        </div>
+        <label class="flex items-center gap-2 text-sm font-semibold">${box("can_view_audit", "", r && r.can_view_audit)}${esc(tr("funcs.can_view_audit"))}</label>
+      </div>`;
+    }
+
+    function viewDialog(r) {
+      const m = modal(
+        tr("viewTitle"),
+        `${body(r, true)}
+         <div class="mt-4 flex justify-end gap-2"><button data-edit-now class="${btn("secondary")}">${icon("pencil")} ${esc(tg("edit"))}</button><button data-done class="${btn("primary")}">${esc(t("admin.users.done"))}</button></div>`,
+        { wide: true },
+      );
+      refreshIcons();
+      $("[data-done]", m.el).onclick = m.close;
+      $("[data-edit-now]", m.el).onclick = () => (m.close(), dialog(r));
+    }
+
     function dialog(r) {
-      const bizOn = new Set(r ? rb.filter((x) => x.role_id === r.id).map((x) => x.group_id) : []);
-      const modOn = new Set(r ? rm.filter((x) => x.role_id === r.id).map((x) => x.group_id + ":" + x.module_id) : []);
       const m = modal(
         r ? tr("editTitle") : tr("addTitle"),
         `<form class="space-y-4">
           <div data-err></div>
-          ${field(tr("name"), `<input name="name" required maxlength="60" value="${esc(r ? r.name : "")}" placeholder="${esc(tr("namePlaceholder"))}" class="${cls.input}">`)}
-          ${field(tg("descriptionLabel"), `<input name="description" value="${esc(r ? r.description || "" : "")}" class="${cls.input}">`)}
-          <div>
-            <p class="${cls.label}">${esc(tr("colFunctions"))}</p>
-            <div class="space-y-3">${FUNC_GROUPS.map(
-              ([g, fs]) => `<div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <p class="mb-2 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(tr("groups." + g))}</p>
-                <div class="grid gap-x-4 gap-y-2 sm:grid-cols-2">${fs
-                  .map((f) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="${f}" ${r && r[f] ? "checked" : ""} class="size-4 shrink-0 accent-emerald-600">${esc(tr("funcs." + f))}</label>`)
-                  .join("")}</div>
-              </div>`,
-            ).join("")}</div>
-          </div>
-          <div>
-            <p class="${cls.label}">${esc(tr("scope"))}</p>
-            ${
-              groups.length
-                ? `<div class="space-y-2">${groups
-                    .map(
-                      (g) => `<div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                        <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" data-biz="${g.id}" ${bizOn.has(g.id) ? "checked" : ""} class="size-4 accent-emerald-600">${icon("briefcase-business", "size-4 text-brand-600")}${esc(g.name)}</label>
-                        <div data-biz-mods="${g.id}" class="mt-2 ml-6 flex-wrap gap-x-4 gap-y-1.5 ${bizOn.has(g.id) ? "flex" : "hidden"}">
-                          ${
-                            modsOf(g.id).length
-                              ? modsOf(g.id)
-                                  .map((mod) => `<label class="flex items-center gap-1.5 text-sm"><input type="checkbox" data-mod="${g.id}:${mod.id}" ${modOn.has(g.id + ":" + mod.id) ? "checked" : ""} class="size-4 accent-emerald-600">${esc(mod.name)}</label>`)
-                                  .join("")
-                              : `<span class="text-xs text-slate-400">${esc(tr("noModules"))}</span>`
-                          }
-                        </div>
-                      </div>`,
-                    )
-                    .join("")}</div>`
-                : `<p class="text-sm text-slate-400">${esc(t("admin.userGroups.noBusiness"))}</p>`
-            }
-          </div>
+          ${body(r, false)}
           <div class="flex justify-end gap-2">
             <button type="button" data-cancel class="${btn("secondary")}">${esc(tg("cancel"))}</button>
             <button type="submit" class="${btn("primary")}">${esc(tg("save"))}</button>
@@ -1029,47 +1049,45 @@
         { wide: true },
       );
       refreshIcons();
+      const f = $("form", m.el);
       $("[data-cancel]", m.el).onclick = m.close;
-      m.el.addEventListener("change", (e) => {
-        const b = e.target.closest("[data-biz]");
-        if (!b) return;
-        const box = $(`[data-biz-mods="${b.dataset.biz}"]`, m.el);
-        box.classList.toggle("hidden", !b.checked);
-        box.classList.toggle("flex", b.checked);
-        if (!b.checked) $$("[data-mod]", box).forEach((x) => (x.checked = false));
+      const ugBox = $("[name=can_view_user_group]", f);
+      f.addEventListener("change", (e) => {
+        const el = e.target;
+        if (el === ugBox) return $("[data-ug]", f).classList.toggle("hidden", !el.checked);
+        // 勾了任何 Business 动作 → 自动勾 User & Group Manage
+        if (UG.includes(el.name) && el.checked) ((ugBox.checked = true), $("[data-ug]", f).classList.remove("hidden"));
       });
-      $("form", m.el).addEventListener("submit", async (e) => {
+      f.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const f = e.target;
-        const fail = (error) => ($("[data-err]", m.el).innerHTML = alertBox(error && error.code === "23505" ? tr("duplicate") : tg("saveFailed")));
-        const row = { name: f.name.value.trim(), description: f.description.value.trim() || null, ...Object.fromEntries(FUNCS.map((k) => [k, f[k].checked])) };
+        const submit = $("button[type=submit]", f);
+        submit.disabled = true;
+        const fail = (error) => (($("[data-err]", m.el).innerHTML = alertBox(error && error.code === "23505" ? tr("duplicate") : tg("saveFailed"))), (submit.disabled = false));
+        const perBiz = {};
+        groups.forEach((g) => (perBiz[g.id] = {}));
+        $$("input[data-g]", f).forEach((x) => {
+          if (x.dataset.g) perBiz[x.dataset.g][x.name] = x.checked;
+        });
+        const anyUg = Object.values(perBiz).some((p) => hasAny(p, UG));
+        const row = {
+          name: f.name.value.trim(),
+          description: f.description.value.trim() || null,
+          can_view_user_group: ugBox.checked || anyUg,
+          can_view_audit: f.can_view_audit.checked,
+          can_manage_module_access: f.can_manage_module_access.checked,
+          can_edit_module_name: f.can_edit_module_name.checked,
+        };
         const saved = r ? await sb.from("gw_roles").update(row).eq("id", r.id).select().single() : await sb.from("gw_roles").insert(row).select().single();
         if (saved.error) return fail(saved.error);
         const id = saved.data.id;
-        const wantBiz = $$("[data-biz]", m.el).filter((x) => x.checked).map((x) => x.dataset.biz);
-        const wantMod = $$("[data-mod]", m.el).filter((x) => x.checked).map((x) => x.dataset.mod).filter((k) => wantBiz.includes(k.split(":")[0]));
-        // 先拿掉不要的模块、Business，再加新的（模块要等 Business 加好）
-        const dropMod = [...modOn].filter((k) => !wantMod.includes(k));
-        const dropBiz = [...bizOn].filter((g) => !wantBiz.includes(g));
-        for (const k of dropMod) {
-          const [gid, mid] = k.split(":");
-          const { error } = await sb.from("gw_role_modules").delete().eq("role_id", id).eq("group_id", gid).eq("module_id", mid);
-          if (error) return fail(error);
-        }
-        if (dropBiz.length) {
-          const { error } = await sb.from("gw_role_businesses").delete().eq("role_id", id).in("group_id", dropBiz);
-          if (error) return fail(error);
-        }
-        const addBiz = wantBiz.filter((g) => !bizOn.has(g));
-        if (addBiz.length) {
-          const { error } = await sb.from("gw_role_businesses").insert(addBiz.map((group_id) => ({ role_id: id, group_id })));
-          if (error) return fail(error);
-        }
-        const addMod = wantMod.filter((k) => !modOn.has(k));
-        if (addMod.length) {
-          const { error } = await sb.from("gw_role_modules").insert(addMod.map((k) => ({ role_id: id, group_id: k.split(":")[0], module_id: k.split(":")[1] })));
-          if (error) return fail(error);
-        }
+        // 每个 Business 一行：有勾任何功能的保留 / 新增，全部没勾的拿掉
+        const keep = groups.filter((g) => hasAny(perBiz[g.id], [...NOTICE, ...UG])).map((g) => ({ role_id: id, group_id: g.id, ...perBiz[g.id] }));
+        const drop = groups.filter((g) => !hasAny(perBiz[g.id], [...NOTICE, ...UG])).map((g) => g.id);
+        const [r1, r2] = await Promise.all([
+          keep.length ? sb.from("gw_role_businesses").upsert(keep, { onConflict: "role_id,group_id" }) : Promise.resolve({}),
+          drop.length ? sb.from("gw_role_businesses").delete().eq("role_id", id).in("group_id", drop) : Promise.resolve({}),
+        ]);
+        if (r1.error || r2.error) return fail(r1.error || r2.error);
         m.close();
         rolesTab();
       });
@@ -1079,8 +1097,9 @@
       const b = e.target.closest("button");
       if (!b) return;
       if (b.id === "role-add") return dialog(null);
-      const r = roles.find((x) => x.id === (b.dataset.edit || b.dataset.del));
+      const r = roles.find((x) => x.id === (b.dataset.view || b.dataset.edit || b.dataset.del));
       if (!r) return;
+      if (b.dataset.view) return viewDialog(r);
       if (b.dataset.edit) return dialog(r);
       if (!(await confirmDialog(tr("deleteTitle"), tr("deleteBody", { name: r.name }), tg("delete"), tg("cancel")))) return;
       const { error } = await sb.from("gw_roles").delete().eq("id", r.id);
@@ -1094,18 +1113,13 @@
     const seq = routeSeq;
     const tb = (k, v) => t("admin.business." + k, v);
     const tg = (k, v) => t("admin.groups." + k, v);
-    const [groups, members, companies, modules, grantRows, companyRows] = await Promise.all([
+    const [groups, companies, companyRows] = await Promise.all([
       sb.from("gw_groups").select("*").order("sort_order").order("name"),
-      sb.from("gw_group_members").select("group_id, user_id"),
       sb.from("gw_business_companies").select("group_id, company_id, area, area_unit"),
-      sb.from("gw_modules").select("id, code, name, icon, is_active").order("sort_order").order("name"),
-      sb.from("gw_group_modules").select("group_id, module_id"),
-      sb.from("gw_companies").select("id, name, code"),
-    ]).then((r) => r.map((x) => (Array.isArray(x) ? x : x.data || [])));
+      sb.from("gw_companies").select("id, name, code, short_name"),
+    ]).then((r) => r.map((x) => x.data || []));
     if (stale(seq)) return;
-    const coName = new Map(companyRows.map((c) => [c.id, c.name]));
-    const areaText = (l) => (l.area != null ? ` · ${Number(l.area).toLocaleString(GW.LOCALE)} ${l.area_unit || ""}` : "");
-    let grantSet = new Set(grantRows.map((g) => g.group_id + ":" + g.module_id));
+    const coShort = new Map(companyRows.map((c) => [c.id, c.short_name || c.code || c.name]));
 
     function draw() {
       view.innerHTML = `<div class="space-y-4">
@@ -1115,41 +1129,23 @@
         </div>
         ${
           groups.length
-            ? `<div id="biz-cards" class="grid gap-4 xl:grid-cols-2">${groups
-                .map(
-                  (g) => `<div data-card="${g.id}" class="${cls.card} p-4">
-                    <div class="flex items-start gap-2">
-                      ${grip()}
-                      <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200">${icon("briefcase-business", "size-5")}</span>
-                      <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">${esc(g.name)}</span>${g.code ? `<span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">${esc(g.code)}</span>` : badge(t("admin.company.noCode"), "amber")}</div>
-                        <p class="text-xs text-slate-500">${esc(tb("counts", { companies: companies.filter((c) => c.group_id === g.id).length, members: members.filter((m) => m.group_id === g.id).length }))}${g.description ? " · " + esc(g.description) : ""}</p>
+            ? `<div id="biz-cards" class="${cls.card} divide-y divide-slate-100 dark:divide-slate-800">${groups
+                .map((g) => {
+                  const cos = companies.filter((l) => l.group_id === g.id && coShort.get(l.company_id));
+                  return `<div data-card="${g.id}" class="flex items-center gap-3 px-3 py-3">
+                    ${grip()}
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-semibold">${esc(g.name)}</span>
+                        ${g.code ? `<span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">${esc(g.code)}</span>` : badge(t("admin.company.noCode"), "amber")}
+                        ${cos.length ? `<span class="text-sm text-slate-500">: ${cos.map((l) => `<button data-info="${l.company_id}" data-from="${g.id}" class="hover:underline">${esc(coShort.get(l.company_id))}</button>`).join(", ")}</span>` : ""}
                       </div>
-                      <button data-edit="${g.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
-                      <button data-del="${g.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                      ${g.description ? `<p class="text-xs text-slate-500">${esc(g.description)}</p>` : ""}
                     </div>
-                    <p class="mt-3 mb-1.5 text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(t("admin.tabs.company"))}</p>
-                    <div class="flex flex-wrap gap-1.5">${
-                      companies.filter((l) => l.group_id === g.id).length
-                        ? companies
-                            .filter((l) => l.group_id === g.id)
-                            .map((l) => `<button data-info="${l.company_id}" data-from="${g.id}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">${icon("building-2", "size-3")}${esc(coName.get(l.company_id) || "")}${esc(areaText(l))}</button>`)
-                            .join("")
-                        : `<span class="text-xs text-slate-400">${esc(t("admin.userGroups.noCompanies"))} <a href="#company" class="underline">${esc(t("admin.tabs.company"))}</a></span>`
-                    }</div>
-                    <p class="mt-3 mb-1.5 text-[11px] font-bold tracking-wider text-slate-500 uppercase">${esc(tb("access"))}</p>
-                    <div class="flex flex-wrap gap-1.5">
-                      ${
-                        modules.filter((mod) => grantSet.has(g.id + ":" + mod.id)).length
-                          ? modules
-                              .filter((mod) => grantSet.has(g.id + ":" + mod.id))
-                              .map((mod) => `<span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 ${mod.is_active ? "" : "opacity-50"}">${icon("check", "size-3")}${esc(mod.name)}</span>`)
-                              .join("")
-                          : `<span class="text-xs text-slate-400">${esc(tb("noModules"))} <a href="#modules" class="underline">${esc(t("admin.tabs.modules"))}</a></span>`
-                      }
-                    </div>
-                  </div>`,
-                )
+                    <button data-edit="${g.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
+                    <button data-del="${g.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                  </div>`;
+                })
                 .join("")}</div>`
             : empty(tb("empty"))
         }
@@ -1165,7 +1161,7 @@
           <div data-err></div>
           <div class="grid gap-4 sm:grid-cols-[10rem_1fr]">
             ${field(tb("code"), `<input name="code" required maxlength="20" value="${esc(g ? g.code || "" : "")}" ${g && g.code ? "readonly" : ""} class="${cls.input} font-mono uppercase">`)}
-            ${field(tg("name"), `<input name="name" required value="${esc(g ? g.name : "")}" class="${cls.input}">`)}
+            ${field(tb("name"), `<input name="name" required value="${esc(g ? g.name : "")}" class="${cls.input}">`)}
           </div>
           ${field(tg("descriptionLabel"), `<input name="description" value="${esc(g ? g.description || "" : "")}" class="${cls.input}">`)}
           <div class="flex justify-end gap-2">
@@ -1706,7 +1702,7 @@
     const seq = routeSeq;
     const tl = (k, v) => t("admin.audit." + k, v);
     const PAGE = 50;
-    const TARGETS = ["auth", "profiles", "roles", "role_businesses", "role_modules", "groups", "group_members", "companies", "business_companies", "company_mappings", "modules", "group_modules", "module_companies", "module_members", "announcements"];
+    const TARGETS = ["auth", "profiles", "roles", "role_businesses", "groups", "group_members", "companies", "business_companies", "company_mappings", "modules", "group_modules", "module_companies", "module_members", "announcements"];
     let filters = { from: "", to: "", actor: "", action: "", target: "" };
     let page = 1;
 

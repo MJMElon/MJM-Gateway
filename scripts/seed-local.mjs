@@ -17,29 +17,8 @@ async function must(promise) {
 }
 
 // 角色 HR：负责「全体员工」和「总部车队」，在「全体员工」负责 WIKI、HR 的权限，可以发公告
-const [hrRole] = await must(
-  db
-    .from("gw_roles")
-    .upsert(
-      [
-        {
-          name: "HR",
-          description: "人事",
-          can_post_notice: true,
-          can_delete_notice: true,
-          can_grant_module: true,
-          can_revoke_module: true,
-          can_set_module_admin: true,
-          can_add_business_user: true,
-          can_remove_business_user: true,
-          can_view_user_group: true,
-          can_view_users: true,
-        },
-      ],
-      { onConflict: "name" },
-    )
-    .select(),
-);
+await must(db.from("gw_roles").delete().neq("name", "HR").select("id"));
+const [hrRole] = await must(db.from("gw_roles").upsert([{ name: "HR", description: "人事", can_view_user_group: true }], { onConflict: "name" }).select());
 
 const people = [
   { email: "super@mjm.local", full_name: "超级管理员", role: "super_admin", role_id: null, must_change_password: false },
@@ -49,13 +28,20 @@ const people = [
   { email: "new@mjm.local", full_name: "新同事", role: "user", role_id: null, must_change_password: true },
   { email: "fleet.lead@mjm.local", full_name: "车队组长", role: "user", role_id: null, must_change_password: false },
 ];
+// 清掉 e2e 测试建立的临时帐号，让重跑干净
+{
+  const { data: all } = await db.auth.admin.listUsers({ perPage: 1000 });
+  for (const u of all?.users || []) if (!people.some((p) => p.email === u.email)) await db.auth.admin.deleteUser(u.id);
+}
+for (const t of ["gw_user_widgets", "gw_user_layout", "gw_user_folders", "gw_user_links"]) await db.from(t).delete().not("user_id", "is", null);
 const ids = {};
 for (const p of people) {
   const { data: created, error } = await db.auth.admin.createUser({ email: p.email, password: PASSWORD, email_confirm: true });
   let id = created?.user?.id;
   if (error) id = (await must(db.rpc("gw_auth_user_id", { p_email: p.email })));
+  if (error) await db.auth.admin.updateUserById(id, { password: PASSWORD });
   ids[p.email] = id;
-  await must(db.from("gw_profiles").upsert({ id, ...p }));
+  await must(db.from("gw_profiles").upsert({ id, ...p, layout_initialized: false }));
 }
 
 const modules = await must(
@@ -75,6 +61,10 @@ const modules = await must(
 );
 const mod = Object.fromEntries(modules.map((m) => [m.code, m.id]));
 
+await must(db.from("gw_groups").delete().not("name", "in", '("全体员工","总部车队","营运团队")').select("id"));
+await must(db.from("gw_companies").delete().not("code", "in", '("MJMP","MJMA")').select("id"));
+await must(db.from("gw_company_mappings").delete().neq("external_id", "").select("id"));
+await must(db.from("gw_announcements").delete().neq("message", "").select("id"));
 const groups = await must(
   db
     .from("gw_groups")
@@ -160,14 +150,21 @@ await must(
     ].map(([e, m, admin]) => ({ user_id: ids[e], module_id: mod[m], is_admin: !!admin })),
   ),
 );
+// HR 在「全体员工」「总部车队」可以做的事（按 Business）
 await must(
   db.from("gw_role_businesses").upsert(
-    ["全体员工", "总部车队"].map((g) => ({ role_id: hrRole.id, group_id: grp[g] })),
-  ),
-);
-await must(
-  db.from("gw_role_modules").upsert(
-    ["WIKI", "HR"].map((m) => ({ role_id: hrRole.id, group_id: grp["全体员工"], module_id: mod[m] })),
+    ["全体员工", "总部车队"].map((g) => ({
+      role_id: hrRole.id,
+      group_id: grp[g],
+      can_post_notice: true,
+      can_delete_notice: true,
+      can_grant_module: g === "全体员工",
+      can_revoke_module: g === "全体员工",
+      can_set_module_admin: g === "全体员工",
+      can_add_business_user: true,
+      can_remove_business_user: true,
+      can_view_users: true,
+    })),
   ),
 );
 await must(db.from("gw_company_mappings").upsert({ company_id: co.MJMP, module_id: mod.MACHINERY, external_id: "12", external_name: "MJM PLANTATION" }, { onConflict: "module_id,external_id" }));

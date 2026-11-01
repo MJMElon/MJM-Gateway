@@ -237,19 +237,16 @@ window.GW_LANG["en"] = {
       "audit": "Audit Log"
     },
     "business": {
-      "description": "A business is a group of people. Tick the modules that belong to it — people in the business can then be given access to them one by one.",
       "add": "Add business",
-      "addTitle": "Add business",
-      "editTitle": "Edit business",
+      "addTitle": "Add New Business Name",
+      "editTitle": "Edit Business",
       "deleteTitle": "Delete business",
       "deleteBody": "Delete “{name}”? Its companies are deleted too, and its people lose the apps they had through it.",
       "empty": "No businesses yet. Add the first one.",
       "duplicate": "A business with this code or name already exists.",
-      "access": "Modules in this business",
-      "counts": "{companies} companies · {members} people",
       "code": "Business code",
       "badCode": "Invalid code. Use 2–20 capital letters, numbers, - or _.",
-      "noModules": "No modules linked yet. Link them under"
+      "name": "Business Name"
     },
     "company": {
       "description": "Companies are master data shared by every system. A company can belong to several businesses. Its code never changes and is used to match the company in existing systems.",
@@ -404,7 +401,7 @@ window.GW_LANG["en"] = {
         "downloadResult": "Download results (with temporary passwords)",
         "colName": "Name",
         "colGroups": "Businesses",
-        "colRole": "Role",
+        "colRole": "Role Name",
         "errors": {
           "no_file": "Please choose a file.",
           "bad_file": "Could not read the file. Please use .xlsx format.",
@@ -552,7 +549,6 @@ window.GW_LANG["en"] = {
         "announcements": "Announcements",
         "roles": "Roles",
         "role_businesses": "Role businesses",
-        "role_modules": "Role modules",
         "module_members": "Module access",
         "business_companies": "Business companies",
         "company_mappings": "Company mappings",
@@ -587,12 +583,6 @@ window.GW_LANG["en"] = {
       "namePlaceholder": "e.g. HR, Admin",
       "canPost": "Can post notices",
       "canPostLabel": "Can post on the Notice Board (seen by the people in its businesses)",
-      "scope": "Businesses and modules it covers",
-      "scopeHint": "The functions only work inside the businesses ticked here; module functions only for the modules ticked under each business.",
-      "noModules": "This business has no modules yet.",
-      "people": "{count} people",
-      "manages": "Manages access to: {list}",
-      "placeOnly": "Can place people; manages no modules",
       "noBusiness": "No businesses ticked yet.",
       "empty": "No roles yet. Add the first one, e.g. HR.",
       "deleteTitle": "Delete role",
@@ -612,19 +602,16 @@ window.GW_LANG["en"] = {
         "can_edit_module_name": "Edit module name",
         "can_manage_module_access": "Manage module user access"
       },
-      "colRole": "Role",
-      "colFunctions": "Role functions",
-      "colScope": "Businesses / modules",
-      "colPeople": "People",
-      "noFunctions": "No functions",
-      "functionsHint": "Tick what people with this role can do.",
-      "normalUserHint": "People without a role are normal users: they only use the modules opened for them. You don’t need to create a “User” role.",
+      "colRole": "Role Name",
       "groups": {
         "noticeBoard": "Notice Board",
-        "module": "Module",
-        "business": "Business",
-        "view": "View"
-      }
+        "module": "Module"
+      },
+      "colBusiness": "Business",
+      "colDescription": "Description",
+      "view": "View",
+      "viewTitle": "Role setting",
+      "noBusinessYet": "No businesses yet."
     },
     "userWindow": {
       "modules": "Modules this user can access",

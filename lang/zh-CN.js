@@ -237,19 +237,16 @@ window.GW_LANG["zh-CN"] = {
       "audit": "操作记录"
     },
     "business": {
-      "description": "Business 就是一群人。勾选属于它的模块，之后再逐个把模块开给里面的人。",
       "add": "新增 Business",
       "addTitle": "新增 Business",
-      "editTitle": "编辑 Business",
+      "editTitle": "修改 Business",
       "deleteTitle": "删除 Business",
       "deleteBody": "确定删除「{name}」？它底下的 Company 也会删掉，里面的人会失去从这里拿到的 App。",
       "empty": "还没有 Business，先新增一个。",
       "duplicate": "已经有同样代码或名称的 Business。",
-      "access": "这个 Business 的模块",
-      "counts": "{companies} 个 Company · {members} 人",
       "code": "Business 代码",
       "badCode": "代码格式不对，请用 2–20 个大写英文、数字、- 或 _。",
-      "noModules": "还没有连结模块，请到"
+      "name": "Business 名称"
     },
     "company": {
       "description": "Company 是所有系统共用的主资料，一个 Company 可以属于多个 Business。Company 代码固定不变，用来对应现有系统里的公司。",
@@ -404,7 +401,7 @@ window.GW_LANG["zh-CN"] = {
         "downloadResult": "下载结果（含临时密码）",
         "colName": "姓名",
         "colGroups": "Business",
-        "colRole": "角色",
+        "colRole": "角色名称",
         "errors": {
           "no_file": "请选择档案。",
           "bad_file": "无法读取档案，请使用 .xlsx 格式。",
@@ -552,7 +549,6 @@ window.GW_LANG["zh-CN"] = {
         "announcements": "公告",
         "roles": "角色",
         "role_businesses": "角色的 Business",
-        "role_modules": "角色的模块",
         "module_members": "模块权限",
         "business_companies": "Business 的 Company",
         "company_mappings": "Company 对应",
@@ -587,12 +583,6 @@ window.GW_LANG["zh-CN"] = {
       "namePlaceholder": "例如 HR、Admin",
       "canPost": "可发公告",
       "canPostLabel": "可以在 Notice Board 发公告（给它负责的 Business 的人看）",
-      "scope": "负责的 Business 和模块",
-      "scopeHint": "功能只在这里勾选的 Business 内有效；模块相关的功能只限每个 Business 底下勾选的模块。",
-      "noModules": "这个 Business 还没有模块。",
-      "people": "{count} 人",
-      "manages": "负责开权限：{list}",
-      "placeOnly": "可以放人；没有负责的模块",
       "noBusiness": "还没勾选 Business。",
       "empty": "还没有角色，先新增一个，例如 HR。",
       "deleteTitle": "删除角色",
@@ -612,19 +602,16 @@ window.GW_LANG["zh-CN"] = {
         "can_edit_module_name": "改模块名称",
         "can_manage_module_access": "管理模块内用户权限"
       },
-      "colRole": "角色",
-      "colFunctions": "角色功能",
-      "colScope": "Business / 模块",
-      "colPeople": "人数",
-      "noFunctions": "没有功能",
-      "functionsHint": "勾选有这个角色的人可以做什么。",
-      "normalUserHint": "没有角色的人就是一般用户：只能用开给他的模块。不需要另外建立「User」角色。",
+      "colRole": "角色名称",
       "groups": {
         "noticeBoard": "公告栏",
-        "module": "模块",
-        "business": "Business",
-        "view": "查看"
-      }
+        "module": "模块"
+      },
+      "colBusiness": "Business",
+      "colDescription": "说明",
+      "view": "查看",
+      "viewTitle": "角色设定",
+      "noBusinessYet": "还没有 Business。"
     },
     "userWindow": {
       "modules": "这个用户可以用的模块",

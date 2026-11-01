@@ -43,10 +43,10 @@ window.GWHome = (function () {
     const isSuper = profile.role === "super_admin";
     const isAdmin = isSuper || !!profile.manages;
     const canPost = isSuper || !!profile.canPost;
-    // 公告能不能改 / 删：super_admin 全部；角色只限它负责的 Business 的公告
-    const inScope = (a) => isSuper || (a.group_id && (profile.businessIds || []).includes(a.group_id));
-    const canEditNotice = (a) => !readOnly && canPost && inScope(a);
-    const canDeleteNotice = (a) => !readOnly && (isSuper || !!profile.canDeleteNotice) && inScope(a);
+    // 公告能不能改 / 删：super_admin 全部；角色按每个 Business 的功能
+    const bizCan = (gid, f) => (profile.bizCan ? profile.bizCan(gid, f) : isSuper);
+    const canEditNotice = (a) => !readOnly && (isSuper || (a.group_id && bizCan(a.group_id, "can_post_notice")));
+    const canDeleteNotice = (a) => !readOnly && (isSuper || (a.group_id && bizCan(a.group_id, "can_delete_notice")));
     const widgetsEnabled = !!(opts && Array.isArray(opts.widgets));
     const uninitialized = readOnly && !data.profile.layout_initialized;
 
@@ -781,7 +781,7 @@ window.GWHome = (function () {
       const { data: groups } = await sb.from("gw_groups").select("id, name").order("sort_order").order("name");
       const targets = [
         ...(isSuper ? [["", t("widgets.postEveryone")]] : []),
-        ...(groups || []).filter((g) => isSuper || (profile.businessIds || []).includes(g.id)).map((g) => [g.id, g.name]),
+        ...(groups || []).filter((g) => isSuper || bizCan(g.id, "can_post_notice")).map((g) => [g.id, g.name]),
       ];
       if (!targets.length) return toast(t("widgets.postFailed"));
       const cur = notice || { message: "", group_id: "", level: "info" };

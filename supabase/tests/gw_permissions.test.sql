@@ -36,17 +36,16 @@ insert into public.gw_group_modules (group_id, module_id) values
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b4'),
   ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000b1');
 
-insert into public.gw_roles (id, name, can_post_notice, can_delete_notice, can_grant_module, can_revoke_module, can_set_module_admin, can_add_business_user, can_remove_business_user, can_view_user_group, can_view_users, can_view_audit) values
-  ('00000000-0000-0000-0000-0000000000f1', 'HR', true, true, true, true, true, true, true, true, true, false),
-  ('00000000-0000-0000-0000-0000000000f2', 'Diesel Admin', false, false, true, false, false, true, false, true, false, false),
-  ('00000000-0000-0000-0000-0000000000f3', 'Viewer', false, false, false, false, false, false, false, false, true, true);
-insert into public.gw_role_businesses (role_id, group_id) values
-  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1'),
-  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c2'),
-  ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000c2');
-insert into public.gw_role_modules (role_id, group_id, module_id) values
-  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b3'),
-  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000b1');
+-- 角色（功能按 Business 设定）：
+--  HR：Plantation 全部功能；Diesel Admin：Fleet 可以加人进模块、加人进 Business；Viewer：Fleet 只看名单 + 看操作记录
+insert into public.gw_roles (id, name, can_view_user_group, can_view_audit) values
+  ('00000000-0000-0000-0000-0000000000f1', 'HR', true, false),
+  ('00000000-0000-0000-0000-0000000000f2', 'Diesel Admin', true, false),
+  ('00000000-0000-0000-0000-0000000000f3', 'Viewer', false, true);
+insert into public.gw_role_businesses (role_id, group_id, can_post_notice, can_delete_notice, can_grant_module, can_revoke_module, can_set_module_admin, can_add_business_user, can_remove_business_user, can_view_users) values
+  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', true, true, true, true, true, true, true, true),
+  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c2', false, false, true, false, false, true, false, false),
+  ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000c2', false, false, false, false, false, false, false, true);
 
 insert into public.gw_profiles (id, email, full_name, role, role_id) values
   ('00000000-0000-0000-0000-0000000000a1', 'super@test.local', '超级管理员', 'super_admin', null),
@@ -165,12 +164,12 @@ select pg_temp.logout();
 update public.gw_profiles set status = 'active' where id = '00000000-0000-0000-0000-0000000000a3';
 
 -- ---------------------------------------------------------------------
--- 4. 自订角色 HR：管 Plantation，只管 WIKI，可以发公告
+-- 4. 自订角色 HR：管 Plantation（里面所有模块），可以发公告
 -- ---------------------------------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-0000000000a2');
 select is((select count(*) from public.gw_profiles)::int, 7, '可以放人进 Business 的角色看得到全部用户（才找得到还没分配的人）');
 select set_eq($$ select name from public.gw_groups $$, array['Plantation'], 'HR 只看到自己管的 Business');
-select set_eq($$ select code from public.gw_modules $$, array['WIKI'], 'HR 只看到自己管的模块');
+select set_eq($$ select code from public.gw_modules $$, array['WIKI', 'HR', 'OLD'], 'HR 看到自己管的 Business 里的所有模块');
 select is((select name from public.gw_roles), 'HR', '看得到自己的角色设定');
 select lives_ok(
   $$ insert into public.gw_group_members (group_id, user_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a6') $$,
@@ -193,8 +192,8 @@ select lives_ok(
   'HR 可以把自己管的模块开给 Business 里的人'
 );
 select throws_ok(
-  $$ insert into public.gw_module_members values ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000b2') $$,
-  '42501', null, 'HR 不能开不归他管的模块（同一个 Business 的 HR 系统）'
+  $$ insert into public.gw_module_members values ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000b1') $$,
+  '42501', null, 'HR 不能开别的 Business 的模块（Fleet 的 FUEL）'
 );
 select throws_ok(
   $$ insert into public.gw_module_members values ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b3') $$,
