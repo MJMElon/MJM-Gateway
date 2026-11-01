@@ -6,10 +6,13 @@
   "scripts": {
     "serve": "npx --yes serve -l 3000 .",
     "key": "node scripts/generate-token-key.mjs",
-    "seed": "node --env-file=.env.local scripts/seed-local.mjs"
+    "seed": "node --env-file=.env.local scripts/seed-local.mjs",
+    "build:css": "tailwindcss -i shared/tailwind.src.css -o shared/app.css --minify"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.118.0",
-    "jose": "^5.10.0"
+    "@tailwindcss/cli": "^4.1.11",
+    "jose": "^5.10.0",
+    "tailwindcss": "^4.1.11"
   }
 }

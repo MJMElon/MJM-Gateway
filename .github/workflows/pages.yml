@@ -1,4 +1,4 @@
-# 推送到 main 后，把 repo 根目录的 HTML 原样发布到 GitHub Pages（不需要建置）
+# 推送到 main 后，先编译样式（shared/app.css），再把 repo 根目录发布到 GitHub Pages
 # Pages 设定为「GitHub Actions」时由这个流程发布；设定为「从分支发布」时 GitHub 会直接发布分支内容
 name: Publish to GitHub Pages
 
@@ -24,6 +24,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # 样式事先编译（取代浏览器里的 Tailwind），确保发布的 app.css 一定是最新的
+      - run: npm ci
+      - run: npm run build:css
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

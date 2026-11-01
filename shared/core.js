@@ -63,8 +63,15 @@ window.GW = (function () {
     const { data } = await sb.auth.getSession();
     const session = data.session;
     if (!session) return { session: null, profile: null };
-    const { data: profile } = await sb.from("gw_profiles").select("*").eq("id", session.user.id).maybeSingle();
+    // 一次请求拿到：个人资料 ＋ 角色 ＋ 角色的 Business 功能；模块管理员资料同时一起拿
+    const [{ data: profile }, { data: adm }] = await Promise.all([
+      sb.from("gw_profiles").select("*, gw_roles(*, gw_role_businesses(*))").eq("id", session.user.id).maybeSingle(),
+      sb.from("gw_module_members").select("module_id").eq("user_id", session.user.id).eq("is_admin", true),
+    ]);
     if (profile) {
+      const role = profile.gw_roles || null;
+      const biz = role ? role.gw_role_businesses || [] : [];
+      delete profile.gw_roles;
       // 自订角色：管哪些 Business、能不能发公告（RLS 只给看自己的角色）
       profile.isSuper = profile.role === "super_admin";
       profile.roleName = null;
@@ -79,18 +86,13 @@ window.GW = (function () {
       profile.perms = {}; // group_id → { can_post_notice, ... }
       if (!profile.isSuper) {
         // 模块管理员：可以开 / 收回自己管理的模块的权限
-        const { data: adm } = await sb.from("gw_module_members").select("module_id").eq("user_id", profile.id).eq("is_admin", true);
         profile.adminModuleIds = (adm || []).map((x) => x.module_id);
         profile.adminModules = profile.adminModuleIds.length;
       }
-      if (!profile.isSuper && profile.role_id) {
-        const [{ data: role }, { data: biz }] = await Promise.all([
-          sb.from("gw_roles").select("*").eq("id", profile.role_id).maybeSingle(),
-          sb.from("gw_role_businesses").select("*").eq("role_id", profile.role_id),
-        ]);
-        profile.roleName = role ? role.name : null;
-        if (role) GLOBAL.forEach((f) => (profile.can[f] = !!role[f]));
-        (biz || []).forEach((b) => {
+      if (!profile.isSuper && role) {
+        profile.roleName = role.name;
+        GLOBAL.forEach((f) => (profile.can[f] = !!role[f]));
+        biz.forEach((b) => {
           profile.perms[b.group_id] = Object.fromEntries(PER_BIZ.map((f) => [f, !!b[f]]));
           PER_BIZ.forEach((f) => b[f] && (profile.can[f] = true)); // can.xxx = 在任何一个 Business 有
         });

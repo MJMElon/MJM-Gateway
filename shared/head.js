@@ -11,45 +11,14 @@
 
   const base = document.currentScript.src.replace(/shared\/head\.js.*$/, "");
   const libs = [
-    "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11/dist/index.global.js",
     "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js",
     "https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js",
     base + "shared/config.js",
     base + "lang/en.js",
     base + "shared/core.js",
   ];
-  const theme = `
-@custom-variant dark (&:where(.dark, .dark *));
-@theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --color-brand-50: #eef5ff;
-  --color-brand-100: #d9e8ff;
-  --color-brand-500: #2563eb;
-  --color-brand-600: #1d4ed8;
-  --color-brand-700: #1e40af;
-}
-@layer base {
-  html { -webkit-tap-highlight-color: transparent; }
-  body { @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-dvh; }
-  [x-cloak] { display: none !important; }
-}
-.sortable-ghost { opacity: .35; }
-.sortable-chosen { box-shadow: 0 10px 25px rgba(0,0,0,.15); }
-body.gw-dragging .gw-folder-body { display: block !important; min-height: 3rem; }
-/* 主画面背景 */
-body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #e0ecff 0%, transparent 60%), radial-gradient(900px 500px at 100% 0%, #eef2f7 0%, transparent 55%), #f6f8fb; background-attachment: fixed; }
-.dark body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #12233f 0%, transparent 60%), #020617; }
-/* 主画面棋盘：格子高度（手机 / 平板以上）；拖拉时不要选取文字、不要跳出长按选单 */
-#gw-grid { --gw-row: 5.25rem; }
-@media (min-width: 640px) { #gw-grid { --gw-row: 5.75rem; } }
-.gw-item, .gw-ghost, .gw-sheet-apps [data-lib] { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
-body.gw-dragging { cursor: grabbing; }
-/* 编辑主画面时轻轻抖动（像 iPhone） */
-@keyframes gw-jiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
-.gw-editing > .gw-item { animation: gw-jiggle .14s ease-in-out infinite alternate; }
-.gw-editing > .gw-item:nth-child(2n) { animation-delay: .07s; }
-@media (prefers-reduced-motion: reduce) { .gw-editing > .gw-item { animation: none; } }
-`;
-  document.write('<style type="text/tailwindcss">' + theme + "</style>");
+  // 样式是事先编译好的（shared/app.css）；改了画面的 class 之后执行 npm run build:css
+  document.write('<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>');
+  document.write('<link rel="stylesheet" href="' + base + 'shared/app.css">');
   libs.forEach((src) => document.write('<script src="' + src + '"><\/script>'));
 })();
