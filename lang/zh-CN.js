@@ -323,13 +323,13 @@ window.GW_LANG["zh-CN"] = {
     "backToPortal": "返回 Portal",
     "tabs": {
       "users": "全部用户",
-      "groups": "群组管理",
+      "groups": "按群组",
       "business": "Business",
       "company": "Company",
       "modules": "模块",
       "announcements": "公告",
       "audit": "操作记录",
-      "access": "模块权限",
+      "access": "按模块",
       "roles": "角色"
     },
     "users": {
@@ -357,7 +357,6 @@ window.GW_LANG["zh-CN"] = {
       "addTitle": "新增用户",
       "editTitle": "编辑用户",
       "edit": "编辑",
-      "preview": "预览首页",
       "resetPassword": "重设密码",
       "disable": "停用",
       "enable": "启用",
@@ -433,6 +432,8 @@ window.GW_LANG["zh-CN"] = {
       "save": "保存"
     },
     "modules": {
+      "noMatch": "没有符合筛选的模块。",
+      "activeLabel": "启用",
       "description": "大家可以从 MJM Connect 打开的每一个 模块。System = MJM Connect 旗下的系统（例如 Diesel）；Link = 现有系统或任何外部网站。给每个 模块 标上 Business（和 Company），开权限时就会出现在对的地方。",
       "add": "新增模块",
       "addTitle": "新增模块",
@@ -495,11 +496,6 @@ window.GW_LANG["zh-CN"] = {
       "uploadFailed": "照片上传失败。",
       "tickAll": "全选",
       "noCompanies": "这个 Business 还没有 Company。"
-    },
-    "preview": {
-      "banner": "正在以 {name}（{email}）的身份预览首页（只读）",
-      "back": "返回用户列表",
-      "notAllowed": "找不到这个用户，或你没有权限预览。"
     },
     "announcements": {
       "descriptionSuper": "公告会显示在首页顶部。",
@@ -613,7 +609,12 @@ window.GW_LANG["zh-CN"] = {
       "viewTitle": "角色设定",
       "noBusinessYet": "还没有 Business。"
     },
+    "filter": {
+      "title": "筛选",
+      "clear": "清除全部"
+    },
     "userWindow": {
+      "edit": "编辑权限",
       "modules": "这个用户可以用的模块",
       "noModules": "还没有模块。",
       "noBusiness": "还没放进任何 Business。",

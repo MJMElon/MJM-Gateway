@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(98);
+select plan(100);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -461,6 +461,9 @@ select pg_temp.logout();
 
 delete from public.gw_business_companies where group_id = '00000000-0000-0000-0000-0000000000c1' and company_id = '00000000-0000-0000-0000-0000000000e3';
 select is((select company_id from public.gw_group_members where user_id = '00000000-0000-0000-0000-0000000000a4'), null, 'Company 从 Business 拿掉后，成员还在 Business 里');
+
+select is((select count(*) from public.gw_profiles where user_code is null), 0::bigint, '每个用户都有代码');
+select is((select count(distinct user_code) from public.gw_profiles), (select count(*) from public.gw_profiles), '用户代码不重复');
 
 select * from finish();
 rollback;

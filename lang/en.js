@@ -252,7 +252,7 @@ window.GW_LANG["en"] = {
       "description": "Companies are master data shared by every system. A company can belong to several businesses. Its code never changes and is used to match the company in existing systems.",
       "search": "Search code or name…",
       "add": "Add company",
-      "addTitle": "Add company",
+      "addTitle": "Add New Company",
       "editTitle": "Edit company",
       "code": "Company code",
       "codeHint": "2–20 capital letters / numbers, e.g. MJMP. Cannot be changed later.",
@@ -322,14 +322,14 @@ window.GW_LANG["en"] = {
     "pageTitle": "User Setting",
     "backToPortal": "Back to Portal",
     "tabs": {
-      "users": "All users",
-      "groups": "Group Manage",
+      "users": "Full User List",
+      "groups": "By Group",
       "business": "Business",
       "company": "Company",
       "modules": "Module",
       "announcements": "Announcements",
       "audit": "Audit log",
-      "access": "Module access",
+      "access": "By Module",
       "roles": "Role"
     },
     "users": {
@@ -354,10 +354,9 @@ window.GW_LANG["en"] = {
         "noBusiness": "This person is not in any business yet. Place them in a business first.",
         "saveFailed": "Could not save. You may not manage this module."
       },
-      "addTitle": "Add user",
+      "addTitle": "Add New User",
       "editTitle": "Edit user",
       "edit": "Edit",
-      "preview": "Preview home",
       "resetPassword": "Reset password",
       "disable": "Disable",
       "enable": "Enable",
@@ -433,6 +432,8 @@ window.GW_LANG["en"] = {
       "save": "Save"
     },
     "modules": {
+      "noMatch": "No modules match the filter.",
+      "activeLabel": "Active",
       "description": "Every module people can open from MJM Connect. System = a system under MJM Connect (e.g. Diesel). Link = an existing system or any outside website. Tag each module with its businesses (and companies) so it shows in the right place when you give access.",
       "add": "Add module",
       "addTitle": "Add module",
@@ -495,11 +496,6 @@ window.GW_LANG["en"] = {
       "uploadFailed": "Could not upload the photo.",
       "tickAll": "Tick all",
       "noCompanies": "This business has no companies yet."
-    },
-    "preview": {
-      "banner": "Previewing the home page of {name} ({email}) — read only",
-      "back": "Back to users",
-      "notAllowed": "User not found, or you do not have permission to preview them."
     },
     "announcements": {
       "descriptionSuper": "Announcements appear at the top of the home page.",
@@ -613,7 +609,12 @@ window.GW_LANG["en"] = {
       "viewTitle": "Role setting",
       "noBusinessYet": "No businesses yet."
     },
+    "filter": {
+      "title": "Filter",
+      "clear": "Clear all"
+    },
     "userWindow": {
+      "edit": "Edit access",
       "modules": "Modules this user can access",
       "noModules": "No modules yet.",
       "noBusiness": "Not in any business yet.",
