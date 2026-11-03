@@ -150,7 +150,9 @@ window.GW_LANG["en"] = {
       "rose": "Rose",
       "violet": "Violet",
       "graphite": "Graphite"
-    }
+    },
+    "allCompanies": "All companies",
+    "noAppsForCompany": "No apps for this company."
   },
   "library": {
     "title": "Library",

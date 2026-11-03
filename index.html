@@ -24,15 +24,19 @@
   const sectionsOn = !secRes.error;
   // 旧版：第一次登录按群组自动排好预设版面
   if (firstVisit && !sectionsOn) await GW.sb.rpc("gw_init_layout");
-  const [{ data, error }, widgetRes, memberRes, linkRes, imgRes, itemRes, groupRes, gmodRes] = await Promise.all([
+  const [{ data, error }, widgetRes, memberRes, linkRes, imgRes, itemRes, groupRes, gmodRes, bcoRes, coRes, mcoRes] = await Promise.all([
     GW.sb.rpc("gw_get_home"),
     GW.sb.from("gw_user_widgets").select("*").order("sort_order"),
-    GW.sb.from("gw_group_members").select("group_id").eq("user_id", profile.id),
+    GW.sb.from("gw_group_members").select("group_id, company_id").eq("user_id", profile.id),
     GW.sb.from("gw_user_links").select("*").order("sort_order"),
     GW.sb.from("gw_modules").select("id, image_url"),
     sectionsOn ? GW.sb.from("gw_user_section_items").select("*").order("sort_order") : Promise.resolve({ data: [] }),
     sectionsOn ? GW.sb.from("gw_groups").select("id, name, sort_order").order("sort_order").order("name") : Promise.resolve({ data: [] }),
     sectionsOn ? GW.sb.from("gw_group_modules").select("group_id, module_id") : Promise.resolve({ data: [] }),
+    // 区块里的 Company 选择：这个 Business 有哪些 Company、哪些模块标了哪些 Company
+    sectionsOn ? GW.sb.from("gw_business_companies").select("group_id, company_id") : Promise.resolve({ data: [] }),
+    sectionsOn ? GW.sb.from("gw_companies").select("id, name, code, short_name").eq("is_active", true).order("sort_order").order("name") : Promise.resolve({ data: [] }),
+    sectionsOn ? GW.sb.from("gw_module_companies").select("module_id, company_id") : Promise.resolve({ data: [] }),
   ]);
   if (error) return (main.innerHTML = GW.alertBox(t("errors.description")));
   // 模块照片
@@ -89,6 +93,10 @@
     ? {
         groups: (groupRes.data || []).filter((g) => memberSet.has(g.id)),
         groupModules: gmodRes.data || [],
+        bizCompanies: bcoRes.data || [],
+        companies: coRes.data || [],
+        moduleCompanies: mcoRes.data || [],
+        myCompany: Object.fromEntries((memberRes.data || []).filter((m) => m.company_id).map((m) => [m.group_id, m.company_id])),
         items: itemRes.data || [],
         state: secRes.data || [],
       }

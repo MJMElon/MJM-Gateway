@@ -176,6 +176,8 @@ await must(
 );
 await must(db.from("gw_company_mappings").upsert({ company_id: co.MJMP, module_id: mod.MACHINERY, external_id: "12", external_name: "MJM PLANTATION" }, { onConflict: "module_id,external_id" }));
 await must(db.from("gw_module_companies").upsert({ module_id: mod.MACHINERY, company_id: co.MJMP }));
+// 全体员工区块的 Company 选择：知识库标 MJMA、人事请假标 MJMP（测试用）
+await must(db.from("gw_module_companies").upsert([{ module_id: mod.WIKI, company_id: co.MJMA }, { module_id: mod.HR, company_id: co.MJMP }]));
 
 // Diesel 模块（migration 已建立 DIESEL 模块）：放进「总部车队」；车队组长是 Admin，陈司机、新同事有 Access
 // 模块里的 User Access：陈司机可以现金报销

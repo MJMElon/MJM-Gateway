@@ -150,7 +150,9 @@ window.GW_LANG["zh-CN"] = {
       "rose": "玫瑰",
       "violet": "紫",
       "graphite": "石墨"
-    }
+    },
+    "allCompanies": "全部 Company",
+    "noAppsForCompany": "这个 Company 没有 App。"
   },
   "library": {
     "title": "模块库",

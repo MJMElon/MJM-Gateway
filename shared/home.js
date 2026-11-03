@@ -497,6 +497,24 @@ window.GWHome = (function () {
     let sItems = S ? S.items.map((x) => ({ ...x })) : [];
     const expanded = new Map(S ? S.state.map((x) => [x.group_id, !!x.expanded]) : []);
         let menuGid = null; // 打开着「+」选单的区块
+    let companyMenuGid = null; // 打开着 Company 选单的区块
+    // 每个区块选的 Company（"all" = 全部）：记在 Notice Board 小工具的 config.companies；没选过就用自己在那个 Business 的 Company
+    const companySel = new Map(Object.entries(((opts && opts.widgets) || []).find((w) => w.widget_type === "announcements")?.config?.companies || {}));
+    const companiesOf = (gid) => {
+      const ids = new Set(S.bizCompanies.filter((x) => x.group_id === gid).map((x) => x.company_id));
+      return S.companies.filter((c) => ids.has(c.id));
+    };
+    const selectedCompany = (gid) => {
+      const v = companySel.get(gid) || S.myCompany[gid] || "all";
+      return v !== "all" && companiesOf(gid).some((c) => c.id === v) ? v : "all";
+    };
+    // 模块有标 Company 的，只在选了那个 Company（或选全部）时显示；没标 Company 的模块一律显示
+    const shownFor = (gid, moduleId) => {
+      const sel = selectedCompany(gid);
+      if (sel === "all") return true;
+      const tags = S.moduleCompanies.filter((x) => x.module_id === moduleId);
+      return !tags.length || tags.some((x) => x.company_id === sel);
+    };
     let sortables = [];
     const bySort = (a, b) => (a.sort_order || 0) - (b.sort_order || 0);
     const modsOfGroup = (gid) => {
@@ -506,13 +524,13 @@ window.GWHome = (function () {
     // 区块最上层的东西：有记录的按记录排；还没记录的 App 按默认顺序补在后面
     function boxItems(gid) {
       const mods = new Map(modsOfGroup(gid).map((m) => [m.id, m]));
-      const own = sItems.filter((x) => x.group_id === gid && !x.parent_id && (x.kind !== "module" || mods.has(x.module_id))).sort(bySort);
+      const own = sItems.filter((x) => x.group_id === gid && !x.parent_id && (x.kind !== "module" || (mods.has(x.module_id) && shownFor(gid, x.module_id)))).sort(bySort);
       const have = new Set(sItems.filter((x) => x.group_id === gid && x.kind === "module").map((x) => x.module_id));
       let n = own.length ? own[own.length - 1].sort_order : 0;
-      const extra = [...mods.values()].filter((m) => !have.has(m.id)).map((m) => ({ id: "new:" + m.id, virtual: true, group_id: gid, kind: "module", module_id: m.id, parent_id: null, sort_order: ++n }));
+      const extra = [...mods.values()].filter((m) => !have.has(m.id) && shownFor(gid, m.id)).map((m) => ({ id: "new:" + m.id, virtual: true, group_id: gid, kind: "module", module_id: m.id, parent_id: null, sort_order: ++n }));
       return [...own, ...extra];
     }
-    const folderKids = (fid) => sItems.filter((x) => x.parent_id === fid && modules.has(x.module_id)).sort(bySort);
+    const folderKids = (fid) => sItems.filter((x) => x.parent_id === fid && modules.has(x.module_id) && shownFor(x.group_id, x.module_id)).sort(bySort);
 
     const TILE_H = "h-[6.25rem]";
     const sTile = (it) => {
@@ -548,15 +566,29 @@ window.GWHome = (function () {
       return w && w.config && Array.isArray(w.config.order) ? w.config.order : [];
     };
     function boxShell({ key, title, open, tiles, menu, extraHeader }) {
+      if (!tiles) tiles = `<p class="px-1 py-3 text-sm text-slate-500">${esc(t("home.noAppsForCompany"))}</p>`;
       return `<section data-box="${key}" data-sec-key="${key}" class="${glass} h-auto! overflow-visible! pb-3">
         <div class="mb-2 flex items-center justify-between gap-2">
-          <div class="flex min-w-0 items-center gap-1.5">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2></div>
+          <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2>${key !== "home" ? companyPicker(key) : ""}</div>
           <div class="relative flex items-center gap-1">${extraHeader || ""}${menu || ""}</div>
         </div>
         <div data-list="${key}" class="flex flex-wrap content-start gap-x-1 gap-y-1 ${open ? "" : "max-h-[6.25rem] overflow-hidden"}">${tiles}</div>
         <button type="button" data-expand="${key}" aria-label="${esc(t(open ? "home.collapse" : "home.expand"))}" title="${esc(t(open ? "home.collapse" : "home.expand"))}" class="hidden absolute right-3 bottom-2 z-10 items-center justify-center rounded-full bg-slate-700/90 p-1 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon(open ? "chevrons-up" : "chevrons-down", "size-4")}</button>
       </section>`;
     }
+    // 区块标题旁边的 Company 选择
+    const companyPicker = (gid) => {
+      const list = companiesOf(gid);
+      if (!list.length) return "";
+      const sel = selectedCompany(gid);
+      const cur = list.find((c) => c.id === sel);
+      const label = cur ? cur.short_name || cur.code || cur.name : t("home.allCompanies");
+      const row = (id, text) => `<button type="button" data-company-pick="${id}" data-gid="${gid}" class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span class="truncate">${esc(text)}</span>${sel === id ? icon("check", "size-4 text-emerald-600") : ""}</button>`;
+      return `<div class="relative">
+        <button type="button" data-company-menu="${gid}" class="inline-flex max-w-[11rem] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-2.5 py-1 text-xs font-medium text-slate-700 backdrop-blur hover:bg-white/70 dark:border-white/10 dark:bg-white/10 dark:text-slate-200">${icon("building-2", "size-3.5")}<span class="truncate">${esc(label)}</span>${icon("chevron-down", "size-3.5")}</button>
+        ${companyMenuGid === gid ? `<div class="absolute top-full left-0 z-30 mt-1 w-56 rounded-xl border border-white/60 bg-white/85 p-1.5 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/85">${row("all", t("home.allCompanies"))}${list.map((c) => row(c.id, c.name)).join("")}</div>` : ""}
+      </div>`;
+    };
     const addMenu = (gid) => `<button type="button" data-sec-menu="${gid}" aria-label="${esc(t("home.addToBox"))}" title="${esc(t("home.addToBox"))}" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">${icon("plus", "size-4")}</button>
       ${
         menuGid === gid
@@ -1405,12 +1437,23 @@ window.GWHome = (function () {
       if (Date.now() - lastDragEnd < 400) return; // 刚拖完，不算点击
       const b = e.target.closest("button");
       if (!b || !root.contains(b)) {
-        if (sectionsOn && menuGid) return ((menuGid = null), drawSections());
+        if (sectionsOn && (menuGid || companyMenuGid)) return ((menuGid = null), (companyMenuGid = null), drawSections());
         if (fabOpen && !e.target.closest("[data-fab-toggle]")) ((fabOpen = false), draw());
         return;
       }
       const d = b.dataset;
       if (sectionsOn) {
+        if (companyMenuGid && !("companyMenu" in d) && !("companyPick" in d)) companyMenuGid = null;
+        if ("companyMenu" in d) return ((companyMenuGid = companyMenuGid === d.companyMenu ? null : d.companyMenu), (menuGid = null), draw());
+        if ("companyPick" in d) {
+          companyMenuGid = null;
+          companySel.set(d.gid, d.companyPick);
+          draw();
+          const w = board();
+          if (!w) return;
+          w.config = { ...(w.config || {}), companies: Object.fromEntries(companySel) };
+          return sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id).then(({ error }) => error && toast(t("home.saveFailed")));
+        }
         if (menuGid && !("secMenu" in d)) menuGid = null;
         if ("secMenu" in d) return ((menuGid = menuGid === d.secMenu ? null : d.secMenu), drawSections());
         if (d.secAdd) return ((menuGid = null), drawSections(), addBoxItem(d.gid, d.secAdd));
