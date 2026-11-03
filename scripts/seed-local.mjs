@@ -71,6 +71,9 @@ const mod = Object.fromEntries(modules.map((m) => [m.code, m.id]));
 await must(db.from("gw_groups").delete().not("name", "in", '("全体员工","总部车队","营运团队")').select("id"));
 await must(db.from("gw_companies").delete().not("code", "in", '("MJMP","MJMA")').select("id"));
 await must(db.from("gw_company_mappings").delete().neq("external_id", "").select("id"));
+// 模块 ↔ Business 连结（含 Sector / 负责人）和 Sector 清单：重跑时从头开始
+await must(db.from("gw_group_modules").delete().not("group_id", "is", null).select("group_id"));
+await must(db.from("gw_sectors").delete().not("id", "is", null).select("id"));
 await must(db.from("gw_announcements").delete().neq("message", "").select("id"));
 const groups = await must(
   db

@@ -505,6 +505,7 @@ window.GWHome = (function () {
       return S.companies.filter((c) => ids.has(c.id));
     };
     const selectedCompany = (gid) => {
+      if (companiesOf(gid).length < 2) return "all"; // 只有一个 Company：不用选，全部显示
       const v = companySel.get(gid) || S.myCompany[gid] || "all";
       return v !== "all" && companiesOf(gid).some((c) => c.id === v) ? v : "all";
     };
@@ -567,7 +568,7 @@ window.GWHome = (function () {
     };
     function boxShell({ key, title, open, tiles, menu, extraHeader }) {
       if (!tiles) tiles = `<p class="px-1 py-3 text-sm text-slate-500">${esc(t("home.noAppsForCompany"))}</p>`;
-      return `<section data-box="${key}" data-sec-key="${key}" class="${glass} h-auto! overflow-visible! pb-3">
+      return `<section data-box="${key}" data-sec-key="${key}" class="${glass} h-auto! overflow-visible! pb-3 ${menuGid === key || companyMenuGid === key ? "z-30" : ""}">
         <div class="mb-2 flex items-center justify-between gap-2">
           <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2>${key !== "home" ? companyPicker(key) : ""}</div>
           <div class="relative flex items-center gap-1">${extraHeader || ""}${menu || ""}</div>
@@ -580,13 +581,15 @@ window.GWHome = (function () {
     const companyPicker = (gid) => {
       const list = companiesOf(gid);
       if (!list.length) return "";
+      // 只有一个 Company：只显示它的名字，不用下拉选单
+      if (list.length === 1) return `<span class="inline-flex max-w-[14rem] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-2.5 py-1 text-xs font-medium text-slate-700 backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">${icon("building-2", "size-3.5 shrink-0")}<span class="truncate">${esc(list[0].name)}</span></span>`;
       const sel = selectedCompany(gid);
       const cur = list.find((c) => c.id === sel);
       const label = cur ? cur.short_name || cur.code || cur.name : t("home.allCompanies");
       const row = (id, text) => `<button type="button" data-company-pick="${id}" data-gid="${gid}" class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span class="truncate">${esc(text)}</span>${sel === id ? icon("check", "size-4 text-emerald-600") : ""}</button>`;
       return `<div class="relative">
         <button type="button" data-company-menu="${gid}" class="inline-flex max-w-[11rem] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-2.5 py-1 text-xs font-medium text-slate-700 backdrop-blur hover:bg-white/70 dark:border-white/10 dark:bg-white/10 dark:text-slate-200">${icon("building-2", "size-3.5")}<span class="truncate">${esc(label)}</span>${icon("chevron-down", "size-3.5")}</button>
-        ${companyMenuGid === gid ? `<div class="absolute top-full left-0 z-30 mt-1 w-56 rounded-xl border border-white/60 bg-white/85 p-1.5 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/85">${row("all", t("home.allCompanies"))}${list.map((c) => row(c.id, c.name)).join("")}</div>` : ""}
+        ${companyMenuGid === gid ? `<div class="absolute top-full left-0 z-30 mt-1 max-h-64 w-60 overflow-y-auto rounded-xl border border-white/60 bg-white/90 p-1.5 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90">${row("all", t("home.allCompanies"))}${list.map((c) => row(c.id, c.name)).join("")}</div>` : ""}
       </div>`;
     };
     const addMenu = (gid) => `<button type="button" data-sec-menu="${gid}" aria-label="${esc(t("home.addToBox"))}" title="${esc(t("home.addToBox"))}" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">${icon("plus", "size-4")}</button>
