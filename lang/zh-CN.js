@@ -281,6 +281,19 @@ window.GW_LANG["zh-CN"] = {
       "badCode": "代码格式不对，请用 2–20 个大写英文、数字、- 或 _。",
       "name": "Business 名称"
     },
+    "sector": {
+      "add": "新增 Sector",
+      "addTitle": "新增 Sector",
+      "editTitle": "编辑 Sector",
+      "name": "Sector 名称",
+      "placeholder": "例如 Operation、Admin、Account",
+      "empty": "还没有 Sector，请新增第一个。",
+      "duplicate": "已经有同名的 Sector 了。",
+      "deleteTitle": "删除 Sector",
+      "deleteBody": "删除「{name}」？用到它的模块只会失去 Sector。",
+      "used": "{count} 个模块",
+      "notReady": "数据库还没更新到支持 Sector。"
+    },
     "company": {
       "description": "Company 是所有系统共用的主资料，一个 Company 可以属于多个 Business。Company 代码固定不变，用来对应现有系统里的公司。",
       "search": "搜寻代码或名称…",
@@ -363,7 +376,8 @@ window.GW_LANG["zh-CN"] = {
       "announcements": "公告",
       "audit": "操作记录",
       "access": "按模块",
-      "roles": "角色"
+      "roles": "角色",
+      "sectors": "Sector"
     },
     "users": {
       "search": "搜索姓名或 Email…",
@@ -528,7 +542,10 @@ window.GW_LANG["zh-CN"] = {
       "uploadPhoto": "上传照片",
       "uploadFailed": "照片上传失败。",
       "tickAll": "全选",
-      "noCompanies": "这个 Business 还没有 Company。"
+      "noCompanies": "这个 Business 还没有 Company。",
+      "sector": "Sector",
+      "lead": "主要负责人",
+      "noBusiness": "还没分 Business"
     },
     "announcements": {
       "descriptionSuper": "公告会显示在首页顶部。",
@@ -581,7 +598,8 @@ window.GW_LANG["zh-CN"] = {
         "module_members": "模块权限",
         "business_companies": "Business 的 Company",
         "company_mappings": "Company 对应",
-        "module_companies": "模块 的 Company 标签"
+        "module_companies": "模块 的 Company 标签",
+        "sectors": "Sector"
       },
       "filter": "筛选",
       "export": "导出 Excel",

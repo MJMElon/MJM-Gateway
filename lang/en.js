@@ -281,6 +281,19 @@ window.GW_LANG["en"] = {
       "badCode": "Invalid code. Use 2–20 capital letters, numbers, - or _.",
       "name": "Business Name"
     },
+    "sector": {
+      "add": "Add sector",
+      "addTitle": "Add New Sector",
+      "editTitle": "Edit Sector",
+      "name": "Sector name",
+      "placeholder": "e.g. Operation, Admin, Account",
+      "empty": "No sectors yet. Add the first one.",
+      "duplicate": "A sector with this name already exists.",
+      "deleteTitle": "Delete sector",
+      "deleteBody": "Delete “{name}”? Modules that use it just lose their sector.",
+      "used": "{count} modules",
+      "notReady": "The database has not been updated for sectors yet."
+    },
     "company": {
       "description": "Companies are master data shared by every system. A company can belong to several businesses. Its code never changes and is used to match the company in existing systems.",
       "search": "Search code or name…",
@@ -363,7 +376,8 @@ window.GW_LANG["en"] = {
       "announcements": "Announcements",
       "audit": "Audit log",
       "access": "By Module",
-      "roles": "Role"
+      "roles": "Role",
+      "sectors": "Sector"
     },
     "users": {
       "search": "Search name or email…",
@@ -528,7 +542,10 @@ window.GW_LANG["en"] = {
       "uploadPhoto": "Upload photo",
       "uploadFailed": "Could not upload the photo.",
       "tickAll": "Tick all",
-      "noCompanies": "This business has no companies yet."
+      "noCompanies": "This business has no companies yet.",
+      "sector": "Sector",
+      "lead": "Lead",
+      "noBusiness": "No business"
     },
     "announcements": {
       "descriptionSuper": "Announcements appear at the top of the home page.",
@@ -581,7 +598,8 @@ window.GW_LANG["en"] = {
         "module_members": "Module access",
         "business_companies": "Business companies",
         "company_mappings": "Company mappings",
-        "module_companies": "Module company tags"
+        "module_companies": "Module company tags",
+        "sectors": "Sectors"
       },
       "filter": "Filter",
       "export": "Export Excel",

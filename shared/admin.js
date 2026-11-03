@@ -24,7 +24,7 @@
   const SECTIONS = isSuper
     ? [
         ["userGroup", "users-round", ["groups", "users", "access"]],
-        ["master", "database", ["roles", "business", "company", "modules"]],
+        ["master", "database", ["roles", "business", "company", "sectors", "modules"]],
         ["audit", "scroll-text", ["audit"]],
       ]
     : [
@@ -1565,15 +1565,22 @@
   async function modulesTab() {
     const seq = routeSeq;
     const tmod = (k, v) => t("admin.modules." + k, v);
-    const [modules, groups, companies, bizTags, coTags, bizCo] = await Promise.all([
+    // Sector / 负责人两栏要数据库更新过才有；还没更新时照常显示，只是没有这两项
+    const [sectorRes, tagRes] = await Promise.all([sb.from("gw_sectors").select("id, name").order("sort_order").order("name"), sb.from("gw_group_modules").select("group_id, module_id, sector_id, lead_user_id")]);
+    const sectorsReady = !sectorRes.error && !tagRes.error;
+    const sectors = sectorsReady ? sectorRes.data || [] : [];
+    const [modules, groups, companies, bizTags, coTags, bizCo, people] = await Promise.all([
       sb.from("gw_modules").select("*").eq("kind", "system").order("sort_order").order("name").then((r) => r.data || []),
       sb.from("gw_groups").select("id, name").order("sort_order").order("name").then((r) => r.data || []),
       sb.from("gw_companies").select("id, code, name").order("sort_order").order("name").then((r) => r.data || []),
-      sb.from("gw_group_modules").select("group_id, module_id").then((r) => r.data || []),
+      sectorsReady ? Promise.resolve(tagRes.data || []) : sb.from("gw_group_modules").select("group_id, module_id").then((r) => r.data || []),
       sb.from("gw_module_companies").select("module_id, company_id").then((r) => r.data || []),
       sb.from("gw_business_companies").select("group_id, company_id").then((r) => r.data || []),
+      sb.from("gw_profiles").select("id, full_name").eq("status", "active").order("full_name").then((r) => r.data || []),
     ]);
     if (stale(seq)) return;
+    const sectorName = new Map(sectors.map((x) => [x.id, x.name]));
+    const personName = new Map(people.map((x) => [x.id, x.full_name]));
     const groupName = new Map(groups.map((g) => [g.id, g.name]));
     const companyName = new Map(companies.map((c) => [c.id, c.code || c.name]));
     const companiesIn = (gid) => companies.filter((c) => bizCo.some((l) => l.group_id === gid && l.company_id === c.id));
@@ -1587,7 +1594,7 @@
         ? `<img src="${esc(m.image_url)}" alt="" class="${size} shrink-0 rounded-xl object-cover">`
         : `<span class="flex ${size} shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-700/20 dark:text-brand-100">${moduleIcon(m.icon, "size-5")}</span>`;
 
-    const state = { biz: new Set(), co: new Set() };
+    const state = { biz: new Set(), co: new Set(), sector: new Set() };
     view.innerHTML = `<div class="space-y-4">
       <div class="flex items-center justify-end"><span id="mod-filter"></span></div>
       <div id="mod-list"></div>
@@ -1597,28 +1604,41 @@
         [
           { key: "biz", title: t("admin.tabs.business"), items: groups },
           { key: "co", title: t("admin.tabs.company"), items: companies.map((c) => ({ id: c.id, name: (c.code ? c.code + " · " : "") + c.name })) },
+          ...(sectorsReady ? [{ key: "sector", title: t("admin.tabs.sectors"), items: sectors }] : []),
         ],
         state,
         drawList,
       ),
     );
-    // 一行：模块名称 : 说明，然后 Business
+    // 一行 = 一个 Business × 一个模块：最左边 Business 标签，然后模块名称，右边是 Sector，再来是主要负责人
     function drawList() {
-      const list = modules.filter(
-        (m) =>
-          (!state.biz.size || bizTags.some((x) => x.module_id === m.id && state.biz.has(x.group_id))) &&
-          (!state.co.size || coTags.some((x) => x.module_id === m.id && state.co.has(x.company_id))),
+      const rows = [];
+      groups.forEach((g) =>
+        modules.forEach((m) => {
+          const bt = bizTags.find((x) => x.group_id === g.id && x.module_id === m.id);
+          if (bt) rows.push({ g, m, bt });
+        }),
+      );
+      modules.filter((m) => !bizTags.some((x) => x.module_id === m.id)).forEach((m) => rows.push({ g: null, m, bt: null }));
+      const list = rows.filter(
+        ({ g, m, bt }) =>
+          (!state.biz.size || (g && state.biz.has(g.id))) &&
+          (!state.co.size || coTags.some((x) => x.module_id === m.id && state.co.has(x.company_id))) &&
+          (!state.sector.size || (bt && bt.sector_id && state.sector.has(bt.sector_id))),
       );
       $("#mod-list").innerHTML = list.length
         ? `<div class="${cls.card} divide-y divide-slate-200 dark:divide-slate-800">${list
-            .map((m) => {
-              const bs = bizTags.filter((x) => x.module_id === m.id && groupName.has(x.group_id));
-              return `<div class="flex items-center gap-3 p-3 ${m.is_active ? "" : "opacity-60"}">
+            .map(({ g, m, bt }) => {
+              const sec = bt && bt.sector_id ? sectorName.get(bt.sector_id) : "";
+              const lead = bt && bt.lead_user_id ? personName.get(bt.lead_user_id) : "";
+              return `<div data-row class="flex flex-wrap items-center gap-x-3 gap-y-1.5 p-3 ${m.is_active ? "" : "opacity-60"}">
+                <span class="w-32 shrink-0">${g ? badge(g.name, "blue") : badge(tmod("noBusiness"), "amber")}</span>
                 ${logo(m, "size-10")}
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0 flex-1 basis-40">
                   <p class="truncate"><span class="font-medium">${esc(m.name)}</span>${m.description ? `<span class="text-sm text-slate-500"> : ${esc(m.description)}</span>` : ""}</p>
-                  ${bs.length ? `<div class="mt-1 flex flex-wrap gap-1">${bs.map((x) => badge(groupName.get(x.group_id), "blue")).join("")}</div>` : ""}
                 </div>
+                <span class="w-28 shrink-0">${sec ? badge(sec, "amber") : `<span class="text-xs text-slate-400">—</span>`}</span>
+                <span class="flex w-36 shrink-0 items-center gap-1 truncate text-sm ${lead ? "" : "text-slate-400"}" title="${esc(tmod("lead"))}">${icon("user-round", "size-3.5 shrink-0")}<span class="truncate">${esc(lead || "—")}</span></span>
                 ${canRename(m.id) ? `<button data-edit="${m.id}" aria-label="${esc(tmod("edit"))}" title="${esc(tmod("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>` : ""}
               </div>`;
             })
@@ -1630,6 +1650,8 @@
 
     function dialog(mod) {
       const bizOn = new Set(bizTags.filter((x) => x.module_id === mod.id).map((x) => x.group_id));
+      const tagOf = (gid) => bizTags.find((x) => x.module_id === mod.id && x.group_id === gid) || {};
+      const opt = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur || "") ? "selected" : ""}>${esc(l)}</option>`).join("");
       const coOn = new Set(coTags.filter((x) => x.module_id === mod.id).map((x) => x.company_id));
       let photo = null; // 新选的照片
       const m = modal(
@@ -1662,6 +1684,14 @@
                             const cos = companiesIn(g.id);
                             return `<div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                               <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="biz" value="${g.id}" ${bizOn.has(g.id) ? "checked" : ""} class="size-4 accent-emerald-600">${icon("briefcase-business", "size-4 text-brand-600")}${esc(g.name)}</label>
+                              ${
+                                sectorsReady
+                                  ? `<div data-meta="${g.id}" class="mt-2 ml-6 grid gap-2 sm:grid-cols-2 ${bizOn.has(g.id) ? "" : "hidden"}">
+                                      <label class="block space-y-1"><span class="text-xs text-slate-500">${esc(tmod("sector"))}</span><select data-sector="${g.id}" class="${cls.input}">${opt([["", "—"], ...sectors.map((x) => [x.id, x.name])], tagOf(g.id).sector_id)}</select></label>
+                                      <label class="block space-y-1"><span class="text-xs text-slate-500">${esc(tmod("lead"))}</span><select data-lead="${g.id}" class="${cls.input}">${opt([["", "—"], ...people.map((x) => [x.id, x.full_name])], tagOf(g.id).lead_user_id)}</select></label>
+                                    </div>`
+                                  : ""
+                              }
                               <div data-cos="${g.id}" class="mt-2 ml-6 ${bizOn.has(g.id) ? "" : "hidden"}">
                                 ${
                                   cos.length
@@ -1694,6 +1724,11 @@
           const box = $(`[data-cos="${el.value}"]`, m.el);
           box.classList.toggle("hidden", !el.checked);
           if (!el.checked) $$("input", box).forEach((x) => (x.checked = false));
+          const meta = $(`[data-meta="${el.value}"]`, m.el);
+          if (meta) {
+            meta.classList.toggle("hidden", !el.checked);
+            if (!el.checked) $$("select", meta).forEach((x) => (x.value = ""));
+          }
         } else if (el.dataset.all) {
           $$(`input[name=co][data-g="${el.dataset.all}"]`, m.el).forEach((x) => (x.checked = el.checked));
         } else if (el.name === "photo" && el.files[0]) {
@@ -1736,7 +1771,28 @@
               if (error) return error;
             }
           };
-          const tagError = (await sync("gw_group_modules", "group_id", bizOn, picked("biz"))) || (await sync("gw_module_companies", "company_id", coOn, picked("co")));
+          // Business：新增 / 拿掉；留着的看 Sector 和负责人有没有改
+          const want = picked("biz");
+          const metaOf = (gid) => (sectorsReady ? { sector_id: $(`[data-sector="${gid}"]`, f).value || null, lead_user_id: $(`[data-lead="${gid}"]`, f).value || null } : {});
+          const addBiz = [...want].filter((x) => !bizOn.has(x));
+          const dropBiz = [...bizOn].filter((x) => !want.has(x));
+          if (addBiz.length) {
+            const { error } = await sb.from("gw_group_modules").insert(addBiz.map((gid) => ({ module_id: mod.id, group_id: gid, ...metaOf(gid) })));
+            if (error) return err("saveFailed");
+          }
+          if (dropBiz.length) {
+            const { error } = await sb.from("gw_group_modules").delete().eq("module_id", mod.id).in("group_id", dropBiz);
+            if (error) return err("saveFailed");
+          }
+          if (sectorsReady)
+            for (const gid of [...want].filter((x) => bizOn.has(x))) {
+              const now = metaOf(gid);
+              const was = tagOf(gid);
+              if ((was.sector_id || null) === now.sector_id && (was.lead_user_id || null) === now.lead_user_id) continue;
+              const { error } = await sb.from("gw_group_modules").update(now).eq("module_id", mod.id).eq("group_id", gid);
+              if (error) return err("saveFailed");
+            }
+          const tagError = await sync("gw_module_companies", "company_id", coOn, picked("co"));
           if (tagError) return err("saveFailed");
         }
         m.close();
@@ -1751,12 +1807,83 @@
     refreshIcons();
   }
 
+  // ================================================================ Sector（Master Manage；预设清单，例如 Operation、Admin、Account）
+  async function sectorsTab() {
+    const seq = routeSeq;
+    const ts = (k, v) => t("admin.sector." + k, v);
+    const tg = (k, v) => t("admin.groups." + k, v);
+    const res = await sb.from("gw_sectors").select("*").order("sort_order").order("name");
+    if (stale(seq)) return;
+    if (res.error) return (view.innerHTML = empty(ts("notReady")));
+    const list = res.data || [];
+    const used = await sb.from("gw_group_modules").select("sector_id").not("sector_id", "is", null);
+    const countOf = (id) => (used.data || []).filter((x) => x.sector_id === id).length;
+
+    view.innerHTML = `<div class="space-y-4">
+      <div class="flex items-center justify-end"><button id="sec-add" class="${btn("primary")}">${icon("plus")} ${esc(ts("add"))}</button></div>
+      ${
+        list.length
+          ? `<div id="sec-cards" class="${cls.card} divide-y divide-slate-100 dark:divide-slate-800">${list
+              .map(
+                (x) => `<div data-card="${x.id}" class="flex items-center gap-3 px-3 py-3">
+                  ${grip()}
+                  <span class="min-w-0 flex-1 truncate font-semibold">${esc(x.name)}</span>
+                  <span class="text-xs text-slate-400">${esc(ts("used", { count: countOf(x.id) }))}</span>
+                  <button data-edit="${x.id}" aria-label="${esc(tg("edit"))}" class="${btn("ghost", "sm")}">${icon("pencil")}</button>
+                  <button data-del="${x.id}" aria-label="${esc(tg("delete"))}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${icon("trash-2")}</button>
+                </div>`,
+              )
+              .join("")}</div>`
+          : empty(ts("empty"))
+      }
+    </div>`;
+    refreshIcons();
+    sortableCards($("#sec-cards"), "gw_sectors", () => toast(t("admin.company.orderSaved")));
+
+    function dialog(x) {
+      const m = modal(
+        x ? ts("editTitle") : ts("addTitle"),
+        `<form class="space-y-4">
+          <div data-err></div>
+          ${field(ts("name"), `<input name="name" required maxlength="40" value="${esc(x ? x.name : "")}" placeholder="${esc(ts("placeholder"))}" class="${cls.input}">`)}
+          <div class="flex justify-end gap-2">
+            <button type="button" data-cancel class="${btn("secondary")}">${esc(tg("cancel"))}</button>
+            <button type="submit" class="${btn("primary")}">${esc(tg("save"))}</button>
+          </div>
+        </form>`,
+      );
+      $("[data-cancel]", m.el).onclick = m.close;
+      $("[name=name]", m.el).focus();
+      $("form", m.el).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = e.target.name.value.trim();
+        const { error } = x ? await sb.from("gw_sectors").update({ name }).eq("id", x.id) : await sb.from("gw_sectors").insert({ name, sort_order: list.length });
+        if (error) return ($("[data-err]", m.el).innerHTML = alertBox(error.code === "23505" ? ts("duplicate") : tg("saveFailed")));
+        m.close();
+        sectorsTab();
+      });
+    }
+
+    view.onclick = async (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.id === "sec-add") return dialog(null);
+      const x = list.find((y) => y.id === (b.dataset.edit || b.dataset.del));
+      if (!x) return;
+      if (b.dataset.edit) return dialog(x);
+      if (!(await confirmDialog(ts("deleteTitle"), ts("deleteBody", { name: x.name }), tg("delete"), tg("cancel")))) return;
+      const { error } = await sb.from("gw_sectors").delete().eq("id", x.id);
+      if (error) setMsg(tg("saveFailed"));
+      sectorsTab();
+    };
+  }
+
   // ================================================================ 操作记录
   async function auditTab() {
     const seq = routeSeq;
     const tl = (k, v) => t("admin.audit." + k, v);
     const PAGE = 50;
-    const TARGETS = ["auth", "profiles", "roles", "role_businesses", "groups", "group_members", "companies", "business_companies", "company_mappings", "modules", "group_modules", "module_companies", "module_members", "announcements"];
+    const TARGETS = ["auth", "profiles", "roles", "role_businesses", "groups", "group_members", "companies", "business_companies", "company_mappings", "modules", "group_modules", "module_companies", "sectors", "module_members", "announcements"];
     let filters = { from: "", to: "", actor: "", action: "", target: "" };
     let page = 1;
 
@@ -1883,7 +2010,7 @@
 
   // ================================================================ 以此人身份预览（只读）
   // ---------------------------------------------------------------- 分页切换（#users、#groups …）
-  const HANDLERS = { users: usersTab, groups: groupsTab, access: accessTab, roles: rolesTab, business: businessTab, company: companyTab, modules: modulesTab, audit: auditTab };
+  const HANDLERS = { users: usersTab, groups: groupsTab, access: accessTab, roles: rolesTab, business: businessTab, company: companyTab, sectors: sectorsTab, modules: modulesTab, audit: auditTab };
   // 上面三个大按钮：一样宽，当前的在正中间，其他的淡一点；点旁边的就左右滑动过去
   const SEC_W = 208, SEC_GAP = 8;
   function paintSections(activeKey) {

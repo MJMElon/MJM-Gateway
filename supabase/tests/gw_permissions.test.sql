@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(100);
+select plan(103);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -461,6 +461,19 @@ select pg_temp.logout();
 
 delete from public.gw_business_companies where group_id = '00000000-0000-0000-0000-0000000000c1' and company_id = '00000000-0000-0000-0000-0000000000e3';
 select is((select company_id from public.gw_group_members where user_id = '00000000-0000-0000-0000-0000000000a4'), null, 'Company 从 Business 拿掉后，成员还在 Business 里');
+
+-- Sector 清单：只有 super_admin 可以改；删除 Sector 后，模块上的 Sector 变回空
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+select throws_ok($$ insert into public.gw_sectors (name) values ('Operation') $$, '42501', null, '一般用户不能新增 Sector');
+select pg_temp.logout();
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+insert into public.gw_sectors (id, name) values ('00000000-0000-0000-0000-0000000000d9', 'Operation');
+select is((select count(*) from public.gw_sectors)::int, 1, 'super_admin 可以新增 Sector');
+update public.gw_group_modules set sector_id = '00000000-0000-0000-0000-0000000000d9', lead_user_id = '00000000-0000-0000-0000-0000000000a3'
+  where group_id = '00000000-0000-0000-0000-0000000000c1' and module_id = '00000000-0000-0000-0000-0000000000b3';
+delete from public.gw_sectors where id = '00000000-0000-0000-0000-0000000000d9';
+select is((select sector_id from public.gw_group_modules where group_id = '00000000-0000-0000-0000-0000000000c1' and module_id = '00000000-0000-0000-0000-0000000000b3'), null::uuid, '删除 Sector 后模块的 Sector 变回空');
+select pg_temp.logout();
 
 select is((select count(*) from public.gw_profiles where user_code is null), 0::bigint, '每个用户都有代码');
 select is((select count(distinct user_code) from public.gw_profiles), (select count(*) from public.gw_profiles), '用户代码不重复');
