@@ -362,7 +362,8 @@ window.GW_LANG["zh-CN"] = {
       "noBusiness": "还没有 Business，请先到这里设定：",
       "appsCount": "{count} 个 App",
       "apps": "模块权限",
-      "pendingCompany": "待分配 Company"
+      "pendingCompany": "待分配 Company",
+      "removeFromCompany": "从这个 Company 拿掉"
     },
     "title": "权限后台",
     "pageTitle": "User Setting",
@@ -670,7 +671,8 @@ window.GW_LANG["zh-CN"] = {
       "noModules": "还没有模块。",
       "noBusiness": "还没放进任何 Business。",
       "noPermission": "看得到这个用户有 {name}，但你的角色不能管理它里面的权限。",
-      "tickAccessFirst": "先勾 Access 才能设定其他项目。"
+      "tickAccessFirst": "先勾 Access 才能设定其他项目。",
+      "noCompany": "还没分到 Company"
     }
   },
   "diesel": {

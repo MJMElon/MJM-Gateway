@@ -287,14 +287,15 @@
   async function userWindow(uid, onClose) {
     const tu = (k, v) => t("admin.userWindow." + k, v);
     const m = modal("", GW.spinner(), { wide: true, onClose });
-    const [{ data: u }, { data: mems }, { data: groups }, { data: companies }, { data: mm }, { data: mods }, { data: gxRows }] = await Promise.all([
+    const [{ data: u }, { data: mems }, { data: groups }, { data: companies }, { data: mm }, { data: mods }, { data: gxRows }, { data: mcs }] = await Promise.all([
       sb.from("gw_profiles").select("id, full_name, email, status, role, role_id, user_code").eq("id", uid).maybeSingle(),
-      sb.from("gw_group_members").select("group_id, company_id").eq("user_id", uid),
+      sb.from("gw_group_members").select("group_id").eq("user_id", uid),
       sb.from("gw_groups").select("id, name").order("sort_order").order("name"),
       sb.from("gw_companies").select("id, name"),
       sb.from("gw_module_members").select("user_id, module_id, is_admin").eq("user_id", uid),
       sb.from("gw_modules").select("id, code, name, icon, image_url, is_active").order("sort_order").order("name"),
       sb.from("gw_group_modules").select("group_id, module_id"),
+      sb.from("gw_member_companies").select("group_id, company_id").eq("user_id", uid),
     ]);
     if (!u) return m.close();
     const h = m.el.parentElement.querySelector("h2");
@@ -342,7 +343,14 @@
           <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-slate-200 text-base font-semibold dark:bg-slate-700">${esc(u.full_name.slice(0, 1))}</span>
           <div class="min-w-0 flex-1">
             <p class="text-sm text-slate-500">${esc(u.email)}${u.user_code ? ` · <span class="font-mono">${esc(u.user_code)}</span>` : ""}</p>
-            <div class="mt-1 flex flex-wrap gap-1">${(mems || []).map((x) => badge((gName.get(x.group_id) || "") + (x.company_id ? " · " + (cName.get(x.company_id) || "") : ""), "blue")).join("") || `<span class="text-xs text-slate-400">${esc(tu("noBusiness"))}</span>`}</div>
+            <div class="mt-1.5 space-y-1">${
+              (mems || [])
+                .map((x) => {
+                  const cs = (mcs || []).filter((y) => y.group_id === x.group_id).map((y) => cName.get(y.company_id)).filter(Boolean);
+                  return `<div class="flex flex-wrap items-center gap-1">${badge(gName.get(x.group_id) || "", "blue")}${cs.length ? cs.map((c) => badge(c)).join("") : badge(tu("noCompany"), "amber")}</div>`;
+                })
+                .join("") || `<span class="text-xs text-slate-400">${esc(tu("noBusiness"))}</span>`
+            }</div>
           </div>
         </div>`;
       const pencil = m.el.parentElement.querySelector("[data-edit-access]");
@@ -576,7 +584,7 @@
         // 新用户：把 Company 补上（建立用户的功能只收 Business）
         if (!user && r && r.ok && f.business.value && f.company.value) {
           const { data: created } = await sb.from("gw_profiles").select("id").eq("email", r.email).maybeSingle();
-          if (created) await sb.from("gw_group_members").update({ company_id: f.company.value }).eq("user_id", created.id).eq("group_id", f.business.value);
+          if (created) await sb.from("gw_member_companies").insert({ group_id: f.business.value, user_id: created.id, company_id: f.company.value });
         }
         submit.disabled = false;
         if (!r || !r.ok) return ($("[data-err]", m.el).innerHTML = alertBox(tu("errors." + ((r && r.error) || "forbidden"))));
@@ -732,10 +740,11 @@
     const seq = routeSeq;
     const tg = (k, v) => t("admin.groups." + k, v);
     const tu2 = (k, v) => t("admin.userGroups." + k, v);
-    const [allGroups, users, members, companies, grantRows, links, mods, mm] = await Promise.all([
+    const [allGroups, users, members, memberCos, companies, grantRows, links, mods, mm] = await Promise.all([
       sb.from("gw_groups").select("*").order("sort_order").order("name"),
       sb.from("gw_profiles").select("id, full_name, email, status, role").order("full_name"),
-      sb.from("gw_group_members").select("group_id, user_id, company_id"),
+      sb.from("gw_group_members").select("group_id, user_id"),
+      sb.from("gw_member_companies").select("group_id, user_id, company_id"),
       sb.from("gw_companies").select("*").eq("is_active", true).order("sort_order").order("name"),
       sb.from("gw_group_modules").select("group_id, module_id"),
       sb.from("gw_business_companies").select("group_id, company_id"),
@@ -758,26 +767,59 @@
     // 角色只看到自己管的 Business（自己是成员的其他 Business 不能在这里管）
     const groups = allGroups.filter((g) => isSuper || (me.businessIds || []).includes(g.id));
     const userById = new Map(users.map((u) => [u.id, u]));
-    // "群组:用户" → company_id（null = 还没分到 Company）
-    const memberMap = new Map(members.map((m) => [m.group_id + ":" + m.user_id, m.company_id]));
+    const memberSet = new Set(members.map((m) => m.group_id + ":" + m.user_id));
+    // "Business:用户" → 这个人在这个 Business 里的 Company（可以有好几个；一个都没有 = 还没分到 Company）
+    const coMap = new Map();
+    memberCos.forEach((x) => {
+      const k = x.group_id + ":" + x.user_id;
+      if (!coMap.has(k)) coMap.set(k, new Set());
+      coMap.get(k).add(x.company_id);
+    });
+    const cosOf = (gid, uid) => coMap.get(gid + ":" + uid) || new Set();
     let query = "";
+    let activeGid = null;
+    try {
+      activeGid = localStorage.getItem("gw_ug_business");
+    } catch (e) {
+      /* 忽略 */
+    }
+    if (!groups.some((g) => g.id === activeGid)) activeGid = groups.length ? groups[0].id : null;
     let sortables = [];
-    const groupsOf = (uid) => groups.filter((g) => memberMap.has(g.id + ":" + uid));
+    const groupsOf = (uid) => groups.filter((g) => memberSet.has(g.id + ":" + uid));
     const companiesOf = (gid) => companies.filter((c) => links.some((l) => l.group_id === gid && l.company_id === c.id));
-    const membersIn = (gid, cid) => users.filter((u) => memberMap.has(gid + ":" + u.id) && (memberMap.get(gid + ":" + u.id) || null) === cid);
 
+    const ROW = "h-[3.25rem]";
     // 名片：Business 里只显示名字（下面是他可以用的模块小图示）；左边待分配名单显示名字和 Email
-    const chip = (u, extra, gid) => `<div data-user="${u.id}" class="gw-user flex ${canAdd ? "cursor-grab" : "cursor-pointer"} items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800 ${u.status === "disabled" ? "opacity-50" : ""}">
+    const chip = (u, extra, gid) => `<div data-user="${u.id}" class="gw-user ${gid ? ROW + " mb-1.5" : ""} flex ${canAdd ? "cursor-grab" : "cursor-pointer"} items-center gap-2 rounded-xl border border-white/70 bg-white/80 px-2.5 py-1.5 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800 ${u.status === "disabled" ? "opacity-50" : ""}">
         <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold dark:bg-slate-700">${esc(u.full_name.slice(0, 1))}</span>
         <span class="min-w-0 flex-1"><span class="block truncate font-medium">${esc(u.full_name)}</span>${gid ? `<span class="mt-0.5 flex flex-wrap gap-1">${logosIn(u.id, gid)}</span>` : `<span class="block truncate text-xs text-slate-500">${esc(u.email)}</span>`}</span>
         ${extra || ""}
       </div>`;
-    const zone = (g, c, mems) => `<div>
-        <p class="mb-1 flex items-center gap-1.5 text-xs font-semibold ${c ? "text-slate-700 dark:text-slate-200" : "text-amber-600"}">${icon(c ? "building-2" : "circle-dashed", "size-3.5")}${c ? `<button data-info="${c.id}" data-from="${g.id}" class="no-drag hover:underline">${esc(c.name)}</button>` : esc(tu2("pendingCompany"))}</p>
-        <div ${canAddTo(g.id) ? `data-drop="${g.id}"` : ""} data-company="${c ? c.id : ""}" class="${canAddTo(g.id) ? "gw-drop" : ""} min-h-14 space-y-1.5 rounded-xl border-2 border-dashed border-slate-200 p-2 dark:border-slate-700">
-          ${mems.length ? mems.map((u) => chip(u, `${canRemoveFrom(g.id) ? `<button data-out="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>` : ""}`, g.id)).join("") : `<p class="ug-empty py-2 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}
+    const spacer = `<div class="gw-spacer ${ROW} mb-1.5"></div>`;
+
+    // 一个 Company 的一栏：每个人固定一行，没在这个 Company 的留空白，所以同一个人在不同 Company 会排在同一行
+    function column(g, c, rowUsers) {
+      const mine = rowUsers.filter((u) => (c ? cosOf(g.id, u.id).has(c.id) : cosOf(g.id, u.id).size === 0));
+      const items = rowUsers
+        .map((u) => {
+          if (!mine.includes(u)) return spacer;
+          const x = c
+            ? canAddTo(g.id) || canRemoveFrom(g.id)
+              ? `<button data-out="${g.id}:${u.id}:${c.id}" aria-label="${esc(tu2("removeFromCompany"))}" title="${esc(tu2("removeFromCompany"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>`
+              : ""
+            : canRemoveFrom(g.id)
+              ? `<button data-out-biz="${g.id}:${u.id}" aria-label="${esc(tu2("removeMember"))}" title="${esc(tu2("removeMember"))}" class="no-drag rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">${icon("x")}</button>`
+              : "";
+          return chip(u, x, g.id);
+        })
+        .join("");
+      return `<div class="w-64 shrink-0">
+        <div class="sticky top-0 z-10 -mx-1 mb-2 rounded-xl bg-white/80 px-3 py-2 backdrop-blur dark:bg-slate-900/80">
+          <p class="flex items-center gap-1.5 truncate text-sm font-semibold ${c ? "text-slate-800 dark:text-slate-100" : "text-amber-600"}">${icon(c ? "building-2" : "circle-dashed", "size-4 shrink-0")}${c ? `<button data-info="${c.id}" data-from="${g.id}" class="truncate hover:underline">${esc(c.name)}</button>` : esc(tu2("pendingCompany"))}</p>
         </div>
+        <div ${canAddTo(g.id) ? `data-drop="${g.id}"` : ""} data-company="${c ? c.id : ""}" class="${canAddTo(g.id) ? "gw-drop" : ""} min-h-24 rounded-xl border-2 border-dashed border-slate-200/80 p-1.5 dark:border-slate-700">${items || `<p class="py-4 text-center text-xs text-slate-400">${esc(tu2("dropHere"))}</p>`}</div>
       </div>`;
+    }
 
     function draw() {
       sortables.forEach((x) => x.destroy());
@@ -785,66 +827,71 @@
       const pending = users.filter((u) => u.status === "active" && u.role !== "super_admin" && groupsOf(u.id).length === 0);
       const q = query.trim().toLowerCase();
       const leftList = pending.filter((u) => !q || (u.full_name + " " + u.email).toLowerCase().includes(q));
+      const g = groups.find((x) => x.id === activeGid);
+      // 这个 Business 的所有成员（按名字排），每个 Company 一栏都用同样的顺序
+      const rowUsers = g ? users.filter((u) => memberSet.has(g.id + ":" + u.id)).sort((a, b) => a.full_name.localeCompare(b.full_name)) : [];
+      const comps = g ? companiesOf(g.id) : [];
 
-      // 由左到右：待分配名单一栏，接着每个 Business 一栏
-      view.innerHTML = `<div class="-mx-4 flex gap-4 overflow-x-auto px-4 pb-4">
-        ${canAdd ? `<aside class="w-64 shrink-0 self-start sm:sticky sm:left-0">
-          <div class="${cls.card} p-3">
-            <p class="mb-2 text-xs font-bold tracking-wider text-amber-600 uppercase">${esc(tu2("pending"))}</p>
-            <input id="ug-q" type="search" value="${esc(query)}" placeholder="${esc(t("admin.users.search"))}" class="${cls.input} mb-2 h-9">
-            <div id="ug-left" class="max-h-[65vh] space-y-1.5 overflow-y-auto">
-              ${
-                leftList.length
-                  ? leftList.map((u) => chip(u, "")).join("")
-                  : `<p class="py-6 text-center text-sm text-slate-400">${esc(tu2("pendingEmpty"))}</p>`
-              }
-            </div>
+      view.innerHTML = `<div class="flex flex-col gap-4 lg:flex-row">
+        <aside class="w-full shrink-0 space-y-3 self-start lg:sticky lg:top-20 lg:w-64">
+          <div class="${cls.card} p-2">
+            <div class="flex flex-wrap gap-1 lg:flex-col">${
+              groups.length
+                ? groups.map((x) => `<button data-tab="${x.id}" class="truncate rounded-lg px-3 py-2 text-left text-sm font-medium ${x.id === activeGid ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}">${esc(x.name)}</button>`).join("")
+                : `<p class="px-3 py-2 text-sm text-slate-400">${esc(tu2("noBusiness"))}</p>`
+            }</div>
           </div>
-        </aside>` : ""}
-        ${
-          groups.length
-            ? groups
-                .map((g) => {
-                  const comps = companiesOf(g.id);
-                  const loose = membersIn(g.id, null);
-                  return `<section class="w-72 shrink-0 self-start">
-                    <div class="${cls.card} flex flex-col p-3">
-                      <div class="mb-3 truncate font-semibold">${esc(g.name)}</div>
-                      <div class="space-y-3">
-                        ${comps.map((c) => zone(g, c, membersIn(g.id, c.id))).join("")}
-                        ${zone(g, null, loose)}
-                        ${comps.length ? "" : `<p class="text-xs text-slate-400">${esc(tu2("noCompanies"))} <a href="#company" class="underline">${esc(t("admin.tabs.company"))}</a></p>`}
-                      </div>
-                    </div>
-                  </section>`;
-                })
-                .join("")
-            : `<div class="${cls.empty} flex-1">${esc(tu2("noBusiness"))} <a href="#business" class="font-medium underline">${esc(t("admin.sections.master"))} → ${esc(t("admin.tabs.business"))}</a></div>`
-        }
+          ${
+            canAdd
+              ? `<div class="${cls.card} p-3">
+                  <p class="mb-2 text-xs font-bold tracking-wider text-amber-600 uppercase">${esc(tu2("pending"))}</p>
+                  <input id="ug-q" type="search" value="${esc(query)}" placeholder="${esc(t("admin.users.search"))}" class="${cls.input} mb-2 h-9">
+                  <div id="ug-left" class="max-h-[45vh] space-y-1.5 overflow-y-auto">${
+                    leftList.length ? leftList.map((u) => chip(u, "")).join("") : `<p class="py-6 text-center text-sm text-slate-400">${esc(tu2("pendingEmpty"))}</p>`
+                  }</div>
+                </div>`
+              : ""
+          }
+        </aside>
+        <section class="${cls.card} min-w-0 flex-1 p-3">
+          ${
+            g
+              ? `<h3 class="mb-3 px-1 text-base font-bold">${esc(g.name)}</h3>
+                 <div id="ug-scroll" class="max-h-[72vh] overflow-auto rounded-xl">
+                   <div class="flex min-w-max items-start gap-3 pb-2">
+                     ${comps.map((c) => column(g, c, rowUsers)).join("")}${column(g, null, rowUsers)}
+                   </div>
+                 </div>
+                 ${comps.length ? "" : `<p class="mt-2 text-xs text-slate-400">${esc(tu2("noCompanies"))} <a href="#company" class="underline">${esc(t("admin.tabs.company"))}</a></p>`}`
+              : `<div class="${cls.empty}">${esc(tu2("noBusiness"))} <a href="#business" class="font-medium underline">${esc(t("admin.sections.master"))} → ${esc(t("admin.tabs.business"))}</a></div>`
+          }
+        </section>
       </div>`;
       refreshIcons();
 
-      // 拖拉：左边名单 → Company；Company 之间也可以拖（只限同一个 Business）；没有「加人」功能就只能看
+      // 拖拉：左边待分配的人 → 某个 Company 的一栏；Company 之间拖 = 也加进那个 Company（原来的还在）；没有「加人」功能就只能看
       if (!canAdd) return;
-      sortables.push(window.Sortable.create($("#ug-left"), { group: { name: "ug", pull: "clone", put: false }, sort: false, delay: 200, delayOnTouchOnly: true, filter: ".no-drag", animation: 150 }));
+      if ($("#ug-left"))
+        sortables.push(window.Sortable.create($("#ug-left"), { group: { name: "ug", pull: "clone", put: false }, sort: false, delay: 200, delayOnTouchOnly: true, filter: ".no-drag", animation: 150 }));
       $$(".gw-drop").forEach((el) =>
         sortables.push(
           window.Sortable.create(el, {
-            group: { name: "biz-" + el.dataset.drop, pull: true, put: ["ug", "biz-" + el.dataset.drop] },
+            group: { name: "ug", pull: "clone", put: true },
             sort: false,
             delay: 200,
             delayOnTouchOnly: true,
             animation: 150,
-            filter: ".no-drag",
+            filter: ".no-drag, .gw-spacer",
             onAdd: (evt) => {
               const uid = evt.item.dataset.user;
+              const fromCo = evt.from && evt.from.dataset ? evt.from.dataset.company || null : null;
               evt.item.remove();
-              place(el.dataset.drop, el.dataset.company || null, uid);
+              place(el.dataset.drop, el.dataset.company || null, uid, fromCo);
             },
           }),
         ),
       );
-      $("#ug-q").addEventListener("input", (e) => {
+      $("#ug-q")?.addEventListener("input", (e) => {
         query = e.target.value;
         const pos = e.target.selectionStart;
         draw();
@@ -854,22 +901,32 @@
       });
     }
 
-    // 放进某个 Business 的某个 Company：还不是成员就新增，已经是成员就换 Company
-    async function place(gid, cid, uid) {
+    // 放进某个 Business 的某个 Company：还不是 Business 成员就先加进 Business；拖到「Pending allocation」栏 = 从原来的 Company 拿掉
+    async function place(gid, cid, uid, fromCo) {
       const key = gid + ":" + uid;
       const g = groups.find((x) => x.id === gid);
       const c = companies.find((x) => x.id === cid);
-      const where = c ? g.name + " · " + c.name : g.name;
-      if (memberMap.has(key)) {
-        if ((memberMap.get(key) || null) === cid) return draw(), toast(tu2("alreadyMember"));
-        const { error } = await sb.from("gw_group_members").update({ company_id: cid }).eq("group_id", gid).eq("user_id", uid);
+      if (!cid && fromCo) return removeCompany(gid, uid, fromCo);
+      if (!memberSet.has(key)) {
+        const { error } = await sb.from("gw_group_members").insert({ group_id: gid, user_id: uid });
         if (error) return draw(), setMsg(tg("saveFailed"));
-      } else {
-        const { error } = await sb.from("gw_group_members").insert({ group_id: gid, user_id: uid, company_id: cid });
-        if (error) return draw(), setMsg(tg("saveFailed"));
+        memberSet.add(key);
       }
-      memberMap.set(key, cid);
-      toast(tu2("added", { name: userById.get(uid).email, group: where }));
+      if (cid) {
+        if (cosOf(gid, uid).has(cid)) return draw(), toast(tu2("alreadyMember"));
+        const { error } = await sb.from("gw_member_companies").insert({ group_id: gid, user_id: uid, company_id: cid });
+        if (error) return draw(), setMsg(tg("saveFailed"));
+        if (!coMap.has(key)) coMap.set(key, new Set());
+        coMap.get(key).add(cid);
+      }
+      toast(tu2("added", { name: userById.get(uid).email, group: c ? g.name + " · " + c.name : g.name }));
+      draw();
+    }
+    // 从某个 Company 拿掉（人还在 Business 里；一个 Company 都没有就回到「Pending allocation to company」）
+    async function removeCompany(gid, uid, cid) {
+      const { error } = await sb.from("gw_member_companies").delete().eq("group_id", gid).eq("user_id", uid).eq("company_id", cid);
+      if (error) return draw(), setMsg(tg("saveFailed"));
+      cosOf(gid, uid).delete(cid);
       draw();
     }
 
@@ -885,7 +942,7 @@
                 const opts = [...companiesOf(g.id).map((c) => [c.id, c.name]), ...(companiesOf(g.id).length ? [] : [["", tu2("noCompany")]])];
                 return `<div><p class="mb-1.5 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(g.name)}</p><div class="space-y-1.5">${opts
                   .map(([cid, label]) => {
-                    const here = memberMap.has(g.id + ":" + uid) && (memberMap.get(g.id + ":" + uid) || "") === cid;
+                    const here = cid ? cosOf(g.id, uid).has(cid) : memberSet.has(g.id + ":" + uid);
                     return `<button data-pick="${g.id}" data-company="${cid}" ${here ? "disabled" : ""} class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-left text-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"><span class="font-medium">${esc(label)}</span>${here ? icon("check", "size-4 text-emerald-600") : icon("plus", "size-4")}</button>`;
                   })
                   .join("")}</div></div>`;
@@ -904,15 +961,29 @@
       const b = e.target.closest("button, [data-user]");
       if (!b) return;
       const d = b.dataset;
-      if (d.info) return companyInfo(d.info, d.from || null);
-      if (d.out) {
-        const [gid, uid] = d.out.split(":");
-        const { error } = await sb.from("gw_group_members").delete().eq("group_id", gid).eq("user_id", uid);
-        if (error) return setMsg(tg("saveFailed"));
-        memberMap.delete(gid + ":" + uid);
+      if (d.tab) {
+        activeGid = d.tab;
+        try {
+          localStorage.setItem("gw_ug_business", activeGid);
+        } catch (err) {
+          /* 忽略 */
+        }
         return draw();
       }
-      // 左边名单点名字：选 Business / Company（手机不方便拖拉时用）；Business 里点名字：看他的资料和模块
+      if (d.info) return companyInfo(d.info, d.from || null);
+      if (d.out) {
+        const [gid, uid, cid] = d.out.split(":");
+        return removeCompany(gid, uid, cid);
+      }
+      if (d.outBiz) {
+        const [gid, uid] = d.outBiz.split(":");
+        const { error } = await sb.from("gw_group_members").delete().eq("group_id", gid).eq("user_id", uid);
+        if (error) return setMsg(tg("saveFailed"));
+        memberSet.delete(gid + ":" + uid);
+        coMap.delete(gid + ":" + uid);
+        return draw();
+      }
+      // 左边名单点名字：选 Business / Company（手机不方便拖拉时用）；Business 里点名字：看他的资料、所属 Company 和模块权限
       if (d.user && !e.target.closest(".no-drag")) return b.closest("#ug-left") ? (canAdd ? pick(d.user) : null) : userWindow(d.user, () => groupsTab());
     };
     draw();
@@ -1218,7 +1289,7 @@
       sb.from("gw_companies").select("*").eq("id", companyId).maybeSingle(),
       sb.from("gw_business_companies").select("group_id, area, area_unit").eq("company_id", companyId),
       sb.from("gw_groups").select("id, name, code").order("sort_order").order("name"),
-      sb.from("gw_group_members").select("group_id").eq("company_id", companyId),
+      sb.from("gw_member_companies").select("group_id").eq("company_id", companyId),
     ]);
     if (!c) return m.close();
     const gName = new Map((groups || []).map((g) => [g.id, g]));
@@ -1534,7 +1605,7 @@
             return !l || Number(l.area) !== Number(r.area) || (l.area == null) !== (r.area == null) || (l.area_unit || "ha") !== r.area_unit;
           });
         if (drop.length) {
-          const { count: n } = await sb.from("gw_group_members").select("user_id", { count: "exact", head: true }).eq("company_id", id).in("group_id", drop);
+          const { count: n } = await sb.from("gw_member_companies").select("user_id", { count: "exact", head: true }).eq("company_id", id).in("group_id", drop);
           if (n && !(await confirmDialog(tc("unlinkTitle"), tc("unlinkBody", { count: n }), tc("unlink"), tg("cancel")))) return fail({});
         }
         const [r1, r2] = await Promise.all([

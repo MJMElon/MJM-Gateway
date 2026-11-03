@@ -362,7 +362,8 @@ window.GW_LANG["en"] = {
       "noBusiness": "No businesses yet. Set them up in",
       "appsCount": "Apps: {count}",
       "apps": "Module access",
-      "pendingCompany": "Pending allocation to company"
+      "pendingCompany": "Pending allocation to company",
+      "removeFromCompany": "Remove from this company"
     },
     "title": "Admin",
     "pageTitle": "User Setting",
@@ -670,7 +671,8 @@ window.GW_LANG["en"] = {
       "noModules": "No modules yet.",
       "noBusiness": "Not in any business yet.",
       "noPermission": "You can see that this user has {name}, but your role cannot manage access inside it.",
-      "tickAccessFirst": "Tick Access first to set the other options."
+      "tickAccessFirst": "Tick Access first to set the other options.",
+      "noCompany": "No company yet"
     }
   },
   "diesel": {

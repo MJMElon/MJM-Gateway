@@ -24,10 +24,10 @@
   const sectionsOn = !secRes.error;
   // 旧版：第一次登录按群组自动排好预设版面
   if (firstVisit && !sectionsOn) await GW.sb.rpc("gw_init_layout");
-  const [{ data, error }, widgetRes, memberRes, linkRes, imgRes, itemRes, groupRes, gmodRes, bcoRes, coRes, mcoRes] = await Promise.all([
+  const [{ data, error }, widgetRes, memberRes, linkRes, imgRes, itemRes, groupRes, gmodRes, bcoRes, coRes, mcoRes, myCoRes] = await Promise.all([
     GW.sb.rpc("gw_get_home"),
     GW.sb.from("gw_user_widgets").select("*").order("sort_order"),
-    GW.sb.from("gw_group_members").select("group_id, company_id").eq("user_id", profile.id),
+    GW.sb.from("gw_group_members").select("group_id").eq("user_id", profile.id),
     GW.sb.from("gw_user_links").select("*").order("sort_order"),
     GW.sb.from("gw_modules").select("id, image_url"),
     sectionsOn ? GW.sb.from("gw_user_section_items").select("*").order("sort_order") : Promise.resolve({ data: [] }),
@@ -37,6 +37,7 @@
     sectionsOn ? GW.sb.from("gw_business_companies").select("group_id, company_id") : Promise.resolve({ data: [] }),
     sectionsOn ? GW.sb.from("gw_companies").select("id, name, code, short_name").eq("is_active", true).order("sort_order").order("name") : Promise.resolve({ data: [] }),
     sectionsOn ? GW.sb.from("gw_module_companies").select("module_id, company_id") : Promise.resolve({ data: [] }),
+    sectionsOn ? GW.sb.from("gw_member_companies").select("group_id, company_id").eq("user_id", profile.id) : Promise.resolve({ data: [] }),
   ]);
   if (error) return (main.innerHTML = GW.alertBox(t("errors.description")));
   // 模块照片
@@ -96,7 +97,12 @@
         bizCompanies: bcoRes.data || [],
         companies: coRes.data || [],
         moduleCompanies: mcoRes.data || [],
-        myCompany: Object.fromEntries((memberRes.data || []).filter((m) => m.company_id).map((m) => [m.group_id, m.company_id])),
+        // 在这个 Business 里只属于一个 Company 的人，预设选那个 Company；属于好几个就预设「全部」
+        myCompany: Object.fromEntries(
+          (myCoRes.data || [])
+            .filter((m, _i, all) => all.filter((y) => y.group_id === m.group_id).length === 1)
+            .map((m) => [m.group_id, m.company_id]),
+        ),
         items: itemRes.data || [],
         state: secRes.data || [],
       }

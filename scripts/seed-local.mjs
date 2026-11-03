@@ -127,6 +127,19 @@ await must(
     ].map(([g, c]) => ({ group_id: grp[g], company_id: co[c] })),
   ),
 );
+// 谁在哪个 Business 的哪些 Company（一个人可以在同一个 Business 的好几个 Company）
+await must(db.from("gw_member_companies").delete().not("group_id", "is", null).select("group_id"));
+await must(
+  db.from("gw_member_companies").insert(
+    [
+      ["全体员工", "driver@mjm.local", "MJMP"],
+      ["全体员工", "driver@mjm.local", "MJMA"],
+      ["全体员工", "admin.hq@mjm.local", "MJMP"],
+      ["全体员工", "ops@mjm.local", "MJMA"],
+      ["总部车队", "driver@mjm.local", "MJMP"],
+    ].map(([g, e, c]) => ({ group_id: grp[g], user_id: ids[e], company_id: co[c] })),
+  ),
+);
 // 每个 Business 有哪些 Icon（Business 标签）
 await must(
   db.from("gw_group_modules").upsert(
