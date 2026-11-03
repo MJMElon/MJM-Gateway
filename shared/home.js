@@ -105,11 +105,12 @@ window.GWHome = (function () {
     function rootItems() {
       const items = [];
       layout.forEach((l, id) => modules.has(id) && !l.folder_id && items.push({ kind: "app", id, slot: l.sort_order, w: 1, h: 1 }));
-      links.forEach((l) => items.push({ kind: "link", id: l.id, slot: l.sort_order, w: 1, h: 1 }));
+      links.filter((l) => !l.folder_id).forEach((l) => items.push({ kind: "link", id: l.id, slot: l.sort_order, w: 1, h: 1 }));
       folders.forEach((f) => items.push({ kind: "folder", id: f.id, slot: f.sort_order, w: 1, h: 1 }));
       widgets.filter((w) => !isPinned(w)).forEach((w) => items.push({ kind: "widget", id: w.id, slot: w.sort_order, w: SIZES[w.size][0], h: SIZES[w.size][1] }));
       return items.sort((a, b) => a.slot - b.slot || a.kind.localeCompare(b.kind));
     }
+    const folderLinks = (fid) => links.filter((l) => l.folder_id === fid).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     const folderApps = (fid) =>
       [...layout.entries()]
         .filter(([id, l]) => l.folder_id === fid && modules.has(id))
@@ -198,6 +199,21 @@ window.GWHome = (function () {
       if (error) toast(t("home.saveFailed"));
     }
 
+    async function moveLinkToFolder(id, fid) {
+      const l = links.find((x) => x.id === id);
+      if (!l) return;
+      const order = fid ? folderLinks(fid).length + 1 : nextSlot(1, 1);
+      l.folder_id = fid;
+      l.sort_order = order;
+      draw();
+      const { error } = await sb.from("gw_user_links").update({ folder_id: fid, sort_order: order }).eq("id", id);
+      if (error) {
+        l.folder_id = null;
+        draw();
+        toast(t("home.saveFailed"));
+      }
+    }
+
     async function moveIntoFolder(id, fid) {
       const order = folderApps(fid).length + 1;
       layout.set(id, { folder_id: fid, sort_order: order });
@@ -276,7 +292,10 @@ window.GWHome = (function () {
 
     function folderTile(f) {
       const ids = folderApps(f.id);
-      const minis = ids.slice(0, 9).map((id) => `<span class="aspect-square rounded-[28%] bg-gradient-to-br ${tileColor(modules.get(id).code, id)}"></span>`).join("");
+      const minis = [
+        ...ids.map((id) => `<span class="aspect-square rounded-[28%] bg-gradient-to-br ${tileColor(modules.get(id).code, id)}"></span>`),
+        ...folderLinks(f.id).map((l) => `<span class="aspect-square rounded-[28%] bg-gradient-to-br ${tileColor(l.name)}"></span>`),
+      ].slice(0, 9).join("");
       return `<div data-kind="folder" data-id="${f.id}" class="gw-item relative flex flex-col items-center gap-1.5 pt-1">
         <button type="button" data-folder="${f.id}" class="flex flex-col items-center gap-1.5">
           <span class="grid size-14 grid-cols-3 grid-rows-3 content-start gap-1 gw-icon rounded-[26%] border border-white/60 bg-white/50 p-2 backdrop-blur-xl sm:size-16 dark:border-white/10 dark:bg-white/10">${minis}</span>
@@ -893,7 +912,7 @@ window.GWHome = (function () {
         const key = [...hits][0];
         const [kind, id] = key.split(":");
         const p = P.pos.get(key);
-        if (kind === "folder" && (drag.kind === "app" || drag.kind === "lib")) action = { type: "folder", fid: id };
+        if (kind === "folder" && (drag.kind === "app" || drag.kind === "lib" || drag.kind === "link")) action = { type: "folder", fid: id };
         else if (drag.w === 1 && drag.h === 1 && p.w === 1 && p.h === 1 && drag.kind !== "lib") action = { type: "swap", kind, id, theirSlot: p.slot, mySlot: drag.slot };
       }
       return { c, r, g, action };
@@ -969,7 +988,7 @@ window.GWHome = (function () {
         draw();
         return saving;
       }
-      if (a.type === "folder") return moveIntoFolder(d.id, a.fid);
+      if (a.type === "folder") return d.kind === "link" ? moveLinkToFolder(d.id, a.fid) : moveIntoFolder(d.id, a.fid);
       if (a.type === "swap") {
         const saving = Promise.all([saveSlot(d.kind, d.id, a.theirSlot), saveSlot(a.kind, a.id, a.mySlot)]);
         draw();
@@ -1124,6 +1143,7 @@ window.GWHome = (function () {
     function openFolder(fid) {
       const f = folders.find((x) => x.id === fid);
       const ids = folderApps(fid);
+      const lks = folderLinks(fid);
       const wrap = document.createElement("div");
       wrap.setAttribute("role", "dialog");
       wrap.className = "fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/40 p-6 backdrop-blur-md";
@@ -1131,12 +1151,19 @@ window.GWHome = (function () {
         <h2 class="mb-5 max-w-full truncate px-4 text-3xl font-bold text-white drop-shadow sm:text-4xl">${esc(f.name)}</h2>
         <div data-win class="w-full max-w-md rounded-[2rem] border border-white/60 bg-white/75 p-6 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/75">
           ${
-            ids.length
+            ids.length || lks.length
               ? `<div class="grid grid-cols-3 gap-5 sm:grid-cols-4">${ids
                   .map(
                     (id) => `<div class="relative flex flex-col items-center gap-1.5">
                       <button type="button" data-open="${id}" class="flex flex-col items-center gap-1.5">${appIcon(modules.get(id), "size-14 sm:size-16")}<span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(modules.get(id).name)}</span></button>
                       ${readOnly ? "" : `<button type="button" data-out="${id}" title="${esc(t("fab.moveOut"))}" aria-label="${esc(t("fab.moveOut"))}" class="absolute -top-1 right-1 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon("arrow-up-right", "size-3.5")}</button>`}
+                    </div>`,
+                  )
+                  .join("")}${lks
+                  .map(
+                    (l) => `<div class="relative flex flex-col items-center gap-1.5">
+                      <button type="button" data-open-link="${l.id}" title="${esc(l.url)}" class="flex flex-col items-center gap-1.5">${appIcon({ code: l.name, icon: l.icon, image_url: l.image_url }, "size-14 sm:size-16")}<span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(l.name)}</span></button>
+                      ${readOnly ? "" : `<button type="button" data-out-link="${l.id}" title="${esc(t("fab.moveOut"))}" aria-label="${esc(t("fab.moveOut"))}" class="absolute -top-1 right-1 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon("arrow-up-right", "size-3.5")}</button>`}
                     </div>`,
                   )
                   .join("")}</div>`
@@ -1156,6 +1183,15 @@ window.GWHome = (function () {
           return;
         }
         if (b.dataset.open) return close(), open(b.dataset.open);
+        if (b.dataset.openLink) {
+          const l = links.find((x) => x.id === b.dataset.openLink);
+          return l && window.open(l.url, "_blank", "noopener,noreferrer");
+        }
+        if (b.dataset.outLink) {
+          close();
+          await moveLinkToFolder(b.dataset.outLink, null);
+          return openFolder(fid);
+        }
         if (b.dataset.out) {
           const id = b.dataset.out;
           const slot = nextSlot(1, 1);
@@ -1333,13 +1369,19 @@ window.GWHome = (function () {
       if (!ok) return;
       // 文件夹里的 App 回到主画面的空格
       const ids = folderApps(fid);
+      const lks = folderLinks(fid);
       folders = folders.filter((x) => x.id !== fid);
+      lks.forEach((l) => {
+        l.folder_id = null;
+        l.sort_order = nextSlot(1, 1);
+      });
       const moved = ids.map((id) => {
         const slot = nextSlot(1, 1);
         layout.set(id, { folder_id: null, sort_order: slot });
         return { module_id: id, folder_id: null, sort_order: slot };
       });
       draw();
+      await Promise.all(lks.map((l) => sb.from("gw_user_links").update({ folder_id: null, sort_order: l.sort_order }).eq("id", l.id)));
       const { error } = await sb.from("gw_user_folders").delete().eq("id", fid);
       if (error) return toast(t("home.saveFailed"));
       await saveApps(moved);
