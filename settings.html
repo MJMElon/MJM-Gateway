@@ -74,6 +74,9 @@
     if (!ok) return;
     // 小工具先在前端清掉（RLS 只允许删自己的），旧版 gw_reset_layout 不会删小工具
     await sb.from("gw_user_widgets").delete().eq("user_id", profile.id);
+    // 主页区块：App 的顺序、文件夹、便条、展开状态（资料表还没建立时这两行只会返回错误，不影响）
+    await sb.from("gw_user_section_items").delete().eq("user_id", profile.id);
+    await sb.from("gw_user_sections").delete().eq("user_id", profile.id);
     await sb.rpc("gw_reset_layout");
     try {
       localStorage.removeItem("gw_home_filled_" + profile.id);

@@ -362,7 +362,7 @@ window.GWHome = (function () {
       if (!w) return "";
       return `<div data-kind="widget" data-id="${w.id}" class="gw-pinned relative mb-4 ${w.size === "large" ? "h-[22rem]" : "h-[13rem]"}">
         <div class="${glass}">${widgetBody(w)}</div>
-        ${editing ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
+        ${editing || sectionsOn ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
       </div>`;
     }
 
@@ -438,6 +438,342 @@ window.GWHome = (function () {
 
     // ------------------------------------------------------------ 整页
 
+    // ------------------------------------------------------------ Business 区块（Section box）
+    /* 主页 = 上面固定的 Notice Board，下面每个 Business 一个区块：里面是这个人在这个 Business 里有权限的 App。
+       区块默认只显示一行，右下角按钮展开 / 收起；里面的 App 可以拖拉排顺序（只记在自己的主页）；
+       区块里可以建文件夹、放便条（以后会有更多小工具）。最后还有一个「My Links」区块放自己加的网址图示。 */
+    const S = opts && opts.sections ? opts.sections : null;
+    const sectionsOn = !!S && !readOnly;
+    let sItems = S ? S.items.map((x) => ({ ...x })) : [];
+    const expanded = new Map(S ? S.state.map((x) => [x.group_id, !!x.expanded]) : []);
+    let personalOpen = false;
+    try {
+      personalOpen = localStorage.getItem("gw_personal_open_" + profile.id) === "1";
+    } catch (e) {
+      /* 忽略 */
+    }
+    let menuGid = null; // 打开着「+」选单的区块
+    let sortables = [];
+    const bySort = (a, b) => (a.sort_order || 0) - (b.sort_order || 0);
+    const modsOfGroup = (gid) => {
+      const ids = new Set(S.groupModules.filter((x) => x.group_id === gid).map((x) => x.module_id));
+      return data.modules.filter((m) => ids.has(m.id));
+    };
+    // 区块最上层的东西：有记录的按记录排；还没记录的 App 按默认顺序补在后面
+    function boxItems(gid) {
+      const mods = new Map(modsOfGroup(gid).map((m) => [m.id, m]));
+      const own = sItems.filter((x) => x.group_id === gid && !x.parent_id && (x.kind !== "module" || mods.has(x.module_id))).sort(bySort);
+      const have = new Set(sItems.filter((x) => x.group_id === gid && x.kind === "module").map((x) => x.module_id));
+      let n = own.length ? own[own.length - 1].sort_order : 0;
+      const extra = [...mods.values()].filter((m) => !have.has(m.id)).map((m) => ({ id: "new:" + m.id, virtual: true, group_id: gid, kind: "module", module_id: m.id, parent_id: null, sort_order: ++n }));
+      return [...own, ...extra];
+    }
+    const folderKids = (fid) => sItems.filter((x) => x.parent_id === fid && modules.has(x.module_id)).sort(bySort);
+
+    const TILE_H = "h-[6.25rem]";
+    const sTile = (it) => {
+      const base = `data-key="${it.id}" class="gw-item ${TILE_H} w-24 shrink-0`;
+      if (it.kind === "module") {
+        const m = modules.get(it.module_id);
+        return `<div ${base} relative flex flex-col items-center gap-1.5 pt-1" data-kind="module">
+          <button type="button" data-open="${m.id}" class="flex flex-col items-center gap-1.5" title="${esc(m.description || m.name)}">
+            ${appIcon(m)}
+            <span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(m.name)}</span>
+          </button></div>`;
+      }
+      if (it.kind === "folder") {
+        const kids = folderKids(it.id);
+        const minis = kids.slice(0, 9).map((k) => `<span class="aspect-square rounded-[28%] bg-gradient-to-br ${tileColor(modules.get(k.module_id).code)}"></span>`).join("");
+        return `<div ${base} relative flex flex-col items-center gap-1.5 pt-1" data-kind="folder">
+          <button type="button" data-open-folder="${it.id}" class="flex flex-col items-center gap-1.5">
+            <span class="grid size-14 grid-cols-3 grid-rows-3 content-start gap-1 rounded-[26%] border border-white/60 bg-white/55 p-2 shadow-md shadow-slate-900/10 backdrop-blur sm:size-16 dark:border-white/10 dark:bg-white/10">${minis}</span>
+            <span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(it.name || "")}</span>
+          </button></div>`;
+      }
+      // 便条
+      return `<div data-key="${it.id}" data-kind="note" class="gw-item ${TILE_H} w-52 shrink-0 pt-1">
+        <button type="button" data-open-note="${it.id}" class="flex h-[5.75rem] w-full flex-col items-start overflow-hidden rounded-2xl bg-amber-100 p-3 text-left text-amber-950 shadow-md shadow-slate-900/10 dark:bg-amber-200/90">
+          <span class="flex w-full items-center gap-1.5 text-xs font-semibold">${icon("sticky-note", "size-3.5")}<span class="truncate">${esc(it.name || t("home.noteDefault"))}</span></span>
+          <span class="mt-1 line-clamp-3 w-full text-xs whitespace-pre-line break-words">${esc(it.body || "")}</span>
+        </button></div>`;
+    };
+    const linkSTile = (l) => `<div data-key="${l.id}" data-kind="link" class="gw-item group ${TILE_H} w-24 shrink-0 relative flex flex-col items-center gap-1.5 pt-1">
+        <button type="button" data-open-link="${l.id}" class="flex flex-col items-center gap-1.5" title="${esc(l.url)}">
+          ${appIcon({ code: l.name, icon: l.icon, image_url: l.image_url })}
+          <span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(l.name)}</span>
+        </button>
+        <span class="no-drag absolute top-0 right-0 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+          <button type="button" data-edit-link="${l.id}" aria-label="${esc(t("home.editLink"))}" class="flex size-5 items-center justify-center rounded-full bg-slate-700/90 text-white">${icon("pencil", "size-3")}</button>
+          <button type="button" data-remove-link="${l.id}" aria-label="${esc(t("home.removeFromHome"))}" class="flex size-5 items-center justify-center rounded-full bg-slate-700/90 text-white">${icon("x", "size-3")}</button>
+        </span></div>`;
+
+    function boxShell({ key, title, open, tiles, menu, extraHeader }) {
+      return `<section data-box="${key}" class="${glass} h-auto! overflow-visible! pb-3">
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2>
+          <div class="relative flex items-center gap-1">${extraHeader || ""}${menu || ""}</div>
+        </div>
+        <div data-list="${key}" class="flex flex-wrap content-start gap-x-1 gap-y-1 ${open ? "" : "max-h-[6.25rem] overflow-hidden"}">${tiles}</div>
+        <button type="button" data-expand="${key}" aria-label="${esc(t(open ? "home.collapse" : "home.expand"))}" title="${esc(t(open ? "home.collapse" : "home.expand"))}" class="hidden absolute right-3 bottom-2 z-10 items-center justify-center rounded-full bg-slate-700/90 p-1 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon(open ? "chevrons-up" : "chevrons-down", "size-4")}</button>
+      </section>`;
+    }
+    const addMenu = (gid) => `<button type="button" data-sec-menu="${gid}" aria-label="${esc(t("home.addToBox"))}" title="${esc(t("home.addToBox"))}" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">${icon("plus", "size-4")}</button>
+      ${
+        menuGid === gid
+          ? `<div class="absolute top-full right-0 z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-1.5 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              <button type="button" data-sec-add="folder" data-gid="${gid}" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">${icon("folder-plus", "size-4")}${esc(t("home.newFolder"))}</button>
+              <button type="button" data-sec-add="note" data-gid="${gid}" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">${icon("sticky-note", "size-4")}${esc(t("home.newNote"))}</button>
+              <p class="mt-1 border-t border-slate-100 px-2.5 py-2 text-xs text-slate-400 dark:border-slate-800">${esc(t("home.moreWidgets"))}</p>
+            </div>`
+          : ""
+      }`;
+
+    function drawSections() {
+      sortables.forEach((x) => x.destroy());
+      sortables = [];
+      const boxes = S.groups
+        .map((g) => ({ g, mods: modsOfGroup(g.id) }))
+        .filter(({ g, mods }) => mods.length || sItems.some((x) => x.group_id === g.id))
+        .map(({ g }) => boxShell({ key: g.id, title: g.name, open: !!expanded.get(g.id), tiles: boxItems(g.id).map(sTile).join(""), menu: addMenu(g.id) }))
+        .join("");
+      const personal = boxShell({
+        key: "personal",
+        title: t("home.myLinks"),
+        open: personalOpen,
+        tiles:
+          links.map(linkSTile).join("") +
+          `<div class="${TILE_H} w-24 shrink-0 pt-1"><button type="button" data-new-link class="flex flex-col items-center gap-1.5"><span class="flex size-14 items-center justify-center rounded-[26%] border-2 border-dashed border-slate-300 text-slate-400 sm:size-16 dark:border-slate-600">${icon("plus", "size-6")}</span><span class="w-20 truncate text-center text-xs text-slate-500">${esc(t("home.addIcon"))}</span></button></div>`,
+      });
+      root.innerHTML = `${boardHtml()}
+        <div class="space-y-4">${boxes || `<div class="${cls.empty} bg-white/60 dark:bg-slate-900/40">${esc(t("home.noModules"))}</div>`}${personal}</div>`;
+      refreshIcons();
+      measureBoxes();
+      $$("[data-list]", root).forEach((list) => {
+        const key = list.dataset.list;
+        sortables.push(
+          window.Sortable.create(list, {
+            animation: 150,
+            delay: 180,
+            delayOnTouchOnly: true,
+            draggable: ".gw-item",
+            filter: "[data-new-link]",
+            preventOnFilter: false,
+            onEnd: () => {
+              lastDragEnd = Date.now();
+              const keys = $$(".gw-item[data-key]", list).map((el) => el.dataset.key);
+              if (key === "personal") return saveLinkOrder(keys);
+              saveBoxOrder(key, keys);
+            },
+          }),
+        );
+      });
+    }
+    // 只有内容超过一行才显示展开按钮（展开着的一定显示，才能收起）
+    function measureBoxes() {
+      $$("[data-box]", root).forEach((box) => {
+        const list = $("[data-list]", box);
+        const btn = $("[data-expand]", box);
+        const open = !list.classList.contains("max-h-[6.25rem]");
+        const need = open || list.scrollHeight > list.clientHeight + 4;
+        btn.classList.toggle("hidden", !need);
+        btn.classList.toggle("flex", need);
+      });
+    }
+    addEventListener("resize", () => sectionsOn && measureBoxes());
+
+    async function saveBoxOrder(gid, keys, parentId) {
+      const rows = [];
+      const updates = [];
+      keys.forEach((key, i) => {
+        if (key.startsWith("new:")) rows.push({ user_id: data.profile.id, group_id: gid, kind: "module", module_id: key.slice(4), parent_id: parentId || null, sort_order: i });
+        else {
+          const it = sItems.find((x) => x.id === key);
+          if (it && it.sort_order !== i) {
+            it.sort_order = i;
+            updates.push([key, i]);
+          }
+        }
+      });
+      if (rows.length) {
+        const { data: created, error } = await sb.from("gw_user_section_items").insert(rows).select();
+        if (error) toast(t("home.saveFailed"));
+        else sItems.push(...created);
+      }
+      await Promise.all(updates.map(([id, i]) => sb.from("gw_user_section_items").update({ sort_order: i }).eq("id", id)));
+    }
+    async function saveLinkOrder(keys) {
+      keys.forEach((id, i) => {
+        const l = links.find((x) => x.id === id);
+        if (l) l.sort_order = i;
+      });
+      await Promise.all(keys.map((id, i) => sb.from("gw_user_links").update({ sort_order: i }).eq("id", id)));
+    }
+    async function toggleBox(key) {
+      if (key === "personal") {
+        personalOpen = !personalOpen;
+        try {
+          localStorage.setItem("gw_personal_open_" + profile.id, personalOpen ? "1" : "0");
+        } catch (e) {
+          /* 忽略 */
+        }
+        return drawSections();
+      }
+      const open = !expanded.get(key);
+      expanded.set(key, open);
+      drawSections();
+      await sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: key, expanded: open });
+    }
+
+    // 区块里新增文件夹 / 便条（放在最后面）
+    async function addBoxItem(gid, kind) {
+      const keys = boxItems(gid).map((x) => x.id);
+      await saveBoxOrder(gid, keys); // 先把现有顺序记下来，新的才会排在最后
+      const last = Math.max(-1, ...sItems.filter((x) => x.group_id === gid && !x.parent_id).map((x) => x.sort_order));
+      if (kind === "folder") return itemDialog(null, gid, "folder", last + 1);
+      return itemDialog(null, gid, "note", last + 1);
+    }
+    // 文件夹名称 / 便条内容
+    function itemDialog(item, gid, kind, order) {
+      const isNote = kind === "note";
+      const dlg = modal(
+        item ? t(isNote ? "home.editNote" : "home.editFolder") : t(isNote ? "home.newNote" : "home.newFolder"),
+        `<form class="space-y-4">
+          <input name="name" maxlength="40" ${isNote ? "" : "required"} value="${esc(item ? item.name || "" : "")}" placeholder="${esc(t(isNote ? "home.noteTitle" : "home.folderName"))}" class="${cls.input}">
+          ${isNote ? `<textarea name="body" rows="6" maxlength="2000" placeholder="${esc(t("home.noteBody"))}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900">${esc(item ? item.body || "" : "")}</textarea>` : ""}
+          <div class="flex justify-between gap-2">
+            ${item ? `<button type="button" data-del class="${btn("ghost")} text-red-600 dark:text-red-400">${icon("trash-2", "size-4")} ${esc(t("home.delete"))}</button>` : "<span></span>"}
+            <div class="flex gap-2"><button type="button" data-cancel class="${btn("secondary")}">${esc(t("home.cancel"))}</button><button type="submit" class="${btn("primary")}">${esc(t("home.save"))}</button></div>
+          </div>
+        </form>`,
+      );
+      refreshIcons();
+      $("[data-cancel]", dlg.el).onclick = dlg.close;
+      $("[name=name]", dlg.el).focus();
+      if (item)
+        $("[data-del]", dlg.el).onclick = async () => {
+          if (!isNote) {
+            if (!(await confirmDialog(t("home.deleteFolderTitle"), t("home.deleteFolderBody", { name: item.name }), t("home.delete"), t("home.cancel")))) return;
+            // 文件夹里的 App 回到区块里
+            sItems.filter((x) => x.parent_id === item.id).forEach((x) => (x.parent_id = null));
+            await sb.from("gw_user_section_items").update({ parent_id: null }).eq("parent_id", item.id);
+          }
+          sItems = sItems.filter((x) => x.id !== item.id);
+          dlg.close();
+          drawSections();
+          const { error } = await sb.from("gw_user_section_items").delete().eq("id", item.id);
+          if (error) toast(t("home.saveFailed"));
+        };
+      $("form", dlg.el).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const fields = { name: f.name.value.trim() || null, body: isNote ? f.body.value : null };
+        if (item) {
+          const { error } = await sb.from("gw_user_section_items").update(fields).eq("id", item.id);
+          if (error) return toast(t("home.saveFailed"));
+          Object.assign(item, fields);
+        } else {
+          const { data: created, error } = await sb.from("gw_user_section_items").insert({ ...fields, user_id: data.profile.id, group_id: gid, kind, sort_order: order }).select().single();
+          if (error) return toast(t("home.saveFailed"));
+          sItems.push(created);
+        }
+        dlg.close();
+        drawSections();
+      });
+    }
+
+    // 文件夹：放大成浮动窗，名字在上面；可以加 App 进来、拿出去、改名、删除
+    function openBoxFolder(fid) {
+      const f = sItems.find((x) => x.id === fid);
+      if (!f) return;
+      const kids = folderKids(fid);
+      const wrap = document.createElement("div");
+      wrap.setAttribute("role", "dialog");
+      wrap.className = "fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/40 p-6 backdrop-blur-md";
+      wrap.innerHTML = `
+        <h2 class="mb-5 max-w-full truncate px-4 text-3xl font-bold text-white drop-shadow sm:text-4xl">${esc(f.name || "")}</h2>
+        <div data-win class="w-full max-w-md rounded-[2rem] border border-white/60 bg-white/75 p-6 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/75">
+          ${
+            kids.length
+              ? `<div class="grid grid-cols-3 gap-5 sm:grid-cols-4">${kids
+                  .map(
+                    (k) => `<div class="relative flex flex-col items-center gap-1.5">
+                      <button type="button" data-open="${k.module_id}" class="flex flex-col items-center gap-1.5">${appIcon(modules.get(k.module_id), "size-14 sm:size-16")}<span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(modules.get(k.module_id).name)}</span></button>
+                      <button type="button" data-out="${k.id}" title="${esc(t("fab.moveOut"))}" aria-label="${esc(t("fab.moveOut"))}" class="absolute -top-1 right-1 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon("arrow-up-right", "size-3.5")}</button>
+                    </div>`,
+                  )
+                  .join("")}</div>`
+              : `<p class="py-6 text-center text-sm text-slate-500">${esc(t("fab.emptyFolder"))}</p>`
+          }
+        </div>
+        <div class="mt-4 flex gap-2">
+          <button type="button" data-fadd class="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow backdrop-blur dark:bg-slate-800/80 dark:text-slate-200">${icon("plus", "size-4")} ${esc(t("home.addApps"))}</button>
+          <button type="button" data-frename class="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow backdrop-blur dark:bg-slate-800/80 dark:text-slate-200">${icon("pencil", "size-4")} ${esc(t("home.editFolder"))}</button>
+        </div>`;
+      document.body.appendChild(wrap);
+      refreshIcons();
+      const close = () => wrap.remove();
+      const onKey = (e) => e.key === "Escape" && (close(), document.removeEventListener("keydown", onKey));
+      document.addEventListener("keydown", onKey);
+      wrap.addEventListener("click", async (e) => {
+        const b = e.target.closest("button");
+        if (!b) {
+          if (!e.target.closest("[data-win]")) close();
+          return;
+        }
+        if (b.dataset.open) return close(), open(b.dataset.open);
+        if (b.dataset.out) {
+          const it = sItems.find((x) => x.id === b.dataset.out);
+          it.parent_id = null;
+          it.sort_order = Math.max(-1, ...sItems.filter((x) => x.group_id === f.group_id && !x.parent_id).map((x) => x.sort_order)) + 1;
+          close();
+          drawSections();
+          await sb.from("gw_user_section_items").update({ parent_id: null, sort_order: it.sort_order }).eq("id", it.id);
+          return openBoxFolder(fid);
+        }
+        if ("frename" in b.dataset) return close(), itemDialog(f, f.group_id, "folder");
+        if ("fadd" in b.dataset) return close(), folderAddDialog(f);
+      });
+    }
+    // 把区块里还没放进文件夹的 App 勾选放进来
+    function folderAddDialog(f) {
+      const loose = boxItems(f.group_id).filter((x) => x.kind === "module");
+      const dlg = modal(
+        t("home.addApps"),
+        loose.length
+          ? `<form class="space-y-4"><div class="space-y-1.5">${loose.map((x) => `<label class="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-800"><input type="checkbox" name="pick" value="${x.id}" class="size-4 accent-emerald-600">${appIcon(modules.get(x.module_id), "size-8")}<span class="truncate">${esc(modules.get(x.module_id).name)}</span></label>`).join("")}</div>
+            <div class="flex justify-end gap-2"><button type="button" data-cancel class="${btn("secondary")}">${esc(t("home.cancel"))}</button><button type="submit" class="${btn("primary")}">${esc(t("home.save"))}</button></div></form>`
+          : `<p class="text-sm text-slate-500">${esc(t("home.noLooseApps"))}</p>`,
+      );
+      refreshIcons();
+      const cancel = $("[data-cancel]", dlg.el);
+      if (cancel) cancel.onclick = dlg.close;
+      const form = $("form", dlg.el);
+      if (form)
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const picked = $$("[name=pick]:checked", form).map((x) => x.value);
+          dlg.close();
+          let n = folderKids(f.id).length;
+          const rows = [];
+          for (const key of picked) {
+            if (key.startsWith("new:")) rows.push({ user_id: data.profile.id, group_id: f.group_id, kind: "module", module_id: key.slice(4), parent_id: f.id, sort_order: n++ });
+            else {
+              const it = sItems.find((x) => x.id === key);
+              it.parent_id = f.id;
+              it.sort_order = n++;
+              await sb.from("gw_user_section_items").update({ parent_id: f.id, sort_order: it.sort_order }).eq("id", it.id);
+            }
+          }
+          if (rows.length) {
+            const { data: created, error } = await sb.from("gw_user_section_items").insert(rows).select();
+            if (error) toast(t("home.saveFailed"));
+            else sItems.push(...created);
+          }
+          drawSections();
+          openBoxFolder(f.id);
+        });
+    }
+
     function draw() {
       clearInterval(clockTimer);
       // 还没被分配到任何群组：主画面什么都不显示，只显示等待分配
@@ -450,6 +786,7 @@ window.GWHome = (function () {
         </div>`;
         return refreshIcons();
       }
+      if (sectionsOn) return drawSections();
       const P = positions();
       const items = rootItems();
       // 棋盘下面多留两行空位，可以把东西拖到更下面
@@ -891,7 +1228,10 @@ window.GWHome = (function () {
       if (readOnly || editing || Date.now() - lastDragEnd < 300) return;
       const m = modules.get(id);
       data.recent = [id, ...data.recent.filter((x) => x !== id)].slice(0, 5);
-      if (m.is_new) m.is_new = false;
+      if (m.is_new) {
+        m.is_new = false;
+        if (sectionsOn) sb.rpc("gw_mark_seen", { p_modules: [id] });
+      }
       const ok = await openModule(m);
       if (!ok) toast(t("home.openFailed"));
     }
@@ -902,10 +1242,20 @@ window.GWHome = (function () {
       if (Date.now() - lastDragEnd < 400) return; // 刚拖完，不算点击
       const b = e.target.closest("button");
       if (!b || !root.contains(b)) {
+        if (sectionsOn && menuGid) return ((menuGid = null), drawSections());
         if (fabOpen && !e.target.closest("[data-fab-toggle]")) ((fabOpen = false), draw());
         return;
       }
       const d = b.dataset;
+      if (sectionsOn) {
+        if (menuGid && !("secMenu" in d)) menuGid = null;
+        if ("secMenu" in d) return ((menuGid = menuGid === d.secMenu ? null : d.secMenu), drawSections());
+        if (d.secAdd) return ((menuGid = null), drawSections(), addBoxItem(d.gid, d.secAdd));
+        if (d.expand) return toggleBox(d.expand);
+        if (d.openFolder) return openBoxFolder(d.openFolder);
+        if (d.openNote) return itemDialog(sItems.find((x) => x.id === d.openNote), null, "note");
+        if ("newLink" in d) return linkDialog(null);
+      }
       if (d.open) return open(d.open);
       if (d.openLink) {
         if (editing || Date.now() - lastDragEnd < 300) return;

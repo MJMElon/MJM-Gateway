@@ -19,14 +19,20 @@
   const main = GW.shell(profile, "home");
   main.innerHTML = GW.spinner();
   const firstVisit = !profile.layout_initialized;
-  // 第一次登录：按群组自动排好预设版面
-  if (firstVisit) await GW.sb.rpc("gw_init_layout");
-  const [{ data, error }, widgetRes, memberRes, linkRes, imgRes] = await Promise.all([
+  // 主页按 Business 分区块（资料表还没建立时退回旧的棋盘版面）
+  const secRes = await GW.sb.from("gw_user_sections").select("group_id, expanded");
+  const sectionsOn = !secRes.error;
+  // 旧版：第一次登录按群组自动排好预设版面
+  if (firstVisit && !sectionsOn) await GW.sb.rpc("gw_init_layout");
+  const [{ data, error }, widgetRes, memberRes, linkRes, imgRes, itemRes, groupRes, gmodRes] = await Promise.all([
     GW.sb.rpc("gw_get_home"),
     GW.sb.from("gw_user_widgets").select("*").order("sort_order"),
     GW.sb.from("gw_group_members").select("group_id").eq("user_id", profile.id),
     GW.sb.from("gw_user_links").select("*").order("sort_order"),
     GW.sb.from("gw_modules").select("id, image_url"),
+    sectionsOn ? GW.sb.from("gw_user_section_items").select("*").order("sort_order") : Promise.resolve({ data: [] }),
+    sectionsOn ? GW.sb.from("gw_groups").select("id, name, sort_order").order("sort_order").order("name") : Promise.resolve({ data: [] }),
+    sectionsOn ? GW.sb.from("gw_group_modules").select("group_id, module_id") : Promise.resolve({ data: [] }),
   ]);
   if (error) return (main.innerHTML = GW.alertBox(t("errors.description")));
   // 模块照片
@@ -68,7 +74,7 @@
   // 新开给他的 App（还没看过、也不在主画面上）：自动放到主画面最后面
   const placed = new Set(data.layout.map((l) => l.module_id));
   const fresh = data.modules.filter((m) => m.is_new && !placed.has(m.id));
-  if (!pending && fresh.length) {
+  if (!pending && !sectionsOn && fresh.length) {
     const start = Math.max(0, ...data.layout.map((l) => l.sort_order));
     const items = fresh.map((m, i) => ({ module_id: m.id, folder_id: null, sort_order: start + i + 1, card_size: "large" }));
     const { error: fillError } = await GW.sb.rpc("gw_save_layout", { p_items: items });
@@ -78,7 +84,16 @@
     }
   }
   main.innerHTML = '<div id="board" class="mx-auto max-w-5xl"></div>';
-  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending, memberOf, links });
+  const memberSet = new Set(memberOf);
+  const sections = sectionsOn
+    ? {
+        groups: (groupRes.data || []).filter((g) => memberSet.has(g.id)),
+        groupModules: gmodRes.data || [],
+        items: itemRes.data || [],
+        state: secRes.data || [],
+      }
+    : null;
+  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending, memberOf, links, sections });
 })();
 </script>
 </body>
