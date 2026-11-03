@@ -156,7 +156,7 @@ window.GW = (function () {
     const isAdmin = profile.manages;
     const header = document.createElement("div");
     header.innerHTML = `
-      <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+      <header class="sticky top-0 z-30 border-b border-white/50 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-slate-950/55">
         <div class="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
           <a href="${BASE}index.html" class="text-lg font-bold tracking-tight whitespace-nowrap">${esc(t("app.name"))}</a>
           <div class="ml-auto flex items-center gap-3">

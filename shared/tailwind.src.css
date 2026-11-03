@@ -21,8 +21,28 @@
 .sortable-chosen { box-shadow: 0 10px 25px rgba(0,0,0,.15); }
 body.gw-dragging .gw-folder-body { display: block !important; min-height: 3rem; }
 /* 主画面背景 */
-body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #e0ecff 0%, transparent 60%), radial-gradient(900px 500px at 100% 0%, #eef2f7 0%, transparent 55%), #f6f8fb; background-attachment: fixed; }
-.dark body.gw-wallpaper { background: radial-gradient(1200px 600px at 15% -10%, #12233f 0%, transparent 60%), #020617; }
+body.gw-wallpaper {
+  background:
+    radial-gradient(900px 520px at 8% -8%, #bfd8ff 0%, transparent 62%),
+    radial-gradient(800px 520px at 100% 6%, #d9ccff 0%, transparent 60%),
+    radial-gradient(900px 600px at 70% 105%, #b8f0dc 0%, transparent 62%),
+    radial-gradient(700px 500px at -5% 90%, #ffd6e7 0%, transparent 60%),
+    #eef3fb;
+  background-attachment: fixed;
+}
+.dark body.gw-wallpaper {
+  background:
+    radial-gradient(900px 520px at 8% -8%, #1d3a73 0%, transparent 62%),
+    radial-gradient(800px 520px at 100% 6%, #3b2a73 0%, transparent 60%),
+    radial-gradient(900px 600px at 70% 105%, #0f4a45 0%, transparent 62%),
+    #020617;
+  background-attachment: fixed;
+}
+/* 像漂浮的图示：柔和的大阴影、顶部高光；滑鼠移上去会轻轻浮起 */
+.gw-icon { position: relative; box-shadow: 0 14px 22px -8px rgba(15, 23, 42, .38), 0 3px 6px rgba(15, 23, 42, .14), inset 0 1px 1px rgba(255, 255, 255, .6); transition: transform .2s ease, box-shadow .2s ease; }
+.gw-icon::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(to bottom, rgba(255, 255, 255, .38), rgba(255, 255, 255, 0) 52%); pointer-events: none; }
+button:hover > .gw-icon, .gw-item:hover .gw-icon { transform: translateY(-4px) scale(1.05); box-shadow: 0 20px 28px -8px rgba(15, 23, 42, .42), 0 4px 8px rgba(15, 23, 42, .16), inset 0 1px 1px rgba(255, 255, 255, .65); }
+@media (prefers-reduced-motion: reduce) { .gw-icon { transition: none; } button:hover > .gw-icon, .gw-item:hover .gw-icon { transform: none; } }
 /* 主画面棋盘：格子高度（手机 / 平板以上）；拖拉时不要选取文字、不要跳出长按选单 */
 #gw-grid { --gw-row: 5.25rem; }
 @media (min-width: 640px) { #gw-grid { --gw-row: 5.75rem; } }

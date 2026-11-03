@@ -134,7 +134,8 @@ window.GW_LANG["en"] = {
     "addApps": "Add apps",
     "noLooseApps": "All apps in this section are already in folders.",
     "addIcon": "Add Icon",
-    "myHome": "My Home"
+    "myHome": "My Home",
+    "moveSection": "Drag to move this section"
   },
   "library": {
     "title": "Library",

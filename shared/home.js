@@ -219,8 +219,8 @@ window.GWHome = (function () {
 
     function appIcon(m, size) {
       if (m.image_url)
-        return `<span class="relative flex ${size || "size-14 sm:size-16"} overflow-hidden rounded-[26%] bg-white shadow-md shadow-slate-900/10"><img src="${esc(m.image_url)}" alt="" class="size-full object-cover">${newDot(m)}</span>`;
-      return `<span class="relative flex ${size || "size-14 sm:size-16"} items-center justify-center rounded-[26%] bg-gradient-to-br ${tileColor(m.code)} text-white shadow-md shadow-slate-900/10">
+        return `<span class="gw-icon relative flex ${size || "size-14 sm:size-16"} overflow-hidden rounded-[26%] bg-white"><img src="${esc(m.image_url)}" alt="" class="size-full object-cover">${newDot(m)}</span>`;
+      return `<span class="gw-icon relative flex ${size || "size-14 sm:size-16"} items-center justify-center rounded-[26%] bg-gradient-to-br ${tileColor(m.code)} text-white">
         ${m.icon === "link" ? icon("link", "size-7 sm:size-8") : moduleIcon(m.icon, "size-7 sm:size-8")}${newDot(m)}
       </span>`;
     }
@@ -252,7 +252,7 @@ window.GWHome = (function () {
       const minis = ids.slice(0, 9).map((id) => `<span class="aspect-square rounded-[28%] bg-gradient-to-br ${tileColor(modules.get(id).code)}"></span>`).join("");
       return `<div data-kind="folder" data-id="${f.id}" class="gw-item relative flex flex-col items-center gap-1.5 pt-1">
         <button type="button" data-folder="${f.id}" class="flex flex-col items-center gap-1.5">
-          <span class="grid size-14 grid-cols-3 grid-rows-3 content-start gap-1 rounded-[26%] border border-white/60 bg-white/55 p-2 shadow-md shadow-slate-900/10 backdrop-blur sm:size-16 dark:border-white/10 dark:bg-white/10">${minis}</span>
+          <span class="grid size-14 grid-cols-3 grid-rows-3 content-start gap-1 gw-icon rounded-[26%] border border-white/60 bg-white/50 p-2 backdrop-blur-xl sm:size-16 dark:border-white/10 dark:bg-white/10">${minis}</span>
           <span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(f.name)}</span>
         </button>
         ${editing ? badge(`data-remove-folder="${f.id}"`, "minus", t("home.deleteFolder"), "top-0 left-1/2 -translate-x-[2.4rem]") : ""}
@@ -260,7 +260,7 @@ window.GWHome = (function () {
     }
 
     const glass =
-      "relative h-full overflow-hidden rounded-3xl border border-white/70 bg-white/75 p-4 shadow-lg shadow-slate-900/5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70";
+      "relative h-full overflow-hidden rounded-3xl border border-white/60 bg-white/45 p-4 shadow-xl shadow-slate-900/10 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 ring-inset dark:border-white/10 dark:bg-slate-900/45 dark:ring-white/5";
     const wTitle = (ic, text) => `<div class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">${icon(ic, "size-3.5")}${esc(text)}</div>`;
 
     function widgetBody(w) {
@@ -311,7 +311,7 @@ window.GWHome = (function () {
               data.announcements.length
                 ? `<ul class="no-drag -mr-2 space-y-2 overflow-y-auto pr-2 h-[calc(100%-2.25rem)]">${data.announcements
                     .map(
-                      (a) => `<li class="flex gap-2.5 rounded-xl px-3 py-2 text-sm ${a.level === "warning" ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-slate-50 dark:bg-white/5"}">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<div class="min-w-0 flex-1"><p class="whitespace-pre-line break-words">${esc(a.message)}</p><p class="mt-0.5 text-[11px] text-slate-400">${esc([when(a.starts_at), a.author].filter(Boolean).join(" · "))}</p></div>${
+                      (a) => `<li class="flex gap-2.5 rounded-xl px-3 py-2 text-sm ${a.level === "warning" ? "bg-amber-100/60 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-white/50 dark:bg-white/5"}">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<div class="min-w-0 flex-1"><p class="whitespace-pre-line break-words">${esc(a.message)}</p><p class="mt-0.5 text-[11px] text-slate-400">${esc([when(a.starts_at), a.author].filter(Boolean).join(" · "))}</p></div>${
                         !editing && (canEditNotice(a) || canDeleteNotice(a))
                           ? `<span class="flex shrink-0 items-start gap-0.5">${canEditNotice(a) ? `<button type="button" data-edit-notice="${a.id}" aria-label="${esc(t("widgets.editNotice"))}" title="${esc(t("widgets.editNotice"))}" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-white/10">${icon("pencil", "size-3.5")}</button>` : ""}${canDeleteNotice(a) ? `<button type="button" data-del-notice="${a.id}" aria-label="${esc(t("widgets.deleteNotice"))}" title="${esc(t("widgets.deleteNotice"))}" class="rounded p-1 text-slate-400 hover:bg-white hover:text-red-600 dark:hover:bg-white/10">${icon("trash-2", "size-3.5")}</button>` : ""}</span>`
                           : ""
@@ -356,13 +356,16 @@ window.GWHome = (function () {
       </div>`;
     }
 
-    // Notice Board：固定在最上面、占满整行；只能调高度
+    // Notice Board：固定在最上面、占满整行；区块版拖拉下缘调高度（高度记在这个小工具的 config.height）
     function boardHtml() {
       const w = board();
       if (!w) return "";
-      return `<div data-kind="widget" data-id="${w.id}" class="gw-pinned relative mb-4 ${w.size === "large" ? "h-[22rem]" : "h-[13rem]"}">
+      const h = Number(w.config && w.config.height);
+      const sized = sectionsOn && h > 0;
+      return `<div data-kind="widget" data-id="${w.id}" class="gw-pinned relative mb-4 ${sized ? "" : w.size === "large" ? "h-[22rem]" : "h-[13rem]"}" ${sized ? `style="height:${Math.round(h)}px"` : ""}>
         <div class="${glass}">${widgetBody(w)}</div>
-        ${editing || sectionsOn ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
+        ${editing && !sectionsOn ? badge(`data-resize="${w.id}"`, "scaling", t("widgets.resize"), "-right-2 -bottom-2") : ""}
+        ${sectionsOn ? `<div data-board-resize title="${esc(t("widgets.resize"))}" aria-label="${esc(t("widgets.resize"))}" class="absolute inset-x-0 -bottom-3 z-10 flex h-6 cursor-ns-resize touch-none items-center justify-center"><span class="h-1.5 w-14 rounded-full bg-slate-400/60 shadow backdrop-blur"></span></div>` : ""}
       </div>`;
     }
 
@@ -480,21 +483,27 @@ window.GWHome = (function () {
         const minis = kids.slice(0, 9).map((k) => `<span class="aspect-square rounded-[28%] bg-gradient-to-br ${tileColor(modules.get(k.module_id).code)}"></span>`).join("");
         return `<div ${base} relative flex flex-col items-center gap-1.5 pt-1" data-kind="folder">
           <button type="button" data-open-folder="${it.id}" class="flex flex-col items-center gap-1.5">
-            <span class="grid size-14 grid-cols-3 grid-rows-3 content-start gap-1 rounded-[26%] border border-white/60 bg-white/55 p-2 shadow-md shadow-slate-900/10 backdrop-blur sm:size-16 dark:border-white/10 dark:bg-white/10">${minis}</span>
+            <span class="grid size-14 grid-cols-3 grid-rows-3 content-start gap-1 gw-icon rounded-[26%] border border-white/60 bg-white/50 p-2 backdrop-blur-xl sm:size-16 dark:border-white/10 dark:bg-white/10">${minis}</span>
             <span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(it.name || "")}</span>
           </button></div>`;
       }
       // 便条
       return `<div data-key="${it.id}" data-kind="note" class="gw-item ${TILE_H} w-52 shrink-0 pt-1">
-        <button type="button" data-open-note="${it.id}" class="flex h-[5.75rem] w-full flex-col items-start overflow-hidden rounded-2xl bg-amber-100 p-3 text-left text-amber-950 shadow-md shadow-slate-900/10 dark:bg-amber-200/90">
+        <button type="button" data-open-note="${it.id}" class="flex h-[5.75rem] w-full flex-col items-start overflow-hidden gw-icon rounded-2xl border border-white/50 bg-amber-200/60 p-3 text-left text-amber-950 backdrop-blur-xl dark:bg-amber-200/70">
           <span class="flex w-full items-center gap-1.5 text-xs font-semibold">${icon("sticky-note", "size-3.5")}<span class="truncate">${esc(it.name || t("home.noteDefault"))}</span></span>
           <span class="mt-1 line-clamp-3 w-full text-xs whitespace-pre-line break-words">${esc(it.body || "")}</span>
         </button></div>`;
     };
+    const secGrip = () => `<span class="sec-grip cursor-grab touch-none rounded p-0.5 text-slate-400 hover:text-slate-600 active:cursor-grabbing" title="${esc(t("home.moveSection"))}" aria-label="${esc(t("home.moveSection"))}">${icon("grip-vertical", "size-4")}</span>`;
+    // 区块（各 Business 和 My Home）的先后顺序，记在 Notice Board 小工具的 config.order
+    const sectionOrder = () => {
+      const w = board();
+      return w && w.config && Array.isArray(w.config.order) ? w.config.order : [];
+    };
     function boxShell({ key, title, open, tiles, menu, extraHeader }) {
-      return `<section data-box="${key}" class="${glass} h-auto! overflow-visible! pb-3">
+      return `<section data-box="${key}" data-sec-key="${key}" class="${glass} h-auto! overflow-visible! pb-3">
         <div class="mb-2 flex items-center justify-between gap-2">
-          <h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2>
+          <div class="flex min-w-0 items-center gap-1.5">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2></div>
           <div class="relative flex items-center gap-1">${extraHeader || ""}${menu || ""}</div>
         </div>
         <div data-list="${key}" class="flex flex-wrap content-start gap-x-1 gap-y-1 ${open ? "" : "max-h-[6.25rem] overflow-hidden"}">${tiles}</div>
@@ -512,18 +521,31 @@ window.GWHome = (function () {
           : ""
       }`;
 
-    function sectionBoxesHtml() {
-      return S.groups
-        .map((g) => ({ g, mods: modsOfGroup(g.id) }))
-        .filter(({ g, mods }) => mods.length || sItems.some((x) => x.group_id === g.id))
-        .map(({ g }) => boxShell({ key: g.id, title: g.name, open: !!expanded.get(g.id), tiles: boxItems(g.id).map(sTile).join(""), menu: addMenu(g.id) }))
-        .join("");
-    }
     // 画完之后：算哪些区块要显示展开按钮，并让区块里的东西可以拖拉排序
     function afterSections() {
       sortables.forEach((x) => x.destroy());
       sortables = [];
       measureBoxes();
+      const stack = $("#gw-stack", root);
+      if (stack)
+        sortables.push(
+          window.Sortable.create(stack, {
+            animation: 180,
+            handle: ".sec-grip",
+            draggable: "[data-sec-key]",
+            delay: 120,
+            delayOnTouchOnly: true,
+            onEnd: async () => {
+              lastDragEnd = Date.now();
+              const order = $$("[data-sec-key]", stack).map((el) => el.dataset.secKey);
+              const w = board();
+              if (!w) return;
+              w.config = { ...(w.config || {}), order };
+              const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
+              if (error) toast(t("home.saveFailed"));
+            },
+          }),
+        );
       $$("[data-list]", root).forEach((list) => {
         const key = list.dataset.list;
         sortables.push(
@@ -755,23 +777,39 @@ window.GWHome = (function () {
         if (it.kind === "link") return linkTile(links.find((l) => l.id === it.id)).replace('class="gw-item', at + ' class="gw-item');
         return widgetTile(widgets.find((w) => w.id === it.id), p);
       };
-      // 区块版：Notice Board 下面先是各 Business 区块，再来是自己的「My Home」（自由摆放：App、小工具、文件夹、连结）
+      // 区块版：Notice Board 下面是各 Business 区块和「My Home」（自由摆放：App、小工具、文件夹、连结），顺序可以拖拉调整
       const showGrid = !sectionsOn || items.length > 0 || editing || !!sheet;
-      root.innerHTML = `
-        ${uninitialized ? `<div class="mb-4 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">${esc(t("home.previewUninitialized"))}</div>` : ""}
-        ${boardHtml()}
-        ${sectionsOn ? `<div class="mb-6 space-y-4">${sectionBoxesHtml()}</div>` : ""}
-        ${sectionsOn && showGrid ? `<h2 class="mb-2 px-1 text-sm font-semibold tracking-wide text-slate-500 uppercase">${esc(t("home.myHome"))}</h2>` : ""}
-        ${editing ? `<p class="mb-3 text-center text-xs text-slate-500">${esc(t("fab.editHint"))}</p>` : ""}
-        ${showGrid ? `<div id="gw-grid" data-cols="${P.n}" class="${editing ? "gw-editing" : ""} relative grid gap-x-2 gap-y-4 [grid-auto-rows:5.25rem] sm:[grid-auto-rows:5.75rem]"
+      const gridHtml = showGrid
+        ? `<div id="gw-grid" data-cols="${P.n}" class="${editing ? "gw-editing" : ""} relative grid gap-x-2 gap-y-4 [grid-auto-rows:5.25rem] sm:[grid-auto-rows:5.75rem]"
              style="grid-template-columns:repeat(${P.n},minmax(0,1fr));grid-template-rows:repeat(${Math.max(rows, 1)},var(--gw-row,5.25rem))">
           ${items.map(tile).join("")}
           <div data-drop-hint class="pointer-events-none hidden rounded-2xl border-2 border-dashed"></div>
-        </div>` : ""}
+        </div>`
+        : "";
+      let stackHtml = "";
+      if (sectionsOn) {
+        const parts = [];
+        S.groups.forEach((g) => {
+          const mods = modsOfGroup(g.id);
+          if (mods.length || sItems.some((x) => x.group_id === g.id)) parts.push([g.id, boxShell({ key: g.id, title: g.name, open: !!expanded.get(g.id), tiles: boxItems(g.id).map(sTile).join(""), menu: addMenu(g.id) })]);
+        });
+        if (showGrid)
+          parts.push(["home", `<section data-sec-key="home" class="${glass} h-auto! overflow-visible!"><div class="mb-3 flex items-center gap-1.5">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(t("home.myHome"))}</h2></div>${gridHtml}</section>`]);
+        const order = sectionOrder();
+        const rank = (k) => (order.indexOf(k) === -1 ? 999 : order.indexOf(k));
+        parts.sort((a, b) => rank(a[0]) - rank(b[0]));
+        stackHtml = `<div id="gw-stack" class="mb-6 space-y-4">${parts.map((x) => x[1]).join("")}</div>`;
+      }
+      root.innerHTML = `
+        ${uninitialized ? `<div class="mb-4 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">${esc(t("home.previewUninitialized"))}</div>` : ""}
+        ${boardHtml()}
+        ${stackHtml}
+        ${editing ? `<p class="mb-3 text-center text-xs text-slate-500">${esc(t("fab.editHint"))}</p>` : ""}
+        ${sectionsOn ? "" : gridHtml}
         ${items.length === 0 && !sectionsOn ? `<div class="${cls.empty} mt-2 bg-white/60 dark:bg-slate-900/40">${esc(data.modules.length ? t("fab.emptyHome") : t("home.noModules"))}</div>` : ""}
         ${
           sheet
-            ? `<aside class="gw-sheet fixed inset-x-0 bottom-0 z-50 max-h-[62vh] overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:inset-x-auto sm:top-20 sm:right-4 sm:bottom-4 sm:max-h-none sm:w-96 sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">${sheet === "apps" ? appsSheet() : widgetsSheet()}</aside>`
+            ? `<aside class="gw-sheet fixed inset-x-0 bottom-0 z-50 max-h-[62vh] overflow-y-auto rounded-t-3xl border border-white/60 bg-white/75 p-4 shadow-2xl backdrop-blur-2xl sm:inset-x-auto sm:top-20 sm:right-4 sm:bottom-4 sm:max-h-none sm:w-96 sm:rounded-3xl dark:border-white/10 dark:bg-slate-900/75">${sheet === "apps" ? appsSheet() : widgetsSheet()}</aside>`
             : ""
         }
         ${fabHtml()}`;
@@ -910,6 +948,37 @@ window.GWHome = (function () {
       }
       draw();
     }
+    // Notice Board 下缘：按住往上 / 往下拖调高度，放开时记住
+    root.addEventListener("pointerdown", (e) => {
+      const grab = e.target.closest("[data-board-resize]");
+      if (!grab || e.button !== 0) return;
+      const el = grab.closest(".gw-pinned");
+      const startY = e.clientY;
+      const startH = el.getBoundingClientRect().height;
+      let h = startH;
+      e.preventDefault();
+      document.body.classList.add("gw-dragging");
+      const move = (ev) => {
+        h = Math.max(150, Math.min(720, startH + ev.clientY - startY));
+        el.style.height = h + "px";
+        el.classList.remove("h-[13rem]", "h-[22rem]");
+      };
+      const up = async () => {
+        removeEventListener("pointermove", move);
+        removeEventListener("pointerup", up);
+        removeEventListener("pointercancel", up);
+        document.body.classList.remove("gw-dragging");
+        lastDragEnd = Date.now();
+        const w = board();
+        if (!w) return;
+        w.config = { ...(w.config || {}), height: Math.round(h) };
+        const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
+        if (error) toast(t("home.saveFailed"));
+      };
+      addEventListener("pointermove", move);
+      addEventListener("pointerup", up);
+      addEventListener("pointercancel", up);
+    });
     // 长按（手机）或拖动（滑鼠）开始
     let press = null;
     root.addEventListener("pointerdown", (e) => {
