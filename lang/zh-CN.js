@@ -135,7 +135,22 @@ window.GW_LANG["zh-CN"] = {
     "noLooseApps": "这个区块的 App 都已经在文件夹里了。",
     "addIcon": "加图示",
     "myHome": "我的主页",
-    "moveSection": "拖拉调整区块顺序"
+    "moveSection": "拖拉调整区块顺序",
+    "iconAll": "全部图示",
+    "iconCalm": "柔和",
+    "iconColorful": "多彩",
+    "iconEach": "个别 App",
+    "iconAuto": "自动",
+    "color": {
+      "slate": "灰蓝",
+      "blue": "蓝",
+      "teal": "青",
+      "green": "绿",
+      "amber": "琥珀",
+      "rose": "玫瑰",
+      "violet": "紫",
+      "graphite": "石墨"
+    }
   },
   "library": {
     "title": "模块库",
@@ -187,7 +202,8 @@ window.GW_LANG["zh-CN"] = {
     "moveOut": "移回主画面",
     "emptyFolder": "这个文件夹是空的。在「编辑主画面」用 App 的 … 选单把它移进来。",
     "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。",
-    "addLink": "新增图示（连结）"
+    "addLink": "新增图示（连结）",
+    "iconColors": "图示颜色"
   },
   "widgets": {
     "unavailable": "小工具要等下次系统更新后才能使用。",

@@ -135,7 +135,22 @@ window.GW_LANG["en"] = {
     "noLooseApps": "All apps in this section are already in folders.",
     "addIcon": "Add Icon",
     "myHome": "My Home",
-    "moveSection": "Drag to move this section"
+    "moveSection": "Drag to move this section",
+    "iconAll": "All icons",
+    "iconCalm": "Calm",
+    "iconColorful": "Colourful",
+    "iconEach": "Each app",
+    "iconAuto": "Auto",
+    "color": {
+      "slate": "Slate",
+      "blue": "Blue",
+      "teal": "Teal",
+      "green": "Green",
+      "amber": "Amber",
+      "rose": "Rose",
+      "violet": "Violet",
+      "graphite": "Graphite"
+    }
   },
   "library": {
     "title": "Library",
@@ -187,7 +202,8 @@ window.GW_LANG["en"] = {
     "moveOut": "Move to home screen",
     "emptyFolder": "This folder is empty. Use an app’s … menu in Edit Home Screen to move it here.",
     "emptyHome": "Your home screen is empty. Tap the + button to add apps and widgets.",
-    "addLink": "Add Icon (link)"
+    "addLink": "Add Icon (link)",
+    "iconColors": "Icon colours"
   },
   "widgets": {
     "unavailable": "Widgets will be available after the next system update.",
