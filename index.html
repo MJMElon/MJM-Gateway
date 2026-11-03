@@ -89,6 +89,12 @@
     }
   }
   main.innerHTML = '<div id="board" class="mx-auto max-w-5xl"></div>';
+  // Notice Board 的表情反应（数据库还没更新时就没有这个功能，其他照常）
+  let reactions = [];
+  if (sectionsOn && data.announcements && data.announcements.length) {
+    const rr = await GW.sb.rpc("gw_get_notice_reactions", { p_ids: data.announcements.map((a) => a.id) });
+    if (!rr.error) reactions = rr.data || [];
+  }
   const memberSet = new Set(memberOf);
   const sections = sectionsOn
     ? {
@@ -107,7 +113,7 @@
         state: secRes.data || [],
       }
     : null;
-  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending, memberOf, links, sections });
+  GWHome.render(document.getElementById("board"), data, { widgets, profile, pending, memberOf, links, sections, reactions });
 })();
 </script>
 </body>

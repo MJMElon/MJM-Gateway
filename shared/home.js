@@ -73,6 +73,14 @@ window.GWHome = (function () {
     const uninitialized = readOnly && !data.profile.layout_initialized;
 
     const modules = new Map(data.modules.map((m) => [m.id, m]));
+    // Notice Board 的表情反应：{ announcement_id, emoji, user_id, full_name }
+    let reactions = ((opts && opts.reactions) || []).map((r) => ({ ...r }));
+    const reactionsOn = !!(opts && Array.isArray(opts.reactions));
+    const REACT = [
+      ["like", "👍"],
+      ["love", "❤️"],
+      ["congrats", "🎉"],
+    ];
     {
       const ic = ((opts && opts.widgets) || []).find((w) => w.widget_type === "announcements");
       const saved = ic && ic.config && ic.config.icons;
@@ -309,6 +317,49 @@ window.GWHome = (function () {
       "relative h-full overflow-hidden rounded-3xl border border-white/60 bg-white/45 p-4 shadow-xl shadow-slate-900/10 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 ring-inset dark:border-white/10 dark:bg-slate-900/45 dark:ring-white/5";
     const wTitle = (ic, text) => `<div class="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">${icon(ic, "size-3.5")}${esc(text)}</div>`;
 
+    // 表情反应：按表情 = 加 / 取消自己的反应；点旁边的数字 = 看是谁按的
+    function reactionBar(a) {
+      if (!reactionsOn || readOnly) return "";
+      return `<div class="no-drag mt-1.5 flex flex-wrap gap-1.5">${REACT.map(([k, e]) => {
+        const rs = reactions.filter((r) => r.announcement_id === a.id && r.emoji === k);
+        const mine = rs.some((r) => r.user_id === profile.id);
+        return `<span class="inline-flex items-center overflow-hidden rounded-full border text-xs ${mine ? "border-brand-500 bg-brand-50 dark:bg-brand-700/20" : "border-slate-200 bg-white/60 dark:border-slate-700 dark:bg-white/5"}">
+          <button type="button" data-react="${a.id}:${k}" aria-label="${esc(t("widgets.react." + k))}" title="${esc(t("widgets.react." + k))}" class="px-2 py-0.5 hover:bg-white/70 dark:hover:bg-white/10">${e}</button>
+          ${rs.length ? `<button type="button" data-who="${a.id}:${k}" title="${esc(rs.map((r) => r.full_name || "").filter(Boolean).join(", "))}" class="border-l border-slate-200 px-1.5 py-0.5 font-semibold hover:bg-white/70 dark:border-slate-700 dark:hover:bg-white/10">${rs.length}</button>` : ""}
+        </span>`;
+      }).join("")}</div>`;
+    }
+    async function toggleReaction(aid, kind) {
+      const mine = reactions.find((r) => r.announcement_id === aid && r.emoji === kind && r.user_id === profile.id);
+      if (mine) {
+        reactions = reactions.filter((r) => r !== mine);
+        draw();
+        const { error } = await sb.from("gw_notice_reactions").delete().eq("announcement_id", aid).eq("user_id", profile.id).eq("emoji", kind);
+        if (error) toast(t("home.saveFailed"));
+        return;
+      }
+      reactions.push({ announcement_id: aid, emoji: kind, user_id: profile.id, full_name: profile.full_name });
+      draw();
+      const { error } = await sb.from("gw_notice_reactions").insert({ announcement_id: aid, user_id: profile.id, emoji: kind });
+      if (error) {
+        reactions = reactions.filter((r) => !(r.announcement_id === aid && r.emoji === kind && r.user_id === profile.id));
+        draw();
+        toast(t("home.saveFailed"));
+      }
+    }
+    // 谁按了这个反应
+    function whoReacted(aid, kind) {
+      const emoji = REACT.find(([k]) => k === kind)[1];
+      const rs = reactions.filter((r) => r.announcement_id === aid && r.emoji === kind);
+      const dlg = modal(
+        `${emoji} ${t("widgets.react." + kind)}`,
+        rs.length
+          ? `<ul class="space-y-1.5">${rs.map((r) => `<li class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-800"><span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold dark:bg-slate-700">${esc((r.full_name || "?").slice(0, 1))}</span><span class="truncate">${esc(r.full_name || "—")}${r.user_id === profile.id ? ` <span class="text-xs text-slate-400">(${esc(t("widgets.you"))})</span>` : ""}</span></li>`).join("")}</ul>`
+          : `<p class="text-sm text-slate-500">${esc(t("widgets.noReactions"))}</p>`,
+      );
+      return dlg;
+    }
+
     function widgetBody(w) {
       const now = new Date();
       const tz = GW_CONFIG.timeZone;
@@ -357,7 +408,7 @@ window.GWHome = (function () {
               data.announcements.length
                 ? `<ul class="no-drag -mr-2 space-y-2 overflow-y-auto pr-2 h-[calc(100%-2.25rem)]">${data.announcements
                     .map(
-                      (a) => `<li class="flex gap-2.5 rounded-xl px-3 py-2 text-sm ${a.level === "warning" ? "bg-amber-100/60 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-white/50 dark:bg-white/5"}">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<div class="min-w-0 flex-1"><p class="whitespace-pre-line break-words">${esc(a.message)}</p><p class="mt-0.5 text-[11px] text-slate-400">${esc([when(a.starts_at), a.author].filter(Boolean).join(" · "))}</p></div>${
+                      (a) => `<li class="flex gap-2.5 rounded-xl px-3 py-2 text-sm ${a.level === "warning" ? "bg-amber-100/60 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" : "bg-white/50 dark:bg-white/5"}">${icon(a.level === "warning" ? "triangle-alert" : "info", `mt-0.5 size-4 shrink-0 ${a.level === "warning" ? "text-amber-500" : "text-sky-500"}`)}<div class="min-w-0 flex-1"><p class="whitespace-pre-line break-words">${esc(a.message)}</p><p class="mt-0.5 text-[11px] text-slate-400">${esc([when(a.starts_at), a.author].filter(Boolean).join(" · "))}</p>${reactionBar(a)}</div>${
                         !editing && (canEditNotice(a) || canDeleteNotice(a))
                           ? `<span class="flex shrink-0 items-start gap-0.5">${canEditNotice(a) ? `<button type="button" data-edit-notice="${a.id}" aria-label="${esc(t("widgets.editNotice"))}" title="${esc(t("widgets.editNotice"))}" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-white/10">${icon("pencil", "size-3.5")}</button>` : ""}${canDeleteNotice(a) ? `<button type="button" data-del-notice="${a.id}" aria-label="${esc(t("widgets.deleteNotice"))}" title="${esc(t("widgets.deleteNotice"))}" class="rounded p-1 text-slate-400 hover:bg-white hover:text-red-600 dark:hover:bg-white/10">${icon("trash-2", "size-3.5")}</button>` : ""}</span>`
                           : ""
@@ -1480,6 +1531,8 @@ window.GWHome = (function () {
       if (d.removeFolder) return deleteFolder(d.removeFolder);
       if (d.resize) return resizeWidget(d.resize);
       if ("post" in d) return postNotice();
+      if (d.react) return toggleReaction(...d.react.split(":"));
+      if (d.who) return whoReacted(...d.who.split(":"));
       if (d.editNotice) return postNotice(data.announcements.find((a) => a.id === d.editNotice));
       if (d.delNotice) return deleteNotice(d.delNotice);
       if ("fabToggle" in d) return ((fabOpen = !fabOpen), draw());

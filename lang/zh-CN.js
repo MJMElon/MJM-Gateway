@@ -260,7 +260,14 @@ window.GW_LANG["zh-CN"] = {
     "deleteNoticeBody": "确定删除这则公告？大家都不会再看到。",
     "delete": "删除",
     "save": "储存",
-    "saved": "已储存"
+    "saved": "已储存",
+    "you": "你",
+    "noReactions": "还没有人按。",
+    "react": {
+      "like": "赞",
+      "love": "爱心",
+      "congrats": "恭喜"
+    }
   },
   "admin": {
     "sections": {

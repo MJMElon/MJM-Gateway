@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(107);
+select plan(111);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -491,6 +491,27 @@ update public.gw_group_modules set sector_id = '00000000-0000-0000-0000-00000000
   where group_id = '00000000-0000-0000-0000-0000000000c1' and module_id = '00000000-0000-0000-0000-0000000000b3';
 delete from public.gw_sectors where id = '00000000-0000-0000-0000-0000000000d9';
 select is((select sector_id from public.gw_group_modules where group_id = '00000000-0000-0000-0000-0000000000c1' and module_id = '00000000-0000-0000-0000-0000000000b3'), null::uuid, '删除 Sector 后模块的 Sector 变回空');
+select pg_temp.logout();
+
+-- Notice Board 反应
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+insert into public.gw_announcements (id, message) values ('00000000-0000-0000-0000-0000000000d8', 'Reaction test');
+select pg_temp.logout();
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+select lives_ok(
+  $$ insert into public.gw_notice_reactions (announcement_id, user_id, emoji) values ('00000000-0000-0000-0000-0000000000d8', '00000000-0000-0000-0000-0000000000a3', 'like') $$,
+  '看得到公告的人可以按反应'
+);
+select throws_ok(
+  $$ insert into public.gw_notice_reactions (announcement_id, user_id, emoji) values ('00000000-0000-0000-0000-0000000000d8', '00000000-0000-0000-0000-0000000000a4', 'love') $$,
+  '42501', null, '不能替别人按反应'
+);
+select is((select count(*) from public.gw_get_notice_reactions(array['00000000-0000-0000-0000-0000000000d8']::uuid[]))::int, 1, '读得到这则公告的反应');
+select is(
+  (select full_name from public.gw_get_notice_reactions(array['00000000-0000-0000-0000-0000000000d8']::uuid[]) limit 1),
+  (select full_name from public.gw_profiles where id = '00000000-0000-0000-0000-0000000000a3'),
+  '反应附上按的人的名字'
+);
 select pg_temp.logout();
 
 select is((select count(*) from public.gw_profiles where user_code is null), 0::bigint, '每个用户都有代码');

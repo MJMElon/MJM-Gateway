@@ -260,7 +260,14 @@ window.GW_LANG["en"] = {
     "deleteNoticeBody": "Delete this notice? Everyone will stop seeing it.",
     "delete": "Delete",
     "save": "Save",
-    "saved": "Saved"
+    "saved": "Saved",
+    "you": "you",
+    "noReactions": "No reactions yet.",
+    "react": {
+      "like": "Like",
+      "love": "Love",
+      "congrats": "Congrats"
+    }
   },
   "admin": {
     "sections": {
