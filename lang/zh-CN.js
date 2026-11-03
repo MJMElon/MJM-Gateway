@@ -133,7 +133,8 @@ window.GW_LANG["zh-CN"] = {
     "myLinks": "我的连结",
     "addApps": "加入 App",
     "noLooseApps": "这个区块的 App 都已经在文件夹里了。",
-    "addIcon": "加图示"
+    "addIcon": "加图示",
+    "myHome": "我的主页"
   },
   "library": {
     "title": "模块库",

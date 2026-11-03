@@ -18,6 +18,13 @@ async function must(promise) {
 
 // 角色 HR：负责「全体员工」和「总部车队」，在「全体员工」负责 WIKI、HR 的权限，可以发公告
 await must(db.from("gw_roles").delete().neq("name", "HR").select("id"));
+// Diesel 测试资料（重跑时清掉上一次测试留下的）
+for (const t of ["diesel_card_usage", "diesel_card_reloads", "diesel_claims", "diesel_cards", "diesel_user_access", "diesel_vehicles"]) {
+  for (const col of ["id", "user_id"]) {
+    const { error } = await db.from(t).delete().not(col, "is", null);
+    if (!error) break;
+  }
+}
 const [hrRole] = await must(db.from("gw_roles").upsert([{ name: "HR", description: "人事", can_view_user_group: true }], { onConflict: "name" }).select());
 
 const people = [

@@ -133,7 +133,8 @@ window.GW_LANG["en"] = {
     "myLinks": "My Links",
     "addApps": "Add apps",
     "noLooseApps": "All apps in this section are already in folders.",
-    "addIcon": "Add Icon"
+    "addIcon": "Add Icon",
+    "myHome": "My Home"
   },
   "library": {
     "title": "Library",

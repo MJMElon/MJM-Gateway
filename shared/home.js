@@ -446,13 +446,7 @@ window.GWHome = (function () {
     const sectionsOn = !!S && !readOnly;
     let sItems = S ? S.items.map((x) => ({ ...x })) : [];
     const expanded = new Map(S ? S.state.map((x) => [x.group_id, !!x.expanded]) : []);
-    let personalOpen = false;
-    try {
-      personalOpen = localStorage.getItem("gw_personal_open_" + profile.id) === "1";
-    } catch (e) {
-      /* 忽略 */
-    }
-    let menuGid = null; // 打开着「+」选单的区块
+        let menuGid = null; // 打开着「+」选单的区块
     let sortables = [];
     const bySort = (a, b) => (a.sort_order || 0) - (b.sort_order || 0);
     const modsOfGroup = (gid) => {
@@ -497,16 +491,6 @@ window.GWHome = (function () {
           <span class="mt-1 line-clamp-3 w-full text-xs whitespace-pre-line break-words">${esc(it.body || "")}</span>
         </button></div>`;
     };
-    const linkSTile = (l) => `<div data-key="${l.id}" data-kind="link" class="gw-item group ${TILE_H} w-24 shrink-0 relative flex flex-col items-center gap-1.5 pt-1">
-        <button type="button" data-open-link="${l.id}" class="flex flex-col items-center gap-1.5" title="${esc(l.url)}">
-          ${appIcon({ code: l.name, icon: l.icon, image_url: l.image_url })}
-          <span class="w-20 truncate text-center text-xs font-medium text-slate-700 dark:text-slate-200">${esc(l.name)}</span>
-        </button>
-        <span class="no-drag absolute top-0 right-0 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100">
-          <button type="button" data-edit-link="${l.id}" aria-label="${esc(t("home.editLink"))}" class="flex size-5 items-center justify-center rounded-full bg-slate-700/90 text-white">${icon("pencil", "size-3")}</button>
-          <button type="button" data-remove-link="${l.id}" aria-label="${esc(t("home.removeFromHome"))}" class="flex size-5 items-center justify-center rounded-full bg-slate-700/90 text-white">${icon("x", "size-3")}</button>
-        </span></div>`;
-
     function boxShell({ key, title, open, tiles, menu, extraHeader }) {
       return `<section data-box="${key}" class="${glass} h-auto! overflow-visible! pb-3">
         <div class="mb-2 flex items-center justify-between gap-2">
@@ -528,25 +512,17 @@ window.GWHome = (function () {
           : ""
       }`;
 
-    function drawSections() {
-      sortables.forEach((x) => x.destroy());
-      sortables = [];
-      const boxes = S.groups
+    function sectionBoxesHtml() {
+      return S.groups
         .map((g) => ({ g, mods: modsOfGroup(g.id) }))
         .filter(({ g, mods }) => mods.length || sItems.some((x) => x.group_id === g.id))
         .map(({ g }) => boxShell({ key: g.id, title: g.name, open: !!expanded.get(g.id), tiles: boxItems(g.id).map(sTile).join(""), menu: addMenu(g.id) }))
         .join("");
-      const personal = boxShell({
-        key: "personal",
-        title: t("home.myLinks"),
-        open: personalOpen,
-        tiles:
-          links.map(linkSTile).join("") +
-          `<div class="${TILE_H} w-24 shrink-0 pt-1"><button type="button" data-new-link class="flex flex-col items-center gap-1.5"><span class="flex size-14 items-center justify-center rounded-[26%] border-2 border-dashed border-slate-300 text-slate-400 sm:size-16 dark:border-slate-600">${icon("plus", "size-6")}</span><span class="w-20 truncate text-center text-xs text-slate-500">${esc(t("home.addIcon"))}</span></button></div>`,
-      });
-      root.innerHTML = `${boardHtml()}
-        <div class="space-y-4">${boxes || `<div class="${cls.empty} bg-white/60 dark:bg-slate-900/40">${esc(t("home.noModules"))}</div>`}${personal}</div>`;
-      refreshIcons();
+    }
+    // 画完之后：算哪些区块要显示展开按钮，并让区块里的东西可以拖拉排序
+    function afterSections() {
+      sortables.forEach((x) => x.destroy());
+      sortables = [];
       measureBoxes();
       $$("[data-list]", root).forEach((list) => {
         const key = list.dataset.list;
@@ -556,18 +532,15 @@ window.GWHome = (function () {
             delay: 180,
             delayOnTouchOnly: true,
             draggable: ".gw-item",
-            filter: "[data-new-link]",
-            preventOnFilter: false,
             onEnd: () => {
               lastDragEnd = Date.now();
-              const keys = $$(".gw-item[data-key]", list).map((el) => el.dataset.key);
-              if (key === "personal") return saveLinkOrder(keys);
-              saveBoxOrder(key, keys);
+              saveBoxOrder(key, $$(".gw-item[data-key]", list).map((el) => el.dataset.key));
             },
           }),
         );
       });
     }
+    const drawSections = () => draw();
     // 只有内容超过一行才显示展开按钮（展开着的一定显示，才能收起）
     function measureBoxes() {
       $$("[data-box]", root).forEach((box) => {
@@ -601,23 +574,7 @@ window.GWHome = (function () {
       }
       await Promise.all(updates.map(([id, i]) => sb.from("gw_user_section_items").update({ sort_order: i }).eq("id", id)));
     }
-    async function saveLinkOrder(keys) {
-      keys.forEach((id, i) => {
-        const l = links.find((x) => x.id === id);
-        if (l) l.sort_order = i;
-      });
-      await Promise.all(keys.map((id, i) => sb.from("gw_user_links").update({ sort_order: i }).eq("id", id)));
-    }
     async function toggleBox(key) {
-      if (key === "personal") {
-        personalOpen = !personalOpen;
-        try {
-          localStorage.setItem("gw_personal_open_" + profile.id, personalOpen ? "1" : "0");
-        } catch (e) {
-          /* 忽略 */
-        }
-        return drawSections();
-      }
       const open = !expanded.get(key);
       expanded.set(key, open);
       drawSections();
@@ -786,7 +743,6 @@ window.GWHome = (function () {
         </div>`;
         return refreshIcons();
       }
-      if (sectionsOn) return drawSections();
       const P = positions();
       const items = rootItems();
       // 棋盘下面多留两行空位，可以把东西拖到更下面
@@ -799,16 +755,20 @@ window.GWHome = (function () {
         if (it.kind === "link") return linkTile(links.find((l) => l.id === it.id)).replace('class="gw-item', at + ' class="gw-item');
         return widgetTile(widgets.find((w) => w.id === it.id), p);
       };
+      // 区块版：Notice Board 下面先是各 Business 区块，再来是自己的「My Home」（自由摆放：App、小工具、文件夹、连结）
+      const showGrid = !sectionsOn || items.length > 0 || editing || !!sheet;
       root.innerHTML = `
         ${uninitialized ? `<div class="mb-4 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">${esc(t("home.previewUninitialized"))}</div>` : ""}
         ${boardHtml()}
+        ${sectionsOn ? `<div class="mb-6 space-y-4">${sectionBoxesHtml()}</div>` : ""}
+        ${sectionsOn && showGrid ? `<h2 class="mb-2 px-1 text-sm font-semibold tracking-wide text-slate-500 uppercase">${esc(t("home.myHome"))}</h2>` : ""}
         ${editing ? `<p class="mb-3 text-center text-xs text-slate-500">${esc(t("fab.editHint"))}</p>` : ""}
-        <div id="gw-grid" data-cols="${P.n}" class="${editing ? "gw-editing" : ""} relative grid gap-x-2 gap-y-4 [grid-auto-rows:5.25rem] sm:[grid-auto-rows:5.75rem]"
+        ${showGrid ? `<div id="gw-grid" data-cols="${P.n}" class="${editing ? "gw-editing" : ""} relative grid gap-x-2 gap-y-4 [grid-auto-rows:5.25rem] sm:[grid-auto-rows:5.75rem]"
              style="grid-template-columns:repeat(${P.n},minmax(0,1fr));grid-template-rows:repeat(${Math.max(rows, 1)},var(--gw-row,5.25rem))">
           ${items.map(tile).join("")}
           <div data-drop-hint class="pointer-events-none hidden rounded-2xl border-2 border-dashed"></div>
-        </div>
-        ${items.length === 0 ? `<div class="${cls.empty} mt-2 bg-white/60 dark:bg-slate-900/40">${esc(data.modules.length ? t("fab.emptyHome") : t("home.noModules"))}</div>` : ""}
+        </div>` : ""}
+        ${items.length === 0 && !sectionsOn ? `<div class="${cls.empty} mt-2 bg-white/60 dark:bg-slate-900/40">${esc(data.modules.length ? t("fab.emptyHome") : t("home.noModules"))}</div>` : ""}
         ${
           sheet
             ? `<aside class="gw-sheet fixed inset-x-0 bottom-0 z-50 max-h-[62vh] overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:inset-x-auto sm:top-20 sm:right-4 sm:bottom-4 sm:max-h-none sm:w-96 sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">${sheet === "apps" ? appsSheet() : widgetsSheet()}</aside>`
@@ -816,6 +776,7 @@ window.GWHome = (function () {
         }
         ${fabHtml()}`;
       refreshIcons();
+      if (sectionsOn) afterSections();
       if ($("[data-clock]", root)) {
         clockTimer = setInterval(() => {
           const now = new Intl.DateTimeFormat(GW.LOCALE, { timeZone: GW_CONFIG.timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
@@ -1254,7 +1215,6 @@ window.GWHome = (function () {
         if (d.expand) return toggleBox(d.expand);
         if (d.openFolder) return openBoxFolder(d.openFolder);
         if (d.openNote) return itemDialog(sItems.find((x) => x.id === d.openNote), null, "note");
-        if ("newLink" in d) return linkDialog(null);
       }
       if (d.open) return open(d.open);
       if (d.openLink) {
