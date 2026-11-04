@@ -190,7 +190,33 @@ window.GW_LANG["zh-CN"] = {
     "resetHomeConfirm": "确定要重设首页吗？你的小工具、文件夹和排序都会被清除。",
     "resetHomeDone": "首页已重设。",
     "cancel": "取消",
-    "confirm": "确定重设"
+    "confirm": "确定重设",
+    "connector": {
+      "title": "AI Connector",
+      "intro": "用你自己的 AI（例如 Claude）和 MJM Connect 的资料对话。建立一条私人链接，在你的 AI 应用里加为自定义连接器，就可以查资料、要报表。它只能读取你本来就有权限看的资料。",
+      "off": "AI Connector 还没有开启，请联系管理员。",
+      "notReady": "数据库还没有为 AI Connector 更新。",
+      "create": "建立连接链接",
+      "name": "名称",
+      "namePlaceholder": "例如：我的电脑",
+      "created": "你的新链接（只显示这一次）",
+      "copy": "复制",
+      "copied": "已复制",
+      "warn": "请把这条链接当作密码保管。拿到链接的人可以通过 AI 读取你的资料。如果泄露，请在下面撤销。",
+      "howTitle": "如何连接",
+      "how1": "Claude（claude.ai）：设置 → 连接器 → 添加自定义连接器 → 粘贴链接。",
+      "how2": "Claude Desktop、Claude Code 和其他支持 MCP 的 AI 应用：用这条链接添加为远程 MCP 服务器。",
+      "yours": "你的链接",
+      "none": "还没有链接。",
+      "lastUsed": "最近使用 {time}",
+      "neverUsed": "从未使用",
+      "revoked": "已撤销",
+      "revoke": "撤销",
+      "revokeConfirm": "撤销这条链接？使用它的 AI 应用将无法再连接。",
+      "revokedDone": "链接已撤销。",
+      "tooMany": "你已经有 5 条有效链接，请先撤销一条。",
+      "error": "出错了，请重试。"
+    }
   },
   "fab": {
     "menu": "新增或编辑",
@@ -435,7 +461,8 @@ window.GW_LANG["zh-CN"] = {
       "audit": "操作记录",
       "access": "按模块",
       "roles": "角色",
-      "sectors": "Sector"
+      "sectors": "Sector",
+      "connector": "AI Connector"
     },
     "users": {
       "search": "搜索姓名或 Email…",
@@ -730,6 +757,23 @@ window.GW_LANG["zh-CN"] = {
       "noPermission": "看得到这个用户有 {name}，但你的角色不能管理它里面的权限。",
       "tickAccessFirst": "先勾 Access 才能设定其他项目。",
       "noCompany": "还没分到 Company"
+    },
+    "connector": {
+      "switchTitle": "AI Connector",
+      "switchDesc": "让员工把自己的 AI 应用连到他们本来就能看的公司资料。关闭后，所有链接都会失效。",
+      "on": "开启",
+      "off": "关闭",
+      "saved": "已保存。",
+      "links": "链接",
+      "user": "用户",
+      "empty": "还没有人建立链接。",
+      "created": "建立于 {time}",
+      "lastUsed": "最近使用 {time}",
+      "neverUsed": "从未使用",
+      "revoked": "已撤销",
+      "revoke": "撤销",
+      "revokeConfirm": "撤销这条链接？使用它的 AI 应用将无法再连接。",
+      "notReady": "数据库还没有为 AI Connector 更新。"
     }
   },
   "diesel": {

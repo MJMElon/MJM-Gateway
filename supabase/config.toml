@@ -431,3 +431,9 @@ verify_jwt = false
 
 [functions.gw-admin]
 verify_jwt = false
+
+[functions.gw-mcp]
+verify_jwt = false
+
+[functions.gw-ai-chat]
+verify_jwt = false

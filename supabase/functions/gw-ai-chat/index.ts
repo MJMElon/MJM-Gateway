@@ -3,8 +3,9 @@
 // - 工具：list_datasets / query_data / aggregate_data / create_report；报表的资料直接回给网页（不经过 AI），网页再产生 Excel / CSV 下载
 // - 需要 Edge Function secret：ANTHROPIC_API_KEY（可选：AI_MODEL、AI_DAILY_LIMIT、ANTHROPIC_BASE_URL）
 import { corsHeaders, getCaller, json, serviceClient } from "../_shared/gw.ts";
-import { byName, DATASETS } from "./datasets.ts";
-import { runQuery, type Spec } from "./query.ts";
+import { byName, DATASETS } from "../_shared/ai-datasets.ts";
+import { runQuery, type Spec } from "../_shared/ai-query.ts";
+import { specProps } from "../_shared/ai-spec.ts";
 
 const MODEL = Deno.env.get("AI_MODEL") ?? "claude-sonnet-5-5";
 const BASE = (Deno.env.get("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com").replace(/\/$/, "");
@@ -12,36 +13,6 @@ const DAILY_LIMIT = Number(Deno.env.get("AI_DAILY_LIMIT") ?? "60");
 const MAX_ROWS = 5000;
 const MAX_TURNS = 6;
 
-const filterSchema = {
-  type: "array",
-  description: "Row filters, all must match. Dates are YYYY-MM-DD strings, so gte/lte work on dates.",
-  items: {
-    type: "object",
-    properties: {
-      column: { type: "string" },
-      op: { type: "string", enum: ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "in"] },
-      value: { description: "A string or number; an array of strings for op=in" },
-    },
-    required: ["column", "op", "value"],
-  },
-};
-const specProps = {
-  dataset: { type: "string", description: "Dataset name from list_datasets" },
-  filters: filterSchema,
-  group_by: { type: "array", items: { type: "string" }, description: "Columns to group by (turns the result into a summary)" },
-  metrics: {
-    type: "array",
-    description: "Summary numbers per group. count needs no column; sum/avg need a number column.",
-    items: {
-      type: "object",
-      properties: { fn: { type: "string", enum: ["count", "sum", "avg", "min", "max"] }, column: { type: "string" }, as: { type: "string", description: "Optional name for the result column" } },
-      required: ["fn"],
-    },
-  },
-  columns: { type: "array", items: { type: "string" }, description: "Columns to return for a plain list (default: all)" },
-  order_by: { type: "string", description: "A result column to sort by" },
-  descending: { type: "boolean" },
-};
 const TOOLS = [
   {
     name: "list_datasets",

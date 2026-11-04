@@ -24,7 +24,7 @@
   const SECTIONS = isSuper
     ? [
         ["userGroup", "users-round", ["groups", "users", "access"]],
-        ["master", "database", ["roles", "business", "company", "sectors", "modules"]],
+        ["master", "database", ["roles", "business", "company", "sectors", "modules", "connector"]],
         ["audit", "scroll-text", ["audit"]],
       ]
     : [
@@ -1949,6 +1949,57 @@
     };
   }
 
+  // ================================================================ AI Connector（Master）：全站开关 + 全部链接
+  async function connectorTab() {
+    const seq = routeSeq;
+    const tk = (k, v) => t("admin.connector." + k, v);
+    const [setting, list] = await Promise.all([sb.from("gw_settings").select("value").eq("key", "ai_connector").maybeSingle(), sb.rpc("gw_mcp_list")]);
+    if (stale(seq)) return;
+    if (setting.error || list.error) return (view.innerHTML = empty(tk("notReady")));
+    let on = !!setting.data?.value?.enabled;
+    const links = list.data || [];
+    const paint = () => {
+      view.innerHTML = `<div class="space-y-4">
+        <div class="${cls.card} flex items-center gap-4 p-4">
+          <div class="min-w-0 flex-1"><p class="font-semibold">${esc(tk("switchTitle"))}</p><p class="text-sm text-slate-500">${esc(tk("switchDesc"))}</p></div>
+          <button id="cn-switch" role="switch" aria-checked="${on}" aria-label="${esc(tk("switchTitle"))}" class="relative h-7 w-12 shrink-0 rounded-full transition-colors ${on ? "bg-brand-600" : "bg-slate-300 dark:bg-slate-700"}"><span class="absolute top-0.5 size-6 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}"></span></button>
+          <span class="w-8 text-sm text-slate-500">${esc(on ? tk("on") : tk("off"))}</span>
+        </div>
+        <p class="text-sm font-semibold">${esc(tk("links"))} <span class="font-normal text-slate-400">(${links.filter((x) => !x.revoked_at).length})</span></p>
+        ${
+          links.length
+            ? `<div class="${cls.card} divide-y divide-slate-100 dark:divide-slate-800">${links
+                .map(
+                  (x) => `<div class="flex items-center gap-3 px-3 py-3 text-sm">
+                    <span class="min-w-0 flex-1"><span class="block truncate font-semibold${x.revoked_at ? " text-slate-400 line-through" : ""}">${esc(x.user_name || "—")} <span class="font-normal text-slate-500">· ${esc(x.label)}</span></span>
+                    <span class="block text-xs text-slate-500">${esc(tk("created", { time: fmtDateTime(x.created_at) }))} · ${esc(x.revoked_at ? tk("revoked") : x.last_used_at ? tk("lastUsed", { time: fmtDateTime(x.last_used_at) }) : tk("neverUsed"))}</span></span>
+                    ${x.revoked_at ? "" : `<button data-revoke="${x.id}" class="${btn("ghost", "sm")} text-red-600 dark:text-red-400">${esc(tk("revoke"))}</button>`}
+                  </div>`,
+                )
+                .join("")}</div>`
+            : empty(tk("empty"))
+        }
+      </div>`;
+    };
+    paint();
+    view.onclick = async (e) => {
+      if (e.target.closest("#cn-switch")) {
+        const next = !on;
+        const { error } = await sb.from("gw_settings").upsert({ key: "ai_connector", value: { enabled: next }, updated_at: new Date().toISOString(), updated_by: me.id });
+        if (error) return setMsg(t("admin.groups.saveFailed"));
+        on = next;
+        paint();
+        return toast(tk("saved"));
+      }
+      const b = e.target.closest("[data-revoke]");
+      if (!b) return;
+      if (!(await confirmDialog(tk("switchTitle"), tk("revokeConfirm"), tk("revoke"), t("admin.groups.cancel")))) return;
+      const { error } = await sb.rpc("gw_mcp_revoke", { p_id: b.dataset.revoke });
+      if (error) return setMsg(t("admin.groups.saveFailed"));
+      connectorTab();
+    };
+  }
+
   // ================================================================ 操作记录
   async function auditTab() {
     const seq = routeSeq;
@@ -2081,7 +2132,7 @@
 
   // ================================================================ 以此人身份预览（只读）
   // ---------------------------------------------------------------- 分页切换（#users、#groups …）
-  const HANDLERS = { users: usersTab, groups: groupsTab, access: accessTab, roles: rolesTab, business: businessTab, company: companyTab, sectors: sectorsTab, modules: modulesTab, audit: auditTab };
+  const HANDLERS = { users: usersTab, groups: groupsTab, access: accessTab, roles: rolesTab, business: businessTab, company: companyTab, sectors: sectorsTab, modules: modulesTab, connector: connectorTab, audit: auditTab };
   // 上面三个大按钮：一样宽，当前的在正中间，其他的淡一点；点旁边的就左右滑动过去
   const SEC_W = 208, SEC_GAP = 8;
   function paintSections(activeKey) {

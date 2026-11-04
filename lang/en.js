@@ -190,7 +190,33 @@ window.GW_LANG["en"] = {
     "resetHomeConfirm": "Reset your home page? Your widgets, folders and ordering will be cleared.",
     "resetHomeDone": "Home page reset.",
     "cancel": "Cancel",
-    "confirm": "Reset"
+    "confirm": "Reset",
+    "connector": {
+      "title": "AI Connector",
+      "intro": "Chat with your own AI (for example Claude) about your MJM Connect data. Create a private link, add it to your AI app as a custom connector, then ask for data or reports. It can only read what you are allowed to see.",
+      "off": "The AI Connector is not turned on yet. Please ask your administrator.",
+      "notReady": "The database has not been updated for the AI Connector yet.",
+      "create": "Create connector link",
+      "name": "Name",
+      "namePlaceholder": "e.g. My laptop",
+      "created": "Your new link (shown only once)",
+      "copy": "Copy",
+      "copied": "Copied",
+      "warn": "Treat this link like a password. Anyone who has it can read your data through an AI. If it leaks, revoke it below.",
+      "howTitle": "How to connect",
+      "how1": "Claude (claude.ai): Settings → Connectors → Add custom connector → paste the link.",
+      "how2": "Claude Desktop, Claude Code and other AI apps that support MCP: add it as a remote MCP server using this link.",
+      "yours": "Your links",
+      "none": "No links yet.",
+      "lastUsed": "Last used {time}",
+      "neverUsed": "Never used",
+      "revoked": "Revoked",
+      "revoke": "Revoke",
+      "revokeConfirm": "Revoke this link? The AI app that uses it will stop working.",
+      "revokedDone": "Link revoked.",
+      "tooMany": "You already have 5 active links. Revoke one first.",
+      "error": "Something went wrong. Please try again."
+    }
   },
   "fab": {
     "menu": "Add or edit",
@@ -435,7 +461,8 @@ window.GW_LANG["en"] = {
       "audit": "Audit log",
       "access": "By Module",
       "roles": "Role",
-      "sectors": "Sector"
+      "sectors": "Sector",
+      "connector": "AI Connector"
     },
     "users": {
       "search": "Search name or email…",
@@ -730,6 +757,23 @@ window.GW_LANG["en"] = {
       "noPermission": "You can see that this user has {name}, but your role cannot manage access inside it.",
       "tickAccessFirst": "Tick Access first to set the other options.",
       "noCompany": "No company yet"
+    },
+    "connector": {
+      "switchTitle": "AI Connector",
+      "switchDesc": "Lets staff connect their own AI app to the company data they can already see. When it is off, every link stops working.",
+      "on": "On",
+      "off": "Off",
+      "saved": "Saved.",
+      "links": "Links",
+      "user": "User",
+      "empty": "No links have been created yet.",
+      "created": "Created {time}",
+      "lastUsed": "Last used {time}",
+      "neverUsed": "Never used",
+      "revoked": "Revoked",
+      "revoke": "Revoke",
+      "revokeConfirm": "Revoke this link? The AI app that uses it will stop working.",
+      "notReady": "The database has not been updated for the AI Connector yet."
     }
   },
   "diesel": {

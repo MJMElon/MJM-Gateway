@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(114);
+select plan(127);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -518,6 +518,43 @@ select pg_temp.logout();
 select is(public.gw_ai_take('00000000-0000-0000-0000-0000000000a3', 2), 1, 'AI：第一次，还剩 1 次');
 select is(public.gw_ai_take('00000000-0000-0000-0000-0000000000a3', 2), 0, 'AI：第二次，还剩 0 次');
 select is(public.gw_ai_take('00000000-0000-0000-0000-0000000000a3', 2), -1, 'AI：超过上限回传 -1');
+
+-- AI Connector（自己的 AI 连到公司资料）
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+select throws_ok($$ select public.gw_mcp_create('x') $$, 'connector_off', 'AI Connector：开关关闭时不能建立链接');
+select throws_ok($$ insert into public.gw_settings (key, value) values ('ai_connector', '{"enabled":true}') $$, '42501', null, 'AI Connector：一般用户不能改全站开关');
+select pg_temp.logout();
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+insert into public.gw_settings (key, value) values ('ai_connector', '{"enabled":true}');
+select pg_temp.logout();
+select is(public.gw_mcp_enabled(), true, 'AI Connector：super_admin 可以打开开关');
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+create temp table mcp_t as select public.gw_mcp_create('laptop') as r;
+select ok((select r->>'token' from mcp_t) like 'gwm\_%', 'AI Connector：链接以 gwm_ 开头');
+select is((select count(*) from public.gw_mcp_list()), 1::bigint, 'AI Connector：用户看得到自己的链接');
+select pg_temp.logout();
+select is(public.gw_mcp_resolve(encode(sha256(convert_to((select r->>'token' from mcp_t), 'utf8')), 'hex')), '00000000-0000-0000-0000-0000000000a3'::uuid, 'AI Connector：链接对应到建立它的用户');
+select is(public.gw_mcp_resolve('nope'), null, 'AI Connector：乱写的链接没有用户');
+select pg_temp.login('00000000-0000-0000-0000-0000000000a4');
+select is((select count(*) from public.gw_mcp_list()), 0::bigint, 'AI Connector：看不到别人的链接');
+select public.gw_mcp_revoke((select (r->>'id')::uuid from mcp_t));
+select pg_temp.logout();
+select is(public.gw_mcp_resolve(encode(sha256(convert_to((select r->>'token' from mcp_t), 'utf8')), 'hex')), '00000000-0000-0000-0000-0000000000a3'::uuid, 'AI Connector：别人撤销不了你的链接');
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+select cmp_ok((select count(*) from public.gw_mcp_list()), '>=', 1::bigint, 'AI Connector：super_admin 看得到全部链接');
+select pg_temp.logout();
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+select public.gw_mcp_revoke((select (r->>'id')::uuid from mcp_t));
+select pg_temp.logout();
+select is(public.gw_mcp_resolve(encode(sha256(convert_to((select r->>'token' from mcp_t), 'utf8')), 'hex')), null, 'AI Connector：撤销后链接失效');
+select pg_temp.login('00000000-0000-0000-0000-0000000000a3');
+create temp table mcp_t2 as select public.gw_mcp_create('phone') as r;
+select pg_temp.logout();
+update public.gw_settings set value = '{"enabled":false}' where key = 'ai_connector';
+select is(public.gw_mcp_resolve(encode(sha256(convert_to((select r->>'token' from mcp_t2), 'utf8')), 'hex')), null, 'AI Connector：开关关闭后所有链接失效');
+update public.gw_settings set value = '{"enabled":true}' where key = 'ai_connector';
+update public.gw_profiles set status = 'disabled' where id = '00000000-0000-0000-0000-0000000000a3';
+select is(public.gw_mcp_resolve(encode(sha256(convert_to((select r->>'token' from mcp_t2), 'utf8')), 'hex')), null, 'AI Connector：用户被停用后链接失效');
 
 select is((select count(*) from public.gw_profiles where user_code is null), 0::bigint, '每个用户都有代码');
 select is((select count(distinct user_code) from public.gw_profiles), (select count(*) from public.gw_profiles), '用户代码不重复');

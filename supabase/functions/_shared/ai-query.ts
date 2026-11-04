@@ -1,5 +1,5 @@
 // 在已取得的资料列上做筛选、分组汇总、排序（全部在 Edge Function 里算，不把整张表送给 AI）
-import type { Dataset } from "./datasets.ts";
+import type { Dataset } from "./ai-datasets.ts";
 
 export type Filter = { column: string; op: string; value?: unknown };
 export type Metric = { fn: string; column?: string; as?: string };
