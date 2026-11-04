@@ -240,7 +240,8 @@ window.GW_LANG["zh-CN"] = {
       "calendar": "月历",
       "notes": "便条",
       "admin": "管理",
-      "weather": "天气"
+      "weather": "天气",
+      "ai": "AI 助手"
     },
     "desc": {
       "greeting": "问候语和今天日期",
@@ -251,7 +252,8 @@ window.GW_LANG["zh-CN"] = {
       "calendar": "这个月的月历",
       "notes": "只有自己看得到的便条",
       "admin": "User Access 和 Super Admin 捷径",
-      "weather": "你所在位置今天的天气"
+      "weather": "你所在位置今天的天气",
+      "ai": "问资料、做报表并下载"
     },
     "sizes": {
       "small": "小",
@@ -290,6 +292,31 @@ window.GW_LANG["zh-CN"] = {
       "rain": "雨",
       "snow": "雪",
       "storm": "雷雨"
+    },
+    "ai": {
+      "title": "AI 助手",
+      "placeholder": "问问你的资料…",
+      "send": "送出",
+      "thinking": "思考中…",
+      "clear": "清除聊天",
+      "intro": "可以问你有权限看的公司资料，也可以要求做报表，直接下载。",
+      "s1": "这个月每辆车的柴油报销",
+      "s2": "今年哪几辆车用最多柴油？",
+      "s3": "做一份所有待审核柴油报销的报表",
+      "rows": "{count} 笔",
+      "excel": "Excel",
+      "csv": "CSV",
+      "expired": "请再问一次才能下载这份报表。",
+      "errors": {
+        "no_key": "AI 助手还没启用，需要管理员在 Supabase 加入 AI 钥匙。",
+        "limit": "你今天的 AI 提问次数已用完（上限 {limit}），请明天再试。",
+        "upstream": "AI 服务没有回应，请稍后再试。",
+        "failed": "出错了，请再试一次。",
+        "network": "连不上 AI 服务，请检查网络后再试。",
+        "forbidden": "请重新登入。",
+        "not_ready": "AI 助手还在设定中，请稍后再试。",
+        "bad_request": "请输入问题。"
+      }
     }
   },
   "admin": {

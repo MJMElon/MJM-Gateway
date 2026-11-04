@@ -240,7 +240,8 @@ window.GW_LANG["en"] = {
       "calendar": "Calendar",
       "notes": "Notes",
       "admin": "Administration",
-      "weather": "Weather"
+      "weather": "Weather",
+      "ai": "AI Assistant"
     },
     "desc": {
       "greeting": "Good morning with today’s date",
@@ -251,7 +252,8 @@ window.GW_LANG["en"] = {
       "calendar": "This month at a glance",
       "notes": "A private note only you can see",
       "admin": "User Access and Super Admin shortcuts",
-      "weather": "Today’s forecast for your location"
+      "weather": "Today’s forecast for your location",
+      "ai": "Ask about your data and download reports"
     },
     "sizes": {
       "small": "S",
@@ -290,6 +292,31 @@ window.GW_LANG["en"] = {
       "rain": "Rain",
       "snow": "Snow",
       "storm": "Thunderstorm"
+    },
+    "ai": {
+      "title": "AI Assistant",
+      "placeholder": "Ask about your data…",
+      "send": "Send",
+      "thinking": "Thinking…",
+      "clear": "Clear chat",
+      "intro": "Ask me about the company data you can access, or ask for a report you can download.",
+      "s1": "Diesel claims this month by vehicle",
+      "s2": "Which vehicles used the most diesel this year?",
+      "s3": "Make a report of all pending diesel claims",
+      "rows": "{count} rows",
+      "excel": "Excel",
+      "csv": "CSV",
+      "expired": "Ask again to download this report.",
+      "errors": {
+        "no_key": "The AI assistant is not switched on yet. An administrator needs to add the AI key in Supabase.",
+        "limit": "You have used today’s AI questions (limit {limit}). Please try again tomorrow.",
+        "upstream": "The AI service did not answer. Please try again in a moment.",
+        "failed": "Something went wrong. Please try again.",
+        "network": "Could not reach the AI service. Check your connection and try again.",
+        "forbidden": "Please sign in again.",
+        "not_ready": "The AI assistant is still being set up. Please try again later.",
+        "bad_request": "Please type a question."
+      }
     }
   },
   "admin": {

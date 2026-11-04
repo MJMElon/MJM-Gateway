@@ -1,7 +1,7 @@
 -- Gateway 权限测试（本地执行：npx supabase test db）
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(111);
+select plan(114);
 
 -- ---------------------------------------------------------------------
 -- 测试资料
@@ -513,6 +513,11 @@ select is(
   '反应附上按的人的名字'
 );
 select pg_temp.logout();
+
+-- AI 每天次数上限
+select is(public.gw_ai_take('00000000-0000-0000-0000-0000000000a3', 2), 1, 'AI：第一次，还剩 1 次');
+select is(public.gw_ai_take('00000000-0000-0000-0000-0000000000a3', 2), 0, 'AI：第二次，还剩 0 次');
+select is(public.gw_ai_take('00000000-0000-0000-0000-0000000000a3', 2), -1, 'AI：超过上限回传 -1');
 
 select is((select count(*) from public.gw_profiles where user_code is null), 0::bigint, '每个用户都有代码');
 select is((select count(distinct user_code) from public.gw_profiles), (select count(*) from public.gw_profiles), '用户代码不重复');

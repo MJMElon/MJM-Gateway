@@ -53,6 +53,7 @@ window.GWHome = (function () {
     announcements: { sizes: ["medium", "large"], icon: "megaphone", hidden: true, pinned: true },
     calendar: { sizes: ["small", "medium"], icon: "calendar" },
     weather: { sizes: ["small", "medium"], icon: "cloud-sun" },
+    ai: { sizes: ["medium", "large"], icon: "bot" },
     notes: { sizes: ["small", "medium", "large"], icon: "sticky-note" },
     // 管理入口已改为右上角齿轮；旧的管理小工具仍照常显示，但不再提供新增
     admin: { sizes: ["medium"], icon: "shield-check", hidden: true },
@@ -247,7 +248,7 @@ window.GWHome = (function () {
       const maxX = Math.max(0, root.clientWidth - pw);
       for (let y = startY; y <= bottom; y += GY)
         for (let x = 0; x <= maxX; x += GX) if (!rects.some((r) => hit({ x, y, w: pw, h: ph }, r))) return { x, y };
-      return { x: 0, y: snapY(bottom + 16) };
+      return { x: 0, y: Math.ceil((bottom + 16) / GY) * GY };
     }
 
     async function addWidget(type, size) {
@@ -257,6 +258,8 @@ window.GWHome = (function () {
       if (sectionsOn) {
         // 区块版：新增的小工具浮在所有区块上面，之后可以拖到任何位置，或拖进某个区块
         const [pw, ph] = sizeFor(type, size);
+        // 先把「新增小工具」面板收起来重画（面板打开时页面会多出一块空的 My Home，量到的位置会偏低）
+        if (sheet) ((sheet = null), draw());
         row = { ...row, sort_order: 0, config: { pos: { box: null, ...freeSpot(pw, ph), w: pw, h: ph } } };
       }
       const { data: created, error } = await sb.from("gw_user_widgets").insert(row).select().single();
@@ -406,6 +409,8 @@ window.GWHome = (function () {
             <div data-clock class="font-bold tabular-nums ${w.size === "small" ? "text-3xl" : "text-5xl"}">${esc(fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }))}</div>
             <div class="mt-1 text-sm text-slate-500">${esc(fmt({ weekday: "short", day: "numeric", month: "short" }))}</div>
           </div>`;
+        case "ai":
+          return aiBody();
         case "weather":
           return `<div data-weather="${w.size === "small" ? "small" : "medium"}" class="h-full">${weatherInner(w.size === "small" ? "small" : "medium")}</div>`;
         case "search":
@@ -977,6 +982,7 @@ window.GWHome = (function () {
     // 有些小工具内容比较高（月历），预设大小照内容来，才不会被切掉
     const SIZE_BY_TYPE = {
       calendar: { small: [CELL_W * 2, ROW_PX * 3], medium: [CELL_W * 4, ROW_PX * 3] },
+      ai: { medium: [CELL_W * 4, ROW_PX * 5], large: [CELL_W * 6, ROW_PX * 7] },
       recent: { small: [CELL_W * 2, ROW_PX * 2], medium: [CELL_W * 4, ROW_PX * 2] },
       notes: { small: [CELL_W * 2, ROW_PX * 2], medium: [CELL_W * 4, ROW_PX * 2], large: [CELL_W * 4, ROW_PX * 4] },
     };
@@ -1125,6 +1131,118 @@ window.GWHome = (function () {
       addEventListener("pointermove", move);
       addEventListener("pointerup", up);
       addEventListener("pointercancel", up);
+    });
+
+    // ------------------------------------------------------------ AI 助手：聊天问资料、要报表，报表可以直接下载（Excel / CSV）
+    /* 问题送到 Edge Function gw-ai-chat；它用这个人自己的权限查资料。
+       聊天记录只在这台装置记文字（最近 30 则）；报表的资料只留在这次打开的页面，重新整理后要再问一次才能下载。 */
+    const AI_KEY = "gw_ai_chat_" + profile.id;
+    let aiMsgs = [];
+    try {
+      aiMsgs = JSON.parse(localStorage.getItem(AI_KEY) || "[]").filter((m) => m && typeof m.text === "string");
+    } catch (e) {
+      /* 忽略 */
+    }
+    let aiBusy = false;
+    let aiDraft = "";
+    const aiSave = () => {
+      try {
+        localStorage.setItem(AI_KEY, JSON.stringify(aiMsgs.slice(-30).map((m) => ({ role: m.role, text: m.text, reports: (m.reports || []).map((r) => ({ id: r.id, title: r.title, total: r.total })) }))));
+      } catch (e) {
+        /* 忽略 */
+      }
+    };
+    // 简单的 markdown：表格、列表、粗体、行内代码
+    function mdLite(text) {
+      const inline = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, '<code class="rounded bg-slate-200/70 px-1 dark:bg-slate-700">$1</code>');
+      const lines = String(text).split("\n");
+      let out = "";
+      for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i];
+        if (/^\s*\|/.test(ln)) {
+          const rows = [];
+          while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+          i--;
+          const cells = (r) => r.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+          const body = rows.filter((r) => !/^\s*\|?\s*:?-{2,}/.test(r));
+          out += `<div class="my-1 overflow-x-auto"><table class="min-w-full text-xs">${body.map((r, k) => `<tr>${cells(r).map((c) => (k === 0 ? `<th class="border-b border-slate-300 px-2 py-1 text-left font-semibold">${inline(c)}</th>` : `<td class="border-b border-slate-200/70 px-2 py-1">${inline(c)}</td>`)).join("")}</tr>`).join("")}</table></div>`;
+        } else if (/^\s*[-*]\s+/.test(ln)) {
+          const items = [];
+          while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*[-*]\s+/, ""));
+          i--;
+          out += `<ul class="my-1 list-disc space-y-0.5 pl-4">${items.map((x) => `<li>${inline(x)}</li>`).join("")}</ul>`;
+        } else if (!ln.trim()) out += '<div class="h-1.5"></div>';
+        else out += `<p>${inline(ln)}</p>`;
+      }
+      return out;
+    }
+    function aiBody() {
+      const ta = (k, v) => t("widgets.ai." + k, v);
+      const bubble = (m, idx) =>
+        m.role === "user"
+          ? `<div class="flex justify-end"><div class="max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-3 py-1.5 text-sm text-white whitespace-pre-wrap break-words">${esc(m.text)}</div></div>`
+          : `<div class="flex justify-start"><div class="max-w-[92%] min-w-0 rounded-2xl rounded-bl-md bg-white/70 px-3 py-2 text-sm break-words dark:bg-white/10">${mdLite(m.text)}${(m.reports || [])
+              .map(
+                (r) => `<div class="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 p-2 dark:border-slate-700 dark:bg-slate-900/60">
+                  ${icon("file-spreadsheet", "size-4 shrink-0 text-emerald-600")}<span class="min-w-0 flex-1 truncate text-xs font-semibold" title="${esc(r.title)}">${esc(r.title)}</span><span class="text-[11px] text-slate-500">${esc(ta("rows", { count: r.total }))}</span>
+                  ${r.rows ? `<button type="button" data-ai-dl="${idx}:${r.id}:xlsx" class="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700">${esc(ta("excel"))}</button><button type="button" data-ai-dl="${idx}:${r.id}:csv" class="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold hover:bg-white dark:border-slate-600">${esc(ta("csv"))}</button>` : `<span class="text-[11px] text-slate-400">${esc(ta("expired"))}</span>`}
+                </div>`,
+              )
+              .join("")}</div></div>`;
+      const intro = `<div class="space-y-2 text-sm text-slate-600 dark:text-slate-300"><p>${esc(ta("intro"))}</p><div class="flex flex-wrap gap-1.5">${[1, 2, 3].map((n) => `<button type="button" data-ai-suggest="${esc(ta("s" + n))}" class="rounded-full border border-slate-300 bg-white/70 px-2.5 py-1 text-left text-xs hover:bg-white dark:border-slate-600 dark:bg-white/10">${esc(ta("s" + n))}</button>`).join("")}</div></div>`;
+      return `<div class="flex h-full min-h-0 flex-col">
+        <div class="mb-2 flex items-center justify-between gap-2"><div class="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">${icon("bot", "size-3.5")}${esc(t("widgets.types.ai"))}</div>
+          ${aiMsgs.length ? `<button type="button" data-ai-clear class="no-drag rounded-full px-2 py-0.5 text-[11px] text-slate-500 hover:bg-white/70 dark:hover:bg-white/10">${esc(ta("clear"))}</button>` : ""}</div>
+        <div data-ai-log class="no-drag min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">${aiMsgs.length ? aiMsgs.map(bubble).join("") : intro}${aiBusy ? `<div class="flex justify-start"><div class="rounded-2xl rounded-bl-md bg-white/70 px-3 py-1.5 text-sm text-slate-500 dark:bg-white/10">${esc(ta("thinking"))}</div></div>` : ""}</div>
+        <form data-ai-form class="no-drag mt-2 flex gap-1.5"><input data-ai-input autocomplete="off" maxlength="1000" value="${esc(aiDraft)}" placeholder="${esc(ta("placeholder"))}" ${aiBusy ? "disabled" : ""} class="${cls.input} h-9 min-w-0 flex-1 rounded-full bg-white/80 text-sm dark:bg-slate-800/80"><button type="submit" ${aiBusy ? "disabled" : ""} aria-label="${esc(ta("send"))}" class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white disabled:opacity-50 dark:bg-white dark:text-slate-900">${icon("send", "size-4")}</button></form>
+      </div>`;
+    }
+    function aiAfterDraw() {
+      $$("[data-ai-log]", root).forEach((el) => (el.scrollTop = el.scrollHeight));
+    }
+    async function aiAsk(text) {
+      text = String(text || "").trim();
+      if (!text || aiBusy) return;
+      aiMsgs.push({ role: "user", text });
+      aiDraft = "";
+      aiBusy = true;
+      aiSave();
+      draw();
+      const r = await GW.invoke("gw-ai-chat", { messages: aiMsgs.slice(-12).map((m) => ({ role: m.role, content: m.text })) });
+      aiBusy = false;
+      if (r && r.ok) aiMsgs.push({ role: "assistant", text: r.reply, reports: r.reports || [] });
+      else aiMsgs.push({ role: "assistant", text: t("widgets.ai.errors." + ((r && r.error) || "failed"), { limit: r && r.limit }) });
+      aiSave();
+      draw();
+      const input = $("[data-ai-input]", root);
+      if (input) input.focus();
+    }
+    async function aiDownload(spec) {
+      const [idx, rid, fmt] = spec.split(":");
+      const m = aiMsgs[Number(idx)];
+      const rep = m && (m.reports || []).find((x) => x.id === rid);
+      if (!rep || !rep.rows) return toast(t("widgets.ai.expired"));
+      const day = new Intl.DateTimeFormat("en-CA", { timeZone: GW_CONFIG.timeZone }).format(new Date());
+      const base = (rep.title || "report").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 50) || "report";
+      if (fmt === "xlsx")
+        return GW.downloadXlsx(`${base}-${day}.xlsx`, (wb) => {
+          const ws = wb.addWorksheet((rep.title || "Report").replace(/[\\/?*[\]:]/g, " ").slice(0, 30));
+          ws.columns = rep.columns.map((c) => ({ header: c.label, key: c.key, width: Math.max(12, Math.min(34, c.label.length + 6)) }));
+          rep.rows.forEach((row) => ws.addRow(rep.columns.map((c) => (c.type === "number" && row[c.key] !== null && row[c.key] !== "" ? Number(row[c.key]) : row[c.key] ?? ""))));
+          ws.getRow(1).font = { bold: true };
+          ws.views = [{ state: "frozen", ySplit: 1 }];
+        });
+      const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const lines = [rep.columns.map((c) => q(c.label)).join(","), ...rep.rows.map((row) => rep.columns.map((c) => (c.type === "number" && row[c.key] !== null ? row[c.key] : q(row[c.key]))).join(","))];
+      GW.downloadBlob(`${base}-${day}.csv`, new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+    }
+    root.addEventListener("submit", (e) => {
+      if (!e.target.matches("[data-ai-form]")) return;
+      e.preventDefault();
+      aiAsk($("[data-ai-input]", e.target).value);
+    });
+    root.addEventListener("input", (e) => {
+      if (e.target.matches("[data-ai-input]")) aiDraft = e.target.value;
     });
 
     // ------------------------------------------------------------ 天气：用浏览器的位置，Open-Meteo（免费，不用 key）
@@ -1439,6 +1557,7 @@ window.GWHome = (function () {
         fitBoard();
       }
       if ($("[data-weather]", root)) loadWeather();
+      aiAfterDraw();
       if ($("[data-clock]", root)) {
         clockTimer = setInterval(() => {
           const now = new Intl.DateTimeFormat(GW.LOCALE, { timeZone: GW_CONFIG.timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date());
@@ -2019,6 +2138,9 @@ window.GWHome = (function () {
       if (d.removeFolder) return deleteFolder(d.removeFolder);
       if (d.resize) return resizeWidget(d.resize);
       if ("post" in d) return postNotice();
+      if (d.aiSuggest) return aiAsk(d.aiSuggest);
+      if (d.aiDl) return aiDownload(d.aiDl);
+      if ("aiClear" in d) return ((aiMsgs = []), aiSave(), draw());
       if (d.react) return toggleReaction(...d.react.split(":"));
       if (d.who) return whoReacted(...d.who.split(":"));
       if (d.editNotice) return postNotice(data.announcements.find((a) => a.id === d.editNotice));
