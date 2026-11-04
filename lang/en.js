@@ -154,7 +154,10 @@ window.GW_LANG["en"] = {
     "allCompanies": "All companies",
     "noAppsForCompany": "No apps for this company.",
     "resizeSection": "Drag to resize",
-    "nothingToTidy": "No widgets on the page to tidy."
+    "nothingToTidy": "No widgets on the page to tidy.",
+    "removeFromSection": "Remove from this section",
+    "deleteNoteTitle": "Delete note",
+    "deleteNoteBody": "This note will be deleted."
   },
   "library": {
     "title": "Library",
@@ -223,10 +226,10 @@ window.GW_LANG["en"] = {
     "addWidget": "Add Widget",
     "addWidgetHint": "Pick a widget and a size. It is added to the end of your home screen; drag it to where you want it.",
     "addApps": "Add Apps",
-    "addAppsHint": "Every app you can use. Drag an icon onto your home screen where you want it, or tap + to add it at the end.",
+    "addAppsHint": "Every app you can use. Tap + to add it to your home screen.",
     "newFolder": "New Folder",
     "edit": "Edit Home Screen",
-    "editHint": "Drag to rearrange. Tap − to remove, or the resize button to change a widget’s size.",
+    "editHint": "Drag to rearrange, drag a corner to resize, tap − or ✕ to remove. Tap Done or an empty spot to finish. (Tip: press and hold anything to start editing.)",
     "done": "Done",
     "homeScreen": "Home screen (no folder)",
     "moveOut": "Move to home screen",
@@ -234,7 +237,9 @@ window.GW_LANG["en"] = {
     "emptyHome": "Your home screen is empty. Tap the + button to add apps and widgets.",
     "addLink": "Add Icon (link)",
     "iconColors": "Icon colours",
-    "tidyWidgets": "Tidy widgets"
+    "tidyWidgets": "Tidy widgets",
+    "hiddenApps": "Removed from sections",
+    "putBack": "Put back"
   },
   "widgets": {
     "unavailable": "Widgets will be available after the next system update.",

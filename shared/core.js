@@ -279,7 +279,7 @@ window.GW = (function () {
     if (!el) {
       el = document.createElement("div");
       el.id = "gw-toast";
-      el.className = "fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-6";
+      el.className = "pointer-events-none fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-6";
       document.body.appendChild(el);
     }
     el.innerHTML = `<div class="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg dark:bg-slate-100 dark:text-slate-900">${esc(text)}</div>`;

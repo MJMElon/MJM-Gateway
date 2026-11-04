@@ -154,7 +154,10 @@ window.GW_LANG["zh-CN"] = {
     "allCompanies": "全部 Company",
     "noAppsForCompany": "这个 Company 没有 App。",
     "resizeSection": "拖拉调整大小",
-    "nothingToTidy": "页面上没有需要整理的小工具。"
+    "nothingToTidy": "页面上没有需要整理的小工具。",
+    "removeFromSection": "从这个区块拿掉",
+    "deleteNoteTitle": "删除便条",
+    "deleteNoteBody": "这张便条会被删除。"
   },
   "library": {
     "title": "模块库",
@@ -223,10 +226,10 @@ window.GW_LANG["zh-CN"] = {
     "addWidget": "Add Widget",
     "addWidgetHint": "选一个小工具和大小，会加在主画面最后面，再拖到你想放的位置。",
     "addApps": "Add Apps",
-    "addAppsHint": "你可以使用的全部系统。把图标拖到主画面上想放的位置，或点 + 加在最后面。",
+    "addAppsHint": "你可以使用的全部系统。点 + 加到主画面。",
     "newFolder": "新建文件夹",
     "edit": "编辑主画面",
-    "editHint": "拖拉可以重新排列；点 − 移除，点缩放按钮可改变小工具大小。",
+    "editHint": "拖拉可以重新排列，拖右下角调整大小，点 − 或 ✕ 拿掉；点 Done 或空白处结束。（小提示：按住任何东西不放也可以开始编辑。）",
     "done": "完成",
     "homeScreen": "主画面（不放文件夹）",
     "moveOut": "移回主画面",
@@ -234,7 +237,9 @@ window.GW_LANG["zh-CN"] = {
     "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。",
     "addLink": "新增图示（连结）",
     "iconColors": "图示颜色",
-    "tidyWidgets": "整理小工具"
+    "tidyWidgets": "整理小工具",
+    "hiddenApps": "已从区块拿掉的 App",
+    "putBack": "放回去"
   },
   "widgets": {
     "unavailable": "小工具要等下次系统更新后才能使用。",

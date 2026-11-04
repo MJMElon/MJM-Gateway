@@ -53,3 +53,13 @@ body.gw-dragging { cursor: grabbing; }
 .gw-editing > .gw-item { animation: gw-jiggle .14s ease-in-out infinite alternate; }
 .gw-editing > .gw-item:nth-child(2n) { animation-delay: .07s; }
 @media (prefers-reduced-motion: reduce) { .gw-editing > .gw-item { animation: none; } }
+/* 区块版编辑模式（长按或 Edit Home Screen）：图示和小工具轻轻抖动；减少动态效果时改成静止的虚线框 */
+@keyframes gw-wiggle { 0% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg); } 100% { transform: rotate(-1.4deg); } }
+@keyframes gw-wiggle-sm { 0% { transform: rotate(-.35deg); } 50% { transform: rotate(.35deg); } 100% { transform: rotate(-.35deg); } }
+.gw-jiggle [data-list] > .gw-item { animation: gw-wiggle .3s ease-in-out infinite; }
+.gw-jiggle [data-list] > .gw-item:nth-child(2n) { animation-delay: -.15s; }
+.gw-jiggle .gw-fw-body { animation: gw-wiggle-sm .45s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .gw-jiggle [data-list] > .gw-item, .gw-jiggle .gw-fw-body { animation: none; }
+  .gw-jiggle [data-list] > .gw-item > button > .gw-icon, .gw-jiggle .gw-fw-body > div { outline: 2px dashed rgb(100 116 139 / .55); outline-offset: 3px; }
+}
