@@ -767,7 +767,10 @@ window.GW_LANG["zh-CN"] = {
       "noBusiness": "还没放进任何 Business。",
       "noPermission": "看得到这个用户有 {name}，但你的角色不能管理它里面的权限。",
       "tickAccessFirst": "先勾 Access 才能设定其他项目。",
-      "noCompany": "还没分到 Company"
+      "noCompany": "还没分到 Company",
+      "selfNote": "这是你自己的帐号：可以看你的模块，但不能改自己的权限。",
+      "superNote": "Super Admin 可以打开所有模块，所以这里不能改他的权限。",
+      "viewOnlyNote": "你可以看这个人的模块，但你的角色不能改他的权限。"
     },
     "connector": {
       "switchTitle": "AI Connector",

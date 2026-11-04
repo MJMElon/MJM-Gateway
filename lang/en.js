@@ -767,7 +767,10 @@ window.GW_LANG["en"] = {
       "noBusiness": "Not in any business yet.",
       "noPermission": "You can see that this user has {name}, but your role cannot manage access inside it.",
       "tickAccessFirst": "Tick Access first to set the other options.",
-      "noCompany": "No company yet"
+      "noCompany": "No company yet",
+      "selfNote": "This is your own account: you can see your modules but cannot change your own access.",
+      "superNote": "Super Admin can open every module, so their access cannot be changed here.",
+      "viewOnlyNote": "You can see this person's modules but your role cannot change their access."
     },
     "connector": {
       "switchTitle": "AI Connector",

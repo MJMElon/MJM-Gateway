@@ -350,7 +350,8 @@
         myGroups.some((gid) => ["can_grant_module", "can_revoke_module", "can_set_module_admin"].some((f) => me.bizCan(gid, f))) ||
         (gxRows || []).some((g) => myGroups.includes(g.group_id) && canManageModule(g.module_id)) ||
         (me.adminModuleIds || []).some((mid) => (gxRows || []).some((g) => myGroups.includes(g.group_id) && g.module_id === mid)));
-    let editing = false;
+    // 点名字就直接显示全部模块和 Access / Admin 勾选（不用再按铅笔）
+    const editing = true;
     let ctx = null;
     let diesel = null; // 这个人在 Diesel 里的 Cash Claim / Report
     let open = null; // 正在看的模块（只读模式）
@@ -392,10 +393,9 @@
             }</div>
           </div>
         </div>`;
-      const pencil = m.el.parentElement.querySelector("[data-edit-access]");
-      if (pencil) pencil.className = `rounded-lg p-1 ${editing ? "bg-brand-50 text-brand-600 dark:bg-brand-700/20" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`;
       if (editing) {
-        m.el.innerHTML = `<div class="space-y-4">${head}${ctx ? accessSections(ctx, u, () => diesel || { can_claim: false, can_report: false }) : GW.spinner()}
+        const note = locked ? tu(u.id === me.id ? "selfNote" : "superNote") : !canEdit ? tu("viewOnlyNote") : "";
+        m.el.innerHTML = `<div class="space-y-4">${head}${note ? `<p class="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">${esc(note)}</p>` : ""}${ctx ? accessSections(ctx, u, () => diesel || { can_claim: false, can_report: false }) : GW.spinner()}
           <div class="flex justify-end"><button data-done class="${btn("primary")}">${esc(t("admin.users.done"))}</button></div></div>`;
         refreshIcons();
         return;
@@ -422,26 +422,6 @@
       if (open) detail(open);
     }
 
-    if (canEdit) {
-      // 铅笔放在 X 的左边（和 X 一起靠右）
-      const closeBtn = m.el.parentElement.querySelector("[data-close]");
-      const right = document.createElement("div");
-      right.className = "flex items-center gap-1";
-      closeBtn.replaceWith(right);
-      right.insertAdjacentHTML("beforeend", `<button data-edit-access aria-label="${esc(tu("edit"))}" title="${esc(tu("edit"))}" class="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">${icon("pencil", "size-5")}</button>`);
-      right.append(closeBtn);
-      refreshIcons();
-      m.el.parentElement.querySelector("[data-edit-access]").addEventListener("click", async () => {
-        editing = !editing;
-        if (editing && !ctx) {
-          draw();
-          ctx = await loadAccess();
-          const { data: ua } = await sb.from("diesel_user_access").select("can_claim, can_report").eq("user_id", uid).maybeSingle();
-          diesel = ua || { can_claim: false, can_report: false };
-        }
-        draw();
-      });
-    }
     m.el.addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -465,7 +445,12 @@
       });
     });
     draw();
+    ctx = await loadAccess();
+    const { data: ua } = await sb.from("diesel_user_access").select("can_claim, can_report").eq("user_id", uid).maybeSingle();
+    diesel = ua || { can_claim: false, can_report: false };
+    draw();
   }
+
 
   // ================================================================ 用户名单（super_admin 可以管理；角色有「看名单」只能看，而且只看得到它负责的 Business 的人）
   async function usersTab() {
