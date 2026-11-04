@@ -484,6 +484,12 @@ window.GW_LANG["en"] = {
         "access": "Access to this module",
         "noModules": "The businesses this person is in have no modules yet.",
         "noBusiness": "This person is not in any business yet. Place them in a business first.",
+        "linkedTitle": "Modules in this person's businesses",
+        "unlinkedTitle": "Other modules",
+        "unlinkedHint": "These can't be opened for this person yet. Link the module to one of their businesses, or add them to the module's business.",
+        "notTagged": "Not linked to any business yet. Tag it under Master Manage → Module.",
+        "taggedTo": "Linked to {biz}; this person is not in that business.",
+        "openMaster": "Master Manage → Module",
         "saveFailed": "Could not save. You may not manage this module."
       },
       "addTitle": "Add New User",

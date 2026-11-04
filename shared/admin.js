@@ -160,39 +160,78 @@
     redraw();
   }
 
-  // 某个人在各个 Business 里可以用的模块，和 Access / Admin 勾选（用户资料窗的编辑模式）
+  // 用户资料窗的编辑模式：列出「全部」模块。
+  //   - 模块有标到这个人所在的 Business → 可以勾 Access / Admin，旁边显示是哪个 Business、哪些 Company
+  //   - 没有 → 也列出来但不能勾，说明原因（模块还没标 Business，或这个人不在那个 Business）
   function accessSections(ctx, user, dieselOf) {
     const ta = (k, v) => t("admin.users.accessDialog." + k, v);
-    const modById = new Map(ctx.mods.map((x) => [x.id, x]));
-    const sections = ctx.groups
-      .filter((g) => ctx.inGroup(user.id, g.id))
-      .map((g) => [g, ctx.gm.filter((x) => x.group_id === g.id && modById.has(x.module_id)).map((x) => modById.get(x.module_id))])
-      .filter(([, list]) => list.length);
-    if (!sections.length) return empty(ta(ctx.groups.some((g) => ctx.inGroup(user.id, g.id)) ? "noModules" : "noBusiness"));
-    return `<div class="space-y-4">${sections
-      .map(
-        ([g, list]) => `<div>
-          <p class="mb-1.5 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(g.name)}</p>
-          <div class="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">${list
-            .map((mod) => {
-              const row = ctx.rows.get(user.id + ":" + mod.id);
-              const d = mod.code === "DIESEL" && row && canManageModule(mod.id) ? dieselOf(user.id) : null;
-              return `<div class="p-3 ${mod.is_active ? "" : "opacity-50"}">
-                <div class="flex flex-wrap items-center gap-3">
-                  ${modLogo(mod, "size-8")}
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium">${esc(mod.name)}</span>
-                  <span class="flex gap-4">
-                    ${tick(`data-acc="${user.id}:${mod.id}:admin"`, row && row.is_admin, ctx.canAdmin(user, g.id, mod.id), ta("admin"))}
-                    ${tick(`data-acc="${user.id}:${mod.id}:access"`, !!row, ctx.canAccess(user, g.id, mod.id) && !(row && row.is_admin && !ctx.canAdmin(user, g.id, mod.id)), ta("access"))}
-                  </span>
-                </div>
-                ${d ? `<div class="mt-2 ml-11 flex flex-wrap gap-4">${["can_claim", "can_report"].map((k) => tick(`data-diesel="${k}"`, d[k], true, t("diesel." + (k === "can_claim" ? "cashClaims" : "report")))).join("")}</div>` : ""}
-              </div>`;
-            })
-            .join("")}</div>
-        </div>`,
-      )
-      .join("")}</div>`;
+    const gName = new Map(ctx.groups.map((g) => [g.id, g.name]));
+    const myGids = ctx.groups.filter((g) => ctx.inGroup(user.id, g.id)).map((g) => g.id);
+    const bizOf = (mid) => ctx.gm.filter((x) => x.module_id === mid).map((x) => x.group_id).filter((gid) => gName.has(gid));
+    const chip = (text, tone) =>
+      `<span class="inline-flex max-w-[12rem] truncate rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}">${esc(text)}</span>`;
+    const tags = (mod, gids) =>
+      [...gids.map((gid) => chip(gName.get(gid), "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300")),
+       ...ctx.companyTags(mod.id).map((c) => chip(c, "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"))].join("");
+
+    const linked = [], unlinked = [];
+    ctx.mods.forEach((mod) => {
+      const all = bizOf(mod.id);
+      const here = all.filter((gid) => myGids.includes(gid));
+      (here.length ? linked : unlinked).push({ mod, all, here });
+    });
+
+    const linkedRow = ({ mod, here }) => {
+      const row = ctx.rows.get(user.id + ":" + mod.id);
+      // 用第一个我管得到的 Business 判断能不能勾
+      const gidFor = (fn) => here.find((gid) => fn(user, gid, mod.id)) || here[0];
+      const accGid = gidFor(ctx.canAccess), admGid = gidFor(ctx.canAdmin);
+      const canAdm = ctx.canAdmin(user, admGid, mod.id);
+      const canAcc = ctx.canAccess(user, accGid, mod.id) && !(row && row.is_admin && !canAdm);
+      const d = mod.code === "DIESEL" && row && canManageModule(mod.id) ? dieselOf(user.id) : null;
+      return `<div class="p-3 ${mod.is_active ? "" : "opacity-50"}">
+        <div class="flex flex-wrap items-center gap-3">
+          ${modLogo(mod, "size-8")}
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-medium">${esc(mod.name)}</p>
+            <div class="mt-1 flex flex-wrap gap-1">${tags(mod, here)}</div>
+          </div>
+          <span class="flex gap-4">
+            ${tick(`data-acc="${user.id}:${mod.id}:admin"`, row && row.is_admin, canAdm, ta("admin"))}
+            ${tick(`data-acc="${user.id}:${mod.id}:access"`, !!row, canAcc, ta("access"))}
+          </span>
+        </div>
+        ${d ? `<div class="mt-2 ml-11 flex flex-wrap gap-4">${["can_claim", "can_report"].map((k) => tick(`data-diesel="${k}"`, d[k], true, t("diesel." + (k === "can_claim" ? "cashClaims" : "report")))).join("")}</div>` : ""}
+      </div>`;
+    };
+
+    const unlinkedRow = ({ mod, all }) => {
+      const why = all.length ? ta("taggedTo", { biz: all.map((gid) => gName.get(gid)).join(", ") }) : ta("notTagged");
+      return `<div class="flex flex-wrap items-center gap-3 p-3 opacity-70">
+        ${modLogo(mod, "size-8")}
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-medium">${esc(mod.name)}</p>
+          <p class="mt-0.5 text-xs text-slate-500">${esc(why)}</p>
+        </div>
+        ${isSuper ? `<a href="admin.html#modules" class="text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400">${esc(ta("openMaster"))}</a>` : ""}
+      </div>`;
+    };
+
+    const block = (title, hint, rows, fn) =>
+      rows.length
+        ? `<div>
+            <p class="mb-0.5 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(title)}</p>
+            ${hint ? `<p class="mb-1.5 text-xs text-slate-400">${esc(hint)}</p>` : ""}
+            <div class="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">${rows.map(fn).join("")}</div>
+          </div>`
+        : "";
+
+    if (!ctx.mods.length) return empty(ta("noModules"));
+    return `<div class="space-y-4">
+      ${myGids.length ? "" : `<div class="${cls.empty}">${esc(ta("noBusiness"))}</div>`}
+      ${block(ta("linkedTitle"), "", linked, linkedRow)}
+      ${block(ta("unlinkedTitle"), ta("unlinkedHint"), unlinked, unlinkedRow)}
+    </div>`;
   }
 
   // ================================================================ 模块权限（每个模块：谁是 Admin、谁有 Access）

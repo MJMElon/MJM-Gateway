@@ -484,6 +484,12 @@ window.GW_LANG["zh-CN"] = {
         "access": "可以使用这个模块",
         "noModules": "这个人所属的 Business 还没有模块。",
         "noBusiness": "这个人还没放进任何 Business，请先放进 Business。",
+        "linkedTitle": "这个人所在 Business 的模块",
+        "unlinkedTitle": "其他模块",
+        "unlinkedHint": "这些模块暂时不能开给这个人：先把模块标到他所在的 Business，或把他放进模块所在的 Business。",
+        "notTagged": "还没标任何 Business，请到 Master Manage → Module 设定。",
+        "taggedTo": "已标在 {biz}；这个人不在那个 Business。",
+        "openMaster": "Master Manage → Module",
         "saveFailed": "无法储存，你可能没有管理这个模块的权限。"
       },
       "addTitle": "新增用户",
