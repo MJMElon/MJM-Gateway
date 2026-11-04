@@ -1,5 +1,5 @@
 /* ================================================================
-   MJM Connect — 主画面（像 iPhone 的主画面）
+   MJM Intranet — 主画面（像 iPhone 的主画面）
    Notice Board 固定在最上面；下面是固定格子的棋盘，App 图标、小工具、文件夹可以拖到任何空格（手机长按），会自动对齐。
    右下角浮动按钮：Add Widget、Add Apps（把 App 拖到想放的位置）、New Folder、Edit Home Screen。
    位置：App 存 gw_user_layout、文件夹存 gw_user_folders、小工具存 gw_user_widgets，sort_order = 第几格（slot）。

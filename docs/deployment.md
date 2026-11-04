@@ -1,7 +1,7 @@
 # 上线步骤
 
-线上 Supabase 项目：**MJM Gateway**（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`）。
-网站发布在 **GitHub Pages**：`https://mjmelon.github.io/MJM-Gateway/`（纯 HTML，不需要建置）。
+线上 Supabase 项目：**MJM Intranet**（原 NASA Dashboard，ref `briqzyxfxsvulyizzbiu`）。
+网站发布在 **GitHub Pages**：`https://mjmelon.github.io/MJM-Intranet/`（纯 HTML，不需要建置）。
 
 ## 架构
 
@@ -57,6 +57,6 @@ GitHub repo → Settings → Pages → Build and deployment：
 ## 5. Supabase Auth 设定（忘记密码需要）
 
 - Authentication → URL Configuration
-  - Site URL：`https://mjmelon.github.io/MJM-Gateway/`
-  - Redirect URLs：加入 `https://mjmelon.github.io/MJM-Gateway/**`
+  - Site URL：`https://mjmelon.github.io/MJM-Intranet/`
+  - Redirect URLs：加入 `https://mjmelon.github.io/MJM-Intranet/**`
 - Authentication → Emails：设定 SMTP（内建邮件每小时只能寄很少封）

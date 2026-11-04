@@ -1,12 +1,12 @@
-# MJM Connect（MJM Gateway）
+# MJM Intranet
 
 公司系统统一入口：员工登录一次，就能看到并打开自己有权限的所有系统。
 Gateway 只管**认证、授权、导航**，不处理业务资料。
 
-- 网址：https://mjmelon.github.io/MJM-Gateway/
+- 网址：https://mjmelon.github.io/MJM-Intranet/
 - 前端：纯 HTML + JavaScript（跟 mjm-ai-system 一样），不需要建置；GitHub Pages「从分支发布」
 - 函式库（CDN）：Tailwind CSS（@tailwindcss/browser）、supabase-js、SortableJS（拖拉，支持手机长按）、Lucide 图示、ExcelJS（需要时才载入）
-- 后端：Supabase 项目 MJM Gateway（ref `briqzyxfxsvulyizzbiu`）：Auth、PostgreSQL、RLS、Edge Functions
+- 后端：Supabase 项目 MJM Intranet（ref `briqzyxfxsvulyizzbiu`）：Auth、PostgreSQL、RLS、Edge Functions
 - 界面文字：预设英文 `lang/en.js`，另有简体中文 `lang/zh-CN.js`（个人设置可切换）；以后加 `ms.js`
 
 ## 档案
@@ -35,7 +35,7 @@ docs/                    目标系统接入说明、上线步骤
 
 ## 权限模型
 
-- **Icon**（`gw_modules`，以前叫「模块」）：`kind` = `system`（MJM Connect 旗下的系统，例如 Diesel）或 `link`（现有系统、任何外部网站）
+- **Icon**（`gw_modules`，以前叫「模块」）：`kind` = `system`（MJM Intranet 旗下的系统，例如 Diesel）或 `link`（现有系统、任何外部网站）
   - 标签：Business（`gw_group_modules`）＋ Company（`gw_module_companies`）
 - **Company**（`gw_companies`）是独立主资料：固定的代码（`code`）、简称、注册号码；可以属于多个 Business（`gw_business_companies`）
   - 对应到现有系统：`gw_company_mappings`（Company × 系统 Icon → 那个系统里的 ID / 名称），之后资料对接用

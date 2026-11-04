@@ -2,7 +2,7 @@
 window.GW_LANG = window.GW_LANG || {};
 window.GW_LANG["zh-CN"] = {
   "app": {
-    "name": "MJM Connect",
+    "name": "MJM Intranet",
     "tagline": "公司系统统一入口"
   },
   "nav": {
@@ -434,7 +434,7 @@ window.GW_LANG["zh-CN"] = {
     "modules": {
       "noMatch": "没有符合筛选的模块。",
       "activeLabel": "启用",
-      "description": "大家可以从 MJM Connect 打开的每一个 模块。System = MJM Connect 旗下的系统（例如 Diesel）；Link = 现有系统或任何外部网站。给每个 模块 标上 Business（和 Company），开权限时就会出现在对的地方。",
+      "description": "大家可以从 MJM Intranet 打开的每一个 模块。System = MJM Intranet 旗下的系统（例如 Diesel）；Link = 现有系统或任何外部网站。给每个 模块 标上 Business（和 Company），开权限时就会出现在对的地方。",
       "add": "新增模块",
       "addTitle": "新增模块",
       "editTitle": "修改模块",
@@ -484,7 +484,7 @@ window.GW_LANG["zh-CN"] = {
         "system": "System",
         "link": "Link"
       },
-      "kindHint": "System：MJM Connect 旗下；Link：现有系统或网站。",
+      "kindHint": "System：MJM Intranet 旗下；Link：现有系统或网站。",
       "urlHint": "Link：https:// 开头的完整网址。System：这个网站里的路径（例如 diesel/index.html）或完整网址。",
       "businessTags": "Business 标签",
       "businessTagsHint": "这些 Business 的人可以被开权限。",
