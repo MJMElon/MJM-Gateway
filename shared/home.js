@@ -230,6 +230,26 @@ window.GWHome = (function () {
       await saveApps([{ module_id: id, folder_id: fid, sort_order: order }]);
     }
 
+    // 新增的小工具放在页面上的空位：不压到 Notice Board、各区块、也不压到别的小工具；
+    // 找不到空位（区块都占满整行）就放在所有内容的下面
+    function freeSpot(pw, ph) {
+      const rr = root.getBoundingClientRect();
+      const rel = (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height };
+      };
+      const rects = $$(".gw-pinned, [data-box], [data-sec-key=home] > section", root).map(rel);
+      widgets.filter((w) => isFloating(w) && !w.config.pos.box).forEach((w) => rects.push({ x: w.config.pos.x, y: w.config.pos.y, w: w.config.pos.w, h: w.config.pos.h }));
+      const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      const bottom = Math.max(0, ...rects.map((r) => r.y + r.h));
+      const board = $(".gw-pinned", root);
+      const startY = snapY((board ? rel(board).y + rel(board).h : 0) + 16);
+      const maxX = Math.max(0, root.clientWidth - pw);
+      for (let y = startY; y <= bottom; y += GY)
+        for (let x = 0; x <= maxX; x += GX) if (!rects.some((r) => hit({ x, y, w: pw, h: ph }, r))) return { x, y };
+      return { x: 0, y: snapY(bottom + 16) };
+    }
+
     async function addWidget(type, size) {
       if (!widgetsEnabled) return toast(t("widgets.unavailable"));
       const [w, h] = SIZES[size];
@@ -237,8 +257,7 @@ window.GWHome = (function () {
       if (sectionsOn) {
         // 区块版：新增的小工具浮在所有区块上面，之后可以拖到任何位置，或拖进某个区块
         const [pw, ph] = SIZE_PX[size] || [320, 190];
-        const top = root.getBoundingClientRect().top;
-        row = { ...row, sort_order: 0, config: { pos: { box: null, x: Math.max(8, Math.round((root.clientWidth - pw) / 2)), y: Math.max(0, Math.round(-top + 110)), w: pw, h: ph } } };
+        row = { ...row, sort_order: 0, config: { pos: { box: null, ...freeSpot(pw, ph), w: pw, h: ph } } };
       }
       const { data: created, error } = await sb.from("gw_user_widgets").insert(row).select().single();
       if (error) return toast(t("home.saveFailed"));
@@ -563,9 +582,11 @@ window.GWHome = (function () {
       return S.companies.filter((c) => ids.has(c.id));
     };
     const selectedCompany = (gid) => {
-      if (companiesOf(gid).length < 2) return "all"; // 只有一个 Company：不用选，全部显示
-      const v = companySel.get(gid) || S.myCompany[gid] || "all";
-      return v !== "all" && companiesOf(gid).some((c) => c.id === v) ? v : "all";
+      const list = companiesOf(gid);
+      if (list.length < 2) return "all"; // 只有一个 Company：不用选，全部显示
+      // 一定选一个 Company：自己选过的 → 自己的 Company → 第一个
+      const v = companySel.get(gid) || S.myCompany[gid];
+      return list.some((c) => c.id === v) ? v : list[0].id;
     };
     // 模块有标 Company 的，只在选了那个 Company（或选全部）时显示；没标 Company 的模块一律显示
     const shownFor = (gid, moduleId) => {
@@ -594,16 +615,30 @@ window.GWHome = (function () {
     const TILE_H = "h-[6.25rem]";
     const ROW_PX = 100;
     // ---- 区块的大小：宽度（占一整行的比例）和展开时的高度，记在 Notice Board 小工具的 config.layout
-    const secLayout = (key) => ({ w: 1, h: null, ...((board() && board().config && board().config.layout && board().config.layout[key]) || {}) });
-    async function saveLayout(key, patch) {
+    const CELL_W = 104; // 一格的宽度：区块宽度按整数栏吸附，间距才会平均
+    const PAD_W = 48; // 区块左右的内距（外层 8×2 + 区块 16×2）
+    const secLayout = (key) => ({ w: 1, h: null, cols: null, mode: null, ...((board() && board().config && board().config.layout && board().config.layout[key]) || {}) });
+    // 三种大小：title = 只看标题（Business 和 Company 名字）；row = 第一行 App；full = 全部 App
+    const modeOf = (key) => secLayout(key).mode || (expanded.get(key) ? "full" : "row");
+    const MODES = ["title", "row", "full"];
+    // 先改画面用的资料（马上重画才会看到），再存到数据库
+    function setLayout(key, patch) {
       const bw = board();
-      if (!bw) return;
+      if (!bw) return null;
       const layout = { ...((bw.config && bw.config.layout) || {}), [key]: { ...secLayout(key), ...patch } };
       bw.config = { ...(bw.config || {}), layout };
+      return bw;
+    }
+    async function saveLayout(key, patch) {
+      const bw = setLayout(key, patch);
+      if (!bw) return;
       const { error } = await sb.from("gw_user_widgets").update({ config: bw.config }).eq("id", bw.id);
       if (error) toast(t("home.saveFailed"));
     }
-    const boxCols = (key) => Math.max(2, Math.min(12, Math.floor(((root.clientWidth || 1000) * secLayout(key).w - 72) / 104)));
+    const boxCols = (key) => {
+      const fit = Math.max(2, Math.floor(((root.clientWidth || 1000) - PAD_W) / CELL_W));
+      return Math.max(2, Math.min(fit, secLayout(key).cols || fit));
+    };
     const widthOf = (it, n) => (it.kind === "note" ? Math.min(2, n) : 1);
 
     /* 区块里每个东西的位置记的是「第几行第几栏」（行 × 100 + 栏）：放哪就在哪，中间可以空着，不会自己挤在一起。
@@ -669,19 +704,22 @@ window.GWHome = (function () {
     // 右下角：拖拉调整区块大小
     const resizeGrip = (key) => `<span data-sec-resize="${key}" title="${esc(t("home.resizeSection"))}" aria-label="${esc(t("home.resizeSection"))}" class="absolute right-1.5 bottom-1.5 z-20 flex size-5 cursor-nwse-resize touch-none items-end justify-end text-slate-400 hover:text-slate-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1 1 11M11 6 6 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>`;
 
-    // 一个 Business 的区块：默认收起（只显示第一行），右上角按钮展开；里面的 App 一定会显示（这个 Business 有的模块）
-    function boxShell({ key, title, open, tiles, n, rows, widgetsHtml }) {
+    // 一个 Business 的区块：三种大小（只看标题 / 第一行 / 全部）；里面的 App 一定会显示（这个 Business 有的模块）
+    function boxShell({ key, title, mode, tiles, n, rows, widgetsHtml }) {
       const lay = secLayout(key);
+      const open = mode === "full";
       const R = open ? rows + 1 : rows;
       const body = tiles || `<p class="col-span-full row-start-1 px-1 py-3 text-sm text-slate-500">${esc(t("home.noAppsForCompany"))}</p>`;
-      return `<div data-sec-wrap data-sec-key="${key}" class="p-2" style="width:${Math.round(lay.w * 100)}%">
-        <section data-box="${key}" class="${glass} h-auto! overflow-visible! pb-6 ${companyMenuGid === key ? "z-30" : ""}">
-          <div class="mb-2 flex items-center justify-between gap-2">
+      const wrapW = lay.cols ? `${n * CELL_W + PAD_W}px` : "100%";
+      const step = (dir, ic, label, off) => `<button type="button" data-mode="${dir}" aria-label="${esc(label)}" title="${esc(label)}" ${off ? "disabled" : ""} class="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-white/60 disabled:pointer-events-none disabled:opacity-25 dark:hover:bg-white/10">${icon(ic, "size-4")}</button>`;
+      return `<div data-sec-wrap data-sec-key="${key}" class="p-2" style="width:${wrapW};max-width:100%">
+        <section data-box="${key}" class="${glass} h-auto! overflow-visible! ${mode === "title" ? "pb-3" : "pb-6"} ${companyMenuGid === key ? "z-30" : ""}">
+          <div class="${mode === "title" ? "" : "mb-2"} flex items-center justify-between gap-2">
             <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2>${companyPicker(key)}</div>
-            <button type="button" data-expand="${key}" aria-label="${esc(t(open ? "home.collapse" : "home.expand"))}" title="${esc(t(open ? "home.collapse" : "home.expand"))}" class="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-white/60 dark:hover:bg-white/10">${icon(open ? "chevrons-up" : "chevrons-down", "size-4")}</button>
+            <div class="flex shrink-0 items-center">${step("less", "chevron-up", t("home.collapse"), mode === "title")}${step("more", "chevron-down", t("home.expand"), mode === "full")}</div>
           </div>
-          <div data-list="${key}" data-fw-host="${key}" data-cols="${n}" class="relative grid gap-x-1 overflow-hidden ${open ? "" : "max-h-[6.25rem]"}" style="grid-template-columns:repeat(${n},minmax(0,1fr));grid-template-rows:repeat(${R},${ROW_PX}px);${open && lay.h ? `min-height:${lay.h}px;` : ""}">${body}<div data-box-hint class="pointer-events-none hidden rounded-2xl border-2 border-dashed"></div>${widgetsHtml || ""}</div>
-          ${resizeGrip(key)}
+          <div data-list="${key}" data-fw-host="${key}" data-cols="${n}" class="relative mx-auto grid gap-x-0 overflow-hidden ${mode === "title" ? "hidden" : ""} ${mode === "row" ? "max-h-[6.25rem]" : ""}" style="width:${n * CELL_W}px;max-width:100%;grid-template-columns:repeat(${n},${CELL_W}px);grid-template-rows:repeat(${R},${ROW_PX}px);${open && lay.h ? `min-height:${lay.h}px;` : ""}">${body}<div data-box-hint class="pointer-events-none hidden rounded-2xl border-2 border-dashed"></div>${widgetsHtml || ""}</div>
+          ${mode === "title" ? "" : resizeGrip(key)}
         </section></div>`;
     }
     // 区块标题旁边的 Company 选择
@@ -692,11 +730,11 @@ window.GWHome = (function () {
       if (list.length === 1) return `<span class="inline-flex max-w-[14rem] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-2.5 py-1 text-xs font-medium text-slate-700 backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">${icon("building-2", "size-3.5 shrink-0")}<span class="truncate">${esc(list[0].name)}</span></span>`;
       const sel = selectedCompany(gid);
       const cur = list.find((c) => c.id === sel);
-      const label = cur ? cur.short_name || cur.code || cur.name : t("home.allCompanies");
+      const label = cur ? cur.short_name || cur.code || cur.name : list[0].name;
       const row = (id, text) => `<button type="button" data-company-pick="${id}" data-gid="${gid}" class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span class="truncate">${esc(text)}</span>${sel === id ? icon("check", "size-4 text-emerald-600") : ""}</button>`;
       return `<div class="relative">
         <button type="button" data-company-menu="${gid}" class="inline-flex max-w-[11rem] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-2.5 py-1 text-xs font-medium text-slate-700 backdrop-blur hover:bg-white/70 dark:border-white/10 dark:bg-white/10 dark:text-slate-200">${icon("building-2", "size-3.5")}<span class="truncate">${esc(label)}</span>${icon("chevron-down", "size-3.5")}</button>
-        ${companyMenuGid === gid ? `<div class="absolute top-full left-0 z-30 mt-1 max-h-64 w-60 overflow-y-auto rounded-xl border border-white/60 bg-white/90 p-1.5 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90">${row("all", t("home.allCompanies"))}${list.map((c) => row(c.id, c.name)).join("")}</div>` : ""}
+        ${companyMenuGid === gid ? `<div class="absolute top-full left-0 z-30 mt-1 max-h-64 w-60 overflow-y-auto rounded-xl border border-white/60 bg-white/90 p-1.5 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90">${list.map((c) => row(c.id, c.name)).join("")}</div>` : ""}
       </div>`;
     };
 
@@ -736,7 +774,7 @@ window.GWHome = (function () {
       const { list, gid, id, w } = bdrag;
       const g = boxCell(list, e.clientX, e.clientY);
       const P = boxPositions(gid, id);
-      const maxR = expanded.get(gid) ? P.rows : 0; // 收起时只看得到第一行
+      const maxR = modeOf(gid) === "full" ? P.rows : 0; // 只显示第一行时，只能放在第一行
       const c = Math.max(0, Math.min(g.n - w, g.c - bdrag.offC));
       const r = Math.min(g.r, maxR);
       const hits = new Set();
@@ -840,7 +878,7 @@ window.GWHome = (function () {
     addEventListener("pointerup", (e) => bdrag && boxUp(e));
     document.addEventListener("touchmove", (e) => bdrag && e.preventDefault(), { passive: false });
 
-    // ------------------------------------------------------------ 区块右下角：拖拉调整大小（宽度 = 占一整行的比例，高度 = 展开时的高度）
+    // ------------------------------------------------------------ 区块右下角：拖拉调整大小（宽度按整数栏吸附，里面的 App 间距才会平均；高度 = 展开时的高度）
     root.addEventListener("pointerdown", (e) => {
       const grab = e.target.closest("[data-sec-resize]");
       if (!grab || e.button !== 0) return;
@@ -853,13 +891,20 @@ window.GWHome = (function () {
       const startH = host.getBoundingClientRect().height;
       const sx = e.clientX;
       const sy = e.clientY;
+      const maxCols = Math.max(2, Math.floor((rootW - PAD_W) / CELL_W));
+      let cols = key === "home" ? null : boxCols(key);
       let frac = secLayout(key).w;
       let h = startH;
       document.body.classList.add("gw-dragging");
       const move = (ev) => {
-        frac = Math.max(0.2, Math.min(1, Math.round(((startW + ev.clientX - sx) / rootW) * 20) / 20));
-        wrap.style.width = Math.round(frac * 100) + "%";
-        h = Math.max(ROW_PX, startH + ev.clientY - sy);
+        if (key === "home") {
+          frac = Math.max(0.2, Math.min(1, Math.round(((startW + ev.clientX - sx) / rootW) * 20) / 20));
+          wrap.style.width = Math.round(frac * 100) + "%";
+        } else {
+          cols = Math.max(2, Math.min(maxCols, Math.round((startW - PAD_W + ev.clientX - sx) / CELL_W)));
+          wrap.style.width = cols * CELL_W + PAD_W + "px";
+        }
+        h = Math.max(ROW_PX, Math.round((startH + ev.clientY - sy) / (ROW_PX / 2)) * (ROW_PX / 2));
         host.style.maxHeight = "none";
         host.style.minHeight = h + "px";
       };
@@ -870,12 +915,13 @@ window.GWHome = (function () {
         document.body.classList.remove("gw-dragging");
         lastDragEnd = Date.now();
         const grew = h > ROW_PX + 24;
-        const patch = { w: frac, h: grew ? Math.round(h) : null };
-        if (key !== "home" && grew && !expanded.get(key)) {
+        const patch = key === "home" ? { w: frac, h: grew ? Math.round(h) : null } : { cols: cols >= maxCols ? null : cols, h: grew ? Math.round(h) : null };
+        if (key !== "home" && grew && modeOf(key) !== "full") {
+          patch.mode = "full";
           expanded.set(key, true);
           sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: key, expanded: true });
         }
-        if (key !== "home" && !grew) patch.h = null;
+        setLayout(key, patch);
         const saving = saveLayout(key, patch);
         draw();
         await saving;
@@ -921,8 +967,12 @@ window.GWHome = (function () {
     });
 
     // ------------------------------------------------------------ 浮动小工具：新增的小工具浮在所有区块上面，可以放在任何位置；拖进某个区块就留在那个区块里
-    const FW_MIN = [150, 110];
-    const SIZE_PX = { small: [190, 190], medium: [340, 190], large: [340, 340] };
+    const GX = CELL_W / 2;
+    const GY = ROW_PX / 2; // 小工具的位置和大小按半格吸附，才好对齐、好置中
+    const snapX = (v) => Math.round(v / GX) * GX;
+    const snapY = (v) => Math.round(v / GY) * GY;
+    const FW_MIN = [GX * 3, GY * 2];
+    const SIZE_PX = { small: [CELL_W * 2, ROW_PX * 2], medium: [CELL_W * 4, ROW_PX * 2], large: [CELL_W * 4, ROW_PX * 4] };
     const isFloating = (w) => !!(w && w.config && w.config.pos);
     function floatWidget(w) {
       const p = w.config.pos;
@@ -948,7 +998,7 @@ window.GWHome = (function () {
       let moved = false;
       const p = { ...w.config.pos };
       const finish = async (box, x, y, nw, nh) => {
-        w.config = { ...w.config, pos: { box, x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), w: Math.round(nw), h: Math.round(nh) } };
+        w.config = { ...w.config, pos: { box, x: Math.max(0, snapX(x)), y: Math.max(0, snapY(y)), w: Math.max(FW_MIN[0], snapX(nw)), h: Math.max(FW_MIN[1], snapY(nh)) } };
         draw();
         const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
         if (error) toast(t("home.saveFailed"));
@@ -1011,11 +1061,12 @@ window.GWHome = (function () {
         let y = r.top - hr.top;
         if (host) {
           x = Math.min(x, Math.max(0, hr.width - 60));
-          if (host !== "home" && !expanded.get(host)) {
+          if (host !== "home" && modeOf(host) !== "full") {
             expanded.set(host, true); // 放进收起的区块：先展开，才看得到
             sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: host, expanded: true });
+            saveLayout(host, { mode: "full" });
           }
-          if (y + r.height + 16 > (secLayout(host).h || 0)) saveLayout(host, { h: Math.round(Math.max(y, 0) + r.height + 16) });
+          if (y + r.height + 16 > (secLayout(host).h || 0)) saveLayout(host, { h: Math.round(snapY(Math.max(y, 0) + r.height) + 16) });
         } else x = Math.min(x, Math.max(0, hr.width - r.width));
         finish(host, x, y, r.width, r.height);
       };
@@ -1107,11 +1158,15 @@ window.GWHome = (function () {
       if (el.getBoundingClientRect().height < min - 1) el.style.height = min + "px";
     }
 
-    async function toggleBox(key) {
-      const open = !expanded.get(key);
-      expanded.set(key, open);
-      drawSections();
-      await sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: key, expanded: open });
+    // 往大一级 / 小一级：只看标题 ⇄ 第一行 ⇄ 全部
+    async function stepBox(key, dir) {
+      const i = MODES.indexOf(modeOf(key)) + (dir === "more" ? 1 : -1);
+      if (i < 0 || i > 2) return;
+      const mode = MODES[i];
+      expanded.set(key, mode === "full");
+      setLayout(key, { mode });
+      draw();
+      await Promise.all([saveLayout(key, { mode }), sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: key, expanded: mode === "full" })]);
     }
 
     // 文件夹名称 / 便条内容
@@ -1297,7 +1352,7 @@ window.GWHome = (function () {
           if (!(mods.length || sItems.some((x) => x.group_id === g.id))) return;
           const P = boxPositions(g.id);
           const tiles = P.items.map((it) => sTile(it, P.pos.get(it.id))).join("");
-          parts.push([g.id, boxShell({ key: g.id, title: g.name, open: !!expanded.get(g.id), tiles, n: P.n, rows: P.rows, widgetsHtml: floatsIn(g.id) })]);
+          parts.push([g.id, boxShell({ key: g.id, title: g.name, mode: modeOf(g.id), tiles, n: P.n, rows: P.rows, widgetsHtml: modeOf(g.id) === "title" ? "" : floatsIn(g.id) })]);
         });
         if (showGrid) {
           const lay = secLayout("home");
@@ -1891,7 +1946,7 @@ window.GWHome = (function () {
           w.config = { ...(w.config || {}), companies: Object.fromEntries(companySel) };
           return sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id).then(({ error }) => error && toast(t("home.saveFailed")));
         }
-        if (d.expand) return toggleBox(d.expand);
+        if (d.mode) return stepBox(d.gid || b.closest("[data-sec-key]").dataset.secKey, d.mode);
         if (d.openFolder) return openBoxFolder(d.openFolder);
         if (d.openNote) return itemDialog(sItems.find((x) => x.id === d.openNote), null, "note");
         if (d.removeFw) return removeWidget(d.removeFw);
@@ -1940,10 +1995,23 @@ window.GWHome = (function () {
       } else if (el.matches("[data-widget-search]")) {
         const q = el.value.trim().toLowerCase();
         const box = el.parentElement.querySelector("[data-search-results]");
-        const hits = q ? data.modules.filter((m) => [m.name, m.code, m.description].some((v) => v && v.toLowerCase().includes(q))).slice(0, 6) : [];
+        const match = (m) => [m.name, m.code, m.description].some((v) => v && v.toLowerCase().includes(q));
+        // 区块版：同一个模块在好几个 Business 都有，所以每个结果都写上它属于哪个 Business（和 Company），才不会进错
+        let hits;
+        if (sectionsOn && q) {
+          hits = [];
+          S.groups.forEach((g) => modsOfGroup(g.id).forEach((m) => {
+            if (!match(m)) return;
+            const cs = companiesOf(g.id);
+            const tagged = cs.filter((c) => S.moduleCompanies.some((x) => x.module_id === m.id && x.company_id === c.id));
+            const names = (tagged.length ? tagged : cs.length === 1 ? cs : []).map((c) => c.short_name || c.code || c.name);
+            hits.push({ m, label: g.name + (names.length ? " · " + names.join(", ") : "") });
+          }));
+          hits = hits.slice(0, 8);
+        } else hits = q ? data.modules.filter(match).slice(0, 6).map((m) => ({ m, label: "" })) : [];
         box.innerHTML = q && !hits.length
           ? `<p class="text-sm text-slate-400">${esc(t("home.noResults"))}</p>`
-          : hits.map((m) => `<button type="button" data-open="${m.id}" class="no-drag flex shrink-0 flex-col items-center gap-1">${appIcon(m, "size-11")}<span class="w-14 truncate text-center text-[11px]">${esc(m.name)}</span></button>`).join("");
+          : hits.map(({ m, label }) => `<button type="button" data-open="${m.id}" class="no-drag flex w-24 shrink-0 flex-col items-center gap-1">${appIcon(m, "size-11")}<span class="w-full truncate text-center text-[11px] font-medium">${esc(m.name)}</span>${label ? `<span class="w-full truncate text-center text-[10px] text-slate-500" title="${esc(label)}">${esc(label)}</span>` : ""}</button>`).join("");
         refreshIcons();
       } else if (el.matches("[data-note]")) {
         // 便条：停止输入一秒后自动保存
