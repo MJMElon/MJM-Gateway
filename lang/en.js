@@ -2,7 +2,7 @@
 window.GW_LANG = window.GW_LANG || {};
 window.GW_LANG["en"] = {
   "app": {
-    "name": "MJM Connect",
+    "name": "MJM Intranet",
     "tagline": "One sign-in for every company system"
   },
   "nav": {
@@ -193,7 +193,7 @@ window.GW_LANG["en"] = {
     "confirm": "Reset",
     "connector": {
       "title": "AI Connector",
-      "intro": "Chat with your own AI (for example Claude) about your MJM Connect data. Create a private link, add it to your AI app as a custom connector, then ask for data or reports. It can only read what you are allowed to see.",
+      "intro": "Chat with your own AI (for example Claude) about your MJM Intranet data. Create a private link, add it to your AI app as a custom connector, then ask for data or reports. It can only read what you are allowed to see.",
       "off": "The AI Connector is not turned on yet. Please ask your administrator.",
       "notReady": "The database has not been updated for the AI Connector yet.",
       "create": "Create connector link",
@@ -566,7 +566,7 @@ window.GW_LANG["en"] = {
     "modules": {
       "noMatch": "No modules match the filter.",
       "activeLabel": "Active",
-      "description": "Every module people can open from MJM Connect. System = a system under MJM Connect (e.g. Diesel). Link = an existing system or any outside website. Tag each module with its businesses (and companies) so it shows in the right place when you give access.",
+      "description": "Every module people can open from MJM Intranet. System = a system under MJM Intranet (e.g. Diesel). Link = an existing system or any outside website. Tag each module with its businesses (and companies) so it shows in the right place when you give access.",
       "add": "Add module",
       "addTitle": "Add module",
       "editTitle": "Edit module",
@@ -616,7 +616,7 @@ window.GW_LANG["en"] = {
         "system": "System",
         "link": "Link"
       },
-      "kindHint": "System: under MJM Connect. Link: existing system or website.",
+      "kindHint": "System: under MJM Intranet. Link: existing system or website.",
       "urlHint": "Link: full address starting with https://. System: a path on this site (e.g. diesel/index.html) or a full address.",
       "businessTags": "Business tags",
       "businessTagsHint": "People in these businesses can be given access.",

@@ -33,7 +33,7 @@ const TOOLS = [
 
 function systemPrompt(name: string, role: string) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-  return `You are the assistant inside MJM Connect, the company portal of a Malaysian plantation group. You are talking to ${name} (${role}).
+  return `You are the assistant inside MJM Intranet, the company portal of a Malaysian plantation group. You are talking to ${name} (${role}).
 Today is ${today} (Malaysia time). Money is in RM. Dates are YYYY-MM-DD.
 
 You can read company data only through your tools, and only what this user is allowed to see. Never invent numbers: if a tool returns nothing, say so. If a question needs data you do not have, say what is missing.

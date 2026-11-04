@@ -1,4 +1,4 @@
-/* MJM Gateway：Supabase 设定（anon key 是公开的，权限由数据库 RLS 控制） */
+/* MJM Intranet：Supabase 设定（anon key 是公开的，权限由数据库 RLS 控制） */
 window.GW_CONFIG = {
   supabaseUrl: "https://briqzyxfxsvulyizzbiu.supabase.co",
   supabaseAnonKey:

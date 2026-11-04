@@ -224,7 +224,7 @@ if (diesel) {
   );
   await must(db.from("diesel_user_access").upsert({ user_id: ids["driver@mjm.local"], can_claim: true }));
 }
-await must(db.from("gw_announcements").insert({ message: "欢迎使用 MJM Gateway！所有公司系统都可以从这里打开。", level: "info" }));
+await must(db.from("gw_announcements").insert({ message: "欢迎使用 MJM Intranet！所有公司系统都可以从这里打开。", level: "info" }));
 
 console.log(`完成。所有测试帐号的密码：${PASSWORD}`);
 console.log(Object.keys(ids).join("\n"));

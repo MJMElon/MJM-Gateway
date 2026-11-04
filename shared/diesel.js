@@ -1,5 +1,5 @@
 /* ================================================================
-   MJM Connect — Diesel 模块（车辆、加油报销、收据）
+   MJM Intranet — Diesel 模块（车辆、加油报销、收据）
    权限两层（都在数据库检查）：
      Gateway：DIESEL 的 Access = 可以进来；Admin（或负责的角色、super_admin）= 模块管理者
      模块里的 User Access（diesel_user_access，管理者设定）：Cash Claim、Report

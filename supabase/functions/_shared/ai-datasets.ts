@@ -170,7 +170,7 @@ export const DATASETS: Dataset[] = [
   },
   {
     name: "modules",
-    description: "Systems (modules) available in MJM Connect.",
+    description: "Systems (modules) available in MJM Intranet.",
     table: "gw_modules",
     select: "code, name, kind, description, is_active",
     order: "name",
