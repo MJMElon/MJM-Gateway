@@ -153,7 +153,8 @@ window.GW_LANG["en"] = {
     },
     "allCompanies": "All companies",
     "noAppsForCompany": "No apps for this company.",
-    "resizeSection": "Drag to resize"
+    "resizeSection": "Drag to resize",
+    "nothingToTidy": "No widgets on the page to tidy."
   },
   "library": {
     "title": "Library",
@@ -206,7 +207,8 @@ window.GW_LANG["en"] = {
     "emptyFolder": "This folder is empty. Use an app’s … menu in Edit Home Screen to move it here.",
     "emptyHome": "Your home screen is empty. Tap the + button to add apps and widgets.",
     "addLink": "Add Icon (link)",
-    "iconColors": "Icon colours"
+    "iconColors": "Icon colours",
+    "tidyWidgets": "Tidy widgets"
   },
   "widgets": {
     "unavailable": "Widgets will be available after the next system update.",

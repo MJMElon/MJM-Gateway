@@ -153,7 +153,8 @@ window.GW_LANG["zh-CN"] = {
     },
     "allCompanies": "全部 Company",
     "noAppsForCompany": "这个 Company 没有 App。",
-    "resizeSection": "拖拉调整大小"
+    "resizeSection": "拖拉调整大小",
+    "nothingToTidy": "页面上没有需要整理的小工具。"
   },
   "library": {
     "title": "模块库",
@@ -206,7 +207,8 @@ window.GW_LANG["zh-CN"] = {
     "emptyFolder": "这个文件夹是空的。在「编辑主画面」用 App 的 … 选单把它移进来。",
     "emptyHome": "主画面还是空的。点右下角的 + 新增 App 和小工具。",
     "addLink": "新增图示（连结）",
-    "iconColors": "图示颜色"
+    "iconColors": "图示颜色",
+    "tidyWidgets": "整理小工具"
   },
   "widgets": {
     "unavailable": "小工具要等下次系统更新后才能使用。",

@@ -232,14 +232,14 @@ window.GWHome = (function () {
 
     // 新增的小工具放在页面上的空位：不压到 Notice Board、各区块、也不压到别的小工具；
     // 找不到空位（区块都占满整行）就放在所有内容的下面
-    function freeSpot(pw, ph) {
+    function freeSpot(pw, ph, ignore) {
       const rr = root.getBoundingClientRect();
       const rel = (el) => {
         const r = el.getBoundingClientRect();
         return { x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height };
       };
       const rects = $$(".gw-pinned, [data-box], [data-sec-key=home] > section", root).map(rel);
-      widgets.filter((w) => isFloating(w) && !w.config.pos.box).forEach((w) => rects.push({ x: w.config.pos.x, y: w.config.pos.y, w: w.config.pos.w, h: w.config.pos.h }));
+      widgets.filter((w) => isFloating(w) && !w.config.pos.box && !(ignore && ignore.has(w.id))).forEach((w) => rects.push({ x: w.config.pos.x, y: w.config.pos.y, w: w.config.pos.w, h: w.config.pos.h }));
       const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
       const bottom = Math.max(0, ...rects.map((r) => r.y + r.h));
       const board = $(".gw-pinned", root);
@@ -256,7 +256,7 @@ window.GWHome = (function () {
       let row = { user_id: data.profile.id, widget_type: type, size, sort_order: nextSlot(w, h), config: {} };
       if (sectionsOn) {
         // 区块版：新增的小工具浮在所有区块上面，之后可以拖到任何位置，或拖进某个区块
-        const [pw, ph] = SIZE_PX[size] || [320, 190];
+        const [pw, ph] = sizeFor(type, size);
         row = { ...row, sort_order: 0, config: { pos: { box: null, ...freeSpot(pw, ph), w: pw, h: ph } } };
       }
       const { data: created, error } = await sb.from("gw_user_widgets").insert(row).select().single();
@@ -542,6 +542,7 @@ window.GWHome = (function () {
         return `<button type="button" data-done class="fixed right-5 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-40 flex h-12 items-center gap-2 rounded-full bg-slate-900 px-5 font-semibold text-white shadow-xl sm:bottom-8 dark:bg-white dark:text-slate-900">${icon("check")} ${esc(t("fab.done"))}</button>`;
       }
       const items = [
+        ["tidy", "layout-grid", t("fab.tidyWidgets")],
         ["icons", "palette", t("fab.iconColors")],
         ["add-link", "link", t("fab.addLink")],
         ["add-widget", "layout-dashboard", t("fab.addWidget")],
@@ -973,16 +974,64 @@ window.GWHome = (function () {
     const snapY = (v) => Math.round(v / GY) * GY;
     const FW_MIN = [GX * 3, GY * 2];
     const SIZE_PX = { small: [CELL_W * 2, ROW_PX * 2], medium: [CELL_W * 4, ROW_PX * 2], large: [CELL_W * 4, ROW_PX * 4] };
+    // 有些小工具内容比较高（月历），预设大小照内容来，才不会被切掉
+    const SIZE_BY_TYPE = {
+      calendar: { small: [CELL_W * 2, ROW_PX * 3], medium: [CELL_W * 4, ROW_PX * 3] },
+      recent: { small: [CELL_W * 2, ROW_PX * 2], medium: [CELL_W * 4, ROW_PX * 2] },
+      notes: { small: [CELL_W * 2, ROW_PX * 2], medium: [CELL_W * 4, ROW_PX * 2], large: [CELL_W * 4, ROW_PX * 4] },
+    };
+    const sizeFor = (type, size) => (SIZE_BY_TYPE[type] && SIZE_BY_TYPE[type][size]) || SIZE_PX[size] || [CELL_W * 4, ROW_PX * 2];
     const isFloating = (w) => !!(w && w.config && w.config.pos);
     function floatWidget(w) {
       const p = w.config.pos;
       return `<div data-fw="${w.id}" class="gw-fw group absolute z-40 touch-none" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px">
-        <div class="${glass.replace("bg-white/45", "bg-white/80").replace("dark:bg-slate-900/45", "dark:bg-slate-900/80")} cursor-grab p-3!">${widgetBody({ ...w, size: p.w < 240 ? "small" : p.h > 260 ? "large" : "medium" })}</div>
+        <div class="h-full p-1.5"><div class="${glass.replace("bg-white/45", "bg-white/80").replace("dark:bg-slate-900/45", "dark:bg-slate-900/80")} cursor-grab p-3!">${widgetBody({ ...w, size: p.w < 240 ? "small" : p.h > 260 ? "large" : "medium" })}</div></div>
         <button type="button" data-remove-fw="${w.id}" aria-label="${esc(t("home.removeFromHome"))}" class="no-drag absolute -top-2 -right-2 z-10 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white opacity-0 shadow ring-2 ring-white transition-opacity group-hover:opacity-100 dark:ring-slate-900 [@media(hover:none)]:opacity-100">${icon("x", "size-3.5")}</button>
         <span data-fw-resize class="no-drag absolute right-1.5 bottom-1.5 z-10 flex size-5 cursor-nwse-resize touch-none items-end justify-end text-slate-400 hover:text-slate-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1 1 11M11 6 6 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
       </div>`;
     }
     const floatsIn = (host) => widgets.filter((w) => isFloating(w) && (w.config.pos.box || null) === host).map(floatWidget).join("");
+    // 放下或调整大小后如果压到别的小工具（页面上的还有 Notice Board 和区块），就挪到最近的空位
+    function resolveSpot(box, x, y, w, h, selfId) {
+      const rr = root.getBoundingClientRect();
+      const rects = widgets.filter((o) => o.id !== selfId && isFloating(o) && (o.config.pos.box || null) === (box || null)).map((o) => ({ x: o.config.pos.x, y: o.config.pos.y, w: o.config.pos.w, h: o.config.pos.h }));
+      if (!box)
+        $$(".gw-pinned, [data-box], [data-sec-key=home] > section", root).forEach((el) => {
+          const r = el.getBoundingClientRect();
+          rects.push({ x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height });
+        });
+      const hostEl = box ? $(`[data-fw-host="${box}"]`, root) : root;
+      const maxX = Math.max(0, (hostEl ? hostEl.clientWidth : root.clientWidth) - w);
+      const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      const ok = (cx, cy) => cx >= 0 && cx <= maxX && cy >= 0 && !rects.some((r) => hit({ x: cx, y: cy, w, h }, r));
+      x = Math.min(Math.max(0, x), maxX);
+      if (ok(x, y)) return { x, y };
+      for (let k = 1; k <= 60; k++)
+        for (let dy = -k; dy <= k; dy++)
+          for (let dx = -k; dx <= k; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== k) continue;
+            const cx = x + dx * GX;
+            const cy = y + dy * GY;
+            if (ok(cx, cy)) return { x: cx, y: cy };
+          }
+      return { x, y };
+    }
+    // 整理页面上的小工具：全部重新排整齐（照原来的上下左右顺序，贴着格线，之间留空隙）
+    async function tidyWidgets() {
+      const list = widgets.filter((w) => isFloating(w) && !w.config.pos.box).sort((a, b) => a.config.pos.y - b.config.pos.y || a.config.pos.x - b.config.pos.x);
+      if (!list.length) return toast(t("home.nothingToTidy"));
+      const pending = new Set(list.map((w) => w.id));
+      for (const w of list) {
+        const { w: pw, h: ph } = w.config.pos;
+        const spot = freeSpot(pw, ph, pending);
+        w.config = { ...w.config, pos: { ...w.config.pos, x: spot.x, y: spot.y } };
+        pending.delete(w.id);
+      }
+      draw();
+      const results = await Promise.all(list.map((w) => sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id)));
+      if (results.some((r) => r.error)) toast(t("home.saveFailed"));
+    }
+
     // 按住小工具拖到任何位置；放在某个区块上面就变成那个区块里的小工具
     root.addEventListener("pointerdown", (e) => {
       const fw = e.target.closest("[data-fw]");
@@ -998,7 +1047,10 @@ window.GWHome = (function () {
       let moved = false;
       const p = { ...w.config.pos };
       const finish = async (box, x, y, nw, nh) => {
-        w.config = { ...w.config, pos: { box, x: Math.max(0, snapX(x)), y: Math.max(0, snapY(y)), w: Math.max(FW_MIN[0], snapX(nw)), h: Math.max(FW_MIN[1], snapY(nh)) } };
+        const sw = Math.max(FW_MIN[0], snapX(nw));
+        const sh = Math.max(FW_MIN[1], snapY(nh));
+        const spot = resolveSpot(box, Math.max(0, snapX(x)), Math.max(0, snapY(y)), sw, sh, w.id);
+        w.config = { ...w.config, pos: { box, x: spot.x, y: spot.y, w: sw, h: sh } };
         draw();
         const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
         if (error) toast(t("home.saveFailed"));
@@ -1975,6 +2027,7 @@ window.GWHome = (function () {
       if (d.fab) {
         fabOpen = false;
         if (d.fab === "icons") return draw(), iconColorsDialog();
+        if (d.fab === "tidy") return draw(), tidyWidgets();
         if (d.fab === "add-widget") sheet = "widgets";
         else if (d.fab === "add-apps") sheet = "apps";
         else if (d.fab === "edit") ((editing = true), (sheet = null));
