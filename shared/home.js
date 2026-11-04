@@ -240,15 +240,16 @@ window.GWHome = (function () {
         return { x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height };
       };
       const rects = $$(".gw-pinned, [data-box], [data-sec-key=home] > section", root).map(rel);
-      widgets.filter((w) => isFloating(w) && !w.config.pos.box && !(ignore && ignore.has(w.id))).forEach((w) => rects.push({ x: w.config.pos.x, y: w.config.pos.y, w: w.config.pos.w, h: w.config.pos.h }));
+      widgets.filter((w) => isFloating(w) && !w.config.pos.box && !(ignore && ignore.has(w.id))).forEach((w) => rects.push({ x: absX(w.config.pos), y: w.config.pos.y, w: w.config.pos.w, h: w.config.pos.h }));
       const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
       const bottom = Math.max(0, ...rects.map((r) => r.y + r.h));
       const board = $(".gw-pinned", root);
       const startY = snapY((board ? rel(board).y + rel(board).h : 0) + 16);
-      const maxX = Math.max(0, root.clientWidth - pw);
+      const off = gridOff();
+      const maxX = Math.max(0, gridW() - pw);
       for (let y = startY; y <= bottom; y += GY)
-        for (let x = 0; x <= maxX; x += GX) if (!rects.some((r) => hit({ x, y, w: pw, h: ph }, r))) return { x, y };
-      return { x: 0, y: Math.ceil((bottom + 16) / GY) * GY };
+        for (let x = 0; x <= maxX; x += GX) if (!rects.some((r) => hit({ x: off + x, y, w: pw, h: ph }, r))) return { x, y, g: 1 };
+      return { x: 0, y: Math.ceil((bottom + 16) / GY) * GY, g: 1 };
     }
 
     async function addWidget(type, size) {
@@ -937,30 +938,82 @@ window.GWHome = (function () {
       addEventListener("pointercancel", up);
     });
 
-    // 画完之后：让区块可以拖拉调整先后顺序
+    // 区块（My Home 和各 Business）用握把拖着换位置：上下左右都可以。
+    // 放开前一直照鼠标位置找最近的区块：压在哪个区块上就排在它前面或后面（窄的区块看左右，整行宽的看上下），空白处找最近的。
+    root.addEventListener("pointerdown", (e) => {
+      const grip = e.target.closest(".sec-grip");
+      if (!grip || e.button !== 0 || readOnly) return;
+      const stack = $("#gw-stack", root);
+      const wrap = grip.closest("[data-sec-wrap]");
+      if (!stack || !wrap) return;
+      e.preventDefault();
+      const rect = wrap.getBoundingClientRect();
+      const sx = e.clientX;
+      const sy = e.clientY;
+      let ghost = null;
+      let moved = false;
+      const dist = (r, x, y) => Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
+      const place = (x, y) => {
+        const mine = wrap.getBoundingClientRect();
+        if (x >= mine.left && x <= mine.right && y >= mine.top && y <= mine.bottom) return; // 还在自己的位置上
+        const others = $$("[data-sec-wrap]", stack).filter((el) => el !== wrap);
+        if (!others.length) return;
+        let target = others[0];
+        let best = Infinity;
+        for (const el of others) {
+          const d = dist(el.getBoundingClientRect(), x, y);
+          if (d < best) ((best = d), (target = el));
+        }
+        const r = target.getBoundingClientRect();
+        const narrow = r.width < stack.clientWidth * 0.8;
+        const before = y < r.top ? true : y > r.bottom ? false : narrow ? x < r.left + r.width / 2 : y < r.top + r.height / 2;
+        if (before) {
+          if (target.previousElementSibling !== wrap) stack.insertBefore(wrap, target);
+        } else if (target.nextElementSibling !== wrap) stack.insertBefore(wrap, target.nextElementSibling);
+      };
+      const move = (ev) => {
+        if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return;
+        if (!moved) {
+          moved = true;
+          document.body.classList.add("gw-dragging");
+          ghost = wrap.cloneNode(true);
+          ghost.removeAttribute("data-sec-wrap");
+          ghost.querySelectorAll("[data-fw-host], [data-list]").forEach((el) => el.removeAttribute("data-fw-host"));
+          ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:80;pointer-events:none;opacity:.88;transform:scale(.98);filter:drop-shadow(0 18px 30px rgba(15,23,42,.25))`;
+          document.body.appendChild(ghost);
+          wrap.style.opacity = "0.3";
+        }
+        ghost.style.left = rect.left + ev.clientX - sx + "px";
+        ghost.style.top = rect.top + ev.clientY - sy + "px";
+        if (ev.clientY < 90) scrollBy(0, -16);
+        else if (ev.clientY > innerHeight - 90) scrollBy(0, 16);
+        place(ev.clientX, ev.clientY);
+      };
+      const up = async () => {
+        removeEventListener("pointermove", move);
+        removeEventListener("pointerup", up);
+        removeEventListener("pointercancel", up);
+        document.body.classList.remove("gw-dragging");
+        lastDragEnd = Date.now();
+        if (!moved) return;
+        ghost.remove();
+        wrap.style.opacity = "";
+        const order = $$("[data-sec-wrap]", stack).map((el) => el.dataset.secKey);
+        if (order.join() === sectionOrder().join()) return;
+        const w = board();
+        if (!w) return;
+        w.config = { ...(w.config || {}), order };
+        const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
+        if (error) toast(t("home.saveFailed"));
+      };
+      addEventListener("pointermove", move);
+      addEventListener("pointerup", up);
+      addEventListener("pointercancel", up);
+    });
+    // 画完之后要做的事（以前这里挂区块排序；现在用上面的拖拉）
     function afterSections() {
       sortables.forEach((x) => x.destroy());
       sortables = [];
-      const stack = $("#gw-stack", root);
-      if (stack)
-        sortables.push(
-          window.Sortable.create(stack, {
-            animation: 180,
-            handle: ".sec-grip",
-            draggable: "[data-sec-wrap]",
-            delay: 120,
-            delayOnTouchOnly: true,
-            onEnd: async () => {
-              lastDragEnd = Date.now();
-              const order = $$("[data-sec-wrap]", stack).map((el) => el.dataset.secKey);
-              const w = board();
-              if (!w) return;
-              w.config = { ...(w.config || {}), order };
-              const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
-              if (error) toast(t("home.saveFailed"));
-            },
-          }),
-        );
     }
     const drawSections = () => draw();
     // 窗口宽度变了、区块的栏数跟着变时重画
@@ -969,7 +1022,11 @@ window.GWHome = (function () {
     addEventListener("resize", () => {
       if (!sectionsOn) return;
       const sig = boxColsSig();
-      if (sig !== lastBoxCols) ((lastBoxCols = sig), draw());
+      if (sig !== lastBoxCols) return ((lastBoxCols = sig), draw());
+      $$("#gw-float [data-fw]", root).forEach((el) => {
+        const w = widgets.find((x) => x.id === el.dataset.fw);
+        if (w && isFloating(w)) el.style.left = absX(w.config.pos) + "px";
+      });
     });
 
     // ------------------------------------------------------------ 浮动小工具：新增的小工具浮在所有区块上面，可以放在任何位置；拖进某个区块就留在那个区块里
@@ -977,6 +1034,11 @@ window.GWHome = (function () {
     const GY = ROW_PX / 2; // 小工具的位置和大小按半格吸附，才好对齐、好置中
     const snapX = (v) => Math.round(v / GX) * GX;
     const snapY = (v) => Math.round(v / GY) * GY;
+    // 页面上的小工具对齐区块里的图示格线：格线在页面里居中，左右留一样宽的边；位置存「离格线左边多远」（pos.g = 1），窗口宽度变了也跟着格线走
+    const gridN = () => Math.max(2, Math.floor(((root.clientWidth || 1000) - PAD_W) / CELL_W));
+    const gridW = () => gridN() * CELL_W;
+    const gridOff = () => Math.max(0, Math.round(((root.clientWidth || 1000) - gridW()) / 2));
+    const absX = (pos) => pos.x + (!pos.box && pos.g ? gridOff() : 0);
     const FW_MIN = [GX * 3, GY * 2];
     const SIZE_PX = { small: [CELL_W * 2, ROW_PX * 2], medium: [CELL_W * 4, ROW_PX * 2], large: [CELL_W * 4, ROW_PX * 4] };
     // 有些小工具内容比较高（月历），预设大小照内容来，才不会被切掉
@@ -990,7 +1052,7 @@ window.GWHome = (function () {
     const isFloating = (w) => !!(w && w.config && w.config.pos);
     function floatWidget(w) {
       const p = w.config.pos;
-      return `<div data-fw="${w.id}" class="gw-fw group absolute z-40 touch-none" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px">
+      return `<div data-fw="${w.id}" class="gw-fw group absolute z-40 touch-none" style="left:${absX(p)}px;top:${p.y}px;width:${p.w}px;height:${p.h}px">
         <div class="h-full p-1.5"><div class="${glass.replace("bg-white/45", "bg-white/80").replace("dark:bg-slate-900/45", "dark:bg-slate-900/80")} cursor-grab p-3!">${widgetBody({ ...w, size: p.w < 240 ? "small" : p.h > 260 ? "large" : "medium" })}</div></div>
         <button type="button" data-remove-fw="${w.id}" aria-label="${esc(t("home.removeFromHome"))}" class="no-drag absolute -top-2 -right-2 z-10 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white opacity-0 shadow ring-2 ring-white transition-opacity group-hover:opacity-100 dark:ring-slate-900 [@media(hover:none)]:opacity-100">${icon("x", "size-3.5")}</button>
         <span data-fw-resize class="no-drag absolute right-1.5 bottom-1.5 z-10 flex size-5 cursor-nwse-resize touch-none items-end justify-end text-slate-400 hover:text-slate-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1 1 11M11 6 6 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
@@ -1000,14 +1062,15 @@ window.GWHome = (function () {
     // 放下或调整大小后如果压到别的小工具（页面上的还有 Notice Board 和区块），就挪到最近的空位
     function resolveSpot(box, x, y, w, h, selfId) {
       const rr = root.getBoundingClientRect();
-      const rects = widgets.filter((o) => o.id !== selfId && isFloating(o) && (o.config.pos.box || null) === (box || null)).map((o) => ({ x: o.config.pos.x, y: o.config.pos.y, w: o.config.pos.w, h: o.config.pos.h }));
+      const off = box ? 0 : gridOff();
+      const rects = widgets.filter((o) => o.id !== selfId && isFloating(o) && (o.config.pos.box || null) === (box || null)).map((o) => ({ x: absX(o.config.pos) - off, y: o.config.pos.y, w: o.config.pos.w, h: o.config.pos.h }));
       if (!box)
         $$(".gw-pinned, [data-box], [data-sec-key=home] > section", root).forEach((el) => {
           const r = el.getBoundingClientRect();
-          rects.push({ x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height });
+          rects.push({ x: r.left - rr.left - off, y: r.top - rr.top, w: r.width, h: r.height });
         });
       const hostEl = box ? $(`[data-fw-host="${box}"]`, root) : root;
-      const maxX = Math.max(0, (hostEl ? hostEl.clientWidth : root.clientWidth) - w);
+      const maxX = Math.max(0, (box ? (hostEl ? hostEl.clientWidth : root.clientWidth) : gridW()) - w);
       const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
       const ok = (cx, cy) => cx >= 0 && cx <= maxX && cy >= 0 && !rects.some((r) => hit({ x: cx, y: cy, w, h }, r));
       x = Math.min(Math.max(0, x), maxX);
@@ -1030,7 +1093,7 @@ window.GWHome = (function () {
       for (const w of list) {
         const { w: pw, h: ph } = w.config.pos;
         const spot = freeSpot(pw, ph, pending);
-        w.config = { ...w.config, pos: { ...w.config.pos, x: spot.x, y: spot.y } };
+        w.config = { ...w.config, pos: { ...w.config.pos, x: spot.x, y: spot.y, g: 1 } };
         pending.delete(w.id);
       }
       draw();
@@ -1056,7 +1119,7 @@ window.GWHome = (function () {
         const sw = Math.max(FW_MIN[0], snapX(nw));
         const sh = Math.max(FW_MIN[1], snapY(nh));
         const spot = resolveSpot(box, Math.max(0, snapX(x)), Math.max(0, snapY(y)), sw, sh, w.id);
-        w.config = { ...w.config, pos: { box, x: spot.x, y: spot.y, w: sw, h: sh } };
+        w.config = { ...w.config, pos: { box, x: spot.x, y: spot.y, w: sw, h: sh, ...(box ? {} : { g: 1 }) } };
         draw();
         const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
         if (error) toast(t("home.saveFailed"));
@@ -1073,7 +1136,7 @@ window.GWHome = (function () {
           removeEventListener("pointercancel", up);
           document.body.classList.remove("gw-dragging");
           lastDragEnd = Date.now();
-          finish(p.box || null, p.x, p.y, parseFloat(fw.style.width), parseFloat(fw.style.height));
+          finish(p.box || null, p.box || p.g ? p.x : p.x - gridOff(), p.y, parseFloat(fw.style.width), parseFloat(fw.style.height));
         };
         addEventListener("pointermove", move);
         addEventListener("pointerup", up);
@@ -1125,7 +1188,7 @@ window.GWHome = (function () {
             saveLayout(host, { mode: "full" });
           }
           if (y + r.height + 16 > (secLayout(host).h || 0)) saveLayout(host, { h: Math.round(snapY(Math.max(y, 0) + r.height) + 16) });
-        } else x = Math.min(x, Math.max(0, hr.width - r.width));
+        } else x = Math.min(Math.max(0, x - gridOff()), Math.max(0, gridW() - r.width));
         finish(host, x, y, r.width, r.height);
       };
       addEventListener("pointermove", move);
