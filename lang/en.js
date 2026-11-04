@@ -152,7 +152,8 @@ window.GW_LANG["en"] = {
       "graphite": "Graphite"
     },
     "allCompanies": "All companies",
-    "noAppsForCompany": "No apps for this company."
+    "noAppsForCompany": "No apps for this company.",
+    "resizeSection": "Drag to resize"
   },
   "library": {
     "title": "Library",
@@ -236,7 +237,8 @@ window.GW_LANG["en"] = {
       "announcements": "Notice Board",
       "calendar": "Calendar",
       "notes": "Notes",
-      "admin": "Administration"
+      "admin": "Administration",
+      "weather": "Weather"
     },
     "desc": {
       "greeting": "Good morning with today’s date",
@@ -246,7 +248,8 @@ window.GW_LANG["en"] = {
       "announcements": "Company and department notices",
       "calendar": "This month at a glance",
       "notes": "A private note only you can see",
-      "admin": "User Access and Super Admin shortcuts"
+      "admin": "User Access and Super Admin shortcuts",
+      "weather": "Today’s forecast for your location"
     },
     "sizes": {
       "small": "S",
@@ -267,6 +270,24 @@ window.GW_LANG["en"] = {
       "like": "Like",
       "love": "Love",
       "congrats": "Congrats"
+    },
+    "weather": {
+      "loading": "Loading the forecast…",
+      "needLocation": "Allow location access to see today’s forecast.",
+      "failed": "Could not load the forecast.",
+      "retry": "Try again",
+      "yourLocation": "Your location",
+      "high": "High",
+      "low": "Low",
+      "rainChance": "Rain",
+      "clear": "Clear",
+      "partly": "Partly cloudy",
+      "cloudy": "Cloudy",
+      "fog": "Fog",
+      "drizzle": "Drizzle",
+      "rain": "Rain",
+      "snow": "Snow",
+      "storm": "Thunderstorm"
     }
   },
   "admin": {

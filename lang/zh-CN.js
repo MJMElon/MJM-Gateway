@@ -152,7 +152,8 @@ window.GW_LANG["zh-CN"] = {
       "graphite": "石墨"
     },
     "allCompanies": "全部 Company",
-    "noAppsForCompany": "这个 Company 没有 App。"
+    "noAppsForCompany": "这个 Company 没有 App。",
+    "resizeSection": "拖拉调整大小"
   },
   "library": {
     "title": "模块库",
@@ -236,7 +237,8 @@ window.GW_LANG["zh-CN"] = {
       "announcements": "公告栏",
       "calendar": "月历",
       "notes": "便条",
-      "admin": "管理"
+      "admin": "管理",
+      "weather": "天气"
     },
     "desc": {
       "greeting": "问候语和今天日期",
@@ -246,7 +248,8 @@ window.GW_LANG["zh-CN"] = {
       "announcements": "公司和部门公告",
       "calendar": "这个月的月历",
       "notes": "只有自己看得到的便条",
-      "admin": "User Access 和 Super Admin 捷径"
+      "admin": "User Access 和 Super Admin 捷径",
+      "weather": "你所在位置今天的天气"
     },
     "sizes": {
       "small": "小",
@@ -267,6 +270,24 @@ window.GW_LANG["zh-CN"] = {
       "like": "赞",
       "love": "爱心",
       "congrats": "恭喜"
+    },
+    "weather": {
+      "loading": "正在载入天气…",
+      "needLocation": "请允许取得位置，才能显示今天的天气。",
+      "failed": "天气载入失败。",
+      "retry": "再试一次",
+      "yourLocation": "你的位置",
+      "high": "最高",
+      "low": "最低",
+      "rainChance": "降雨",
+      "clear": "晴",
+      "partly": "多云时晴",
+      "cloudy": "多云",
+      "fog": "雾",
+      "drizzle": "毛毛雨",
+      "rain": "雨",
+      "snow": "雪",
+      "storm": "雷雨"
     }
   },
   "admin": {

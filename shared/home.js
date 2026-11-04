@@ -52,6 +52,7 @@ window.GWHome = (function () {
     // Notice Board：固定在最上面，只能调大小，不能移动、不能删除，也不能再加第二个
     announcements: { sizes: ["medium", "large"], icon: "megaphone", hidden: true, pinned: true },
     calendar: { sizes: ["small", "medium"], icon: "calendar" },
+    weather: { sizes: ["small", "medium"], icon: "cloud-sun" },
     notes: { sizes: ["small", "medium", "large"], icon: "sticky-note" },
     // 管理入口已改为右上角齿轮；旧的管理小工具仍照常显示，但不再提供新增
     admin: { sizes: ["medium"], icon: "shield-check", hidden: true },
@@ -115,7 +116,7 @@ window.GWHome = (function () {
       layout.forEach((l, id) => modules.has(id) && !l.folder_id && items.push({ kind: "app", id, slot: l.sort_order, w: 1, h: 1 }));
       links.filter((l) => !l.folder_id).forEach((l) => items.push({ kind: "link", id: l.id, slot: l.sort_order, w: 1, h: 1 }));
       folders.forEach((f) => items.push({ kind: "folder", id: f.id, slot: f.sort_order, w: 1, h: 1 }));
-      widgets.filter((w) => !isPinned(w)).forEach((w) => items.push({ kind: "widget", id: w.id, slot: w.sort_order, w: SIZES[w.size][0], h: SIZES[w.size][1] }));
+      widgets.filter((w) => !isPinned(w) && !isFloating(w)).forEach((w) => items.push({ kind: "widget", id: w.id, slot: w.sort_order, w: SIZES[w.size][0], h: SIZES[w.size][1] }));
       return items.sort((a, b) => a.slot - b.slot || a.kind.localeCompare(b.kind));
     }
     const folderLinks = (fid) => links.filter((l) => l.folder_id === fid).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -232,20 +233,24 @@ window.GWHome = (function () {
     async function addWidget(type, size) {
       if (!widgetsEnabled) return toast(t("widgets.unavailable"));
       const [w, h] = SIZES[size];
-      const { data: row, error } = await sb
-        .from("gw_user_widgets")
-        .insert({ user_id: data.profile.id, widget_type: type, size, sort_order: nextSlot(w, h), config: {} })
-        .select()
-        .single();
+      let row = { user_id: data.profile.id, widget_type: type, size, sort_order: nextSlot(w, h), config: {} };
+      if (sectionsOn) {
+        // 区块版：新增的小工具浮在所有区块上面，之后可以拖到任何位置，或拖进某个区块
+        const [pw, ph] = SIZE_PX[size] || [320, 190];
+        const top = root.getBoundingClientRect().top;
+        row = { ...row, sort_order: 0, config: { pos: { box: null, x: Math.max(8, Math.round((root.clientWidth - pw) / 2)), y: Math.max(0, Math.round(-top + 110)), w: pw, h: ph } } };
+      }
+      const { data: created, error } = await sb.from("gw_user_widgets").insert(row).select().single();
       if (error) return toast(t("home.saveFailed"));
-      widgets.push(row);
+      widgets.push(created);
       sheet = null;
       draw();
       toast(t("widgets.added"));
-      setTimeout(() => {
-        const el = root.querySelector(`[data-kind="widget"][data-id="${row.id}"]`);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 50);
+      if (!sectionsOn)
+        setTimeout(() => {
+          const el = root.querySelector(`[data-kind="widget"][data-id="${created.id}"]`);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 50);
     }
 
     async function removeWidget(id) {
@@ -379,9 +384,11 @@ window.GWHome = (function () {
         }
         case "clock":
           return `<div class="flex h-full flex-col justify-center ${w.size === "small" ? "items-center text-center" : ""}">
-            <div data-clock class="font-bold tabular-nums ${w.size === "small" ? "text-3xl" : "text-5xl"}">${esc(fmt({ hour: "2-digit", minute: "2-digit", hour12: false }))}</div>
+            <div data-clock class="font-bold tabular-nums ${w.size === "small" ? "text-3xl" : "text-5xl"}">${esc(fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }))}</div>
             <div class="mt-1 text-sm text-slate-500">${esc(fmt({ weekday: "short", day: "numeric", month: "short" }))}</div>
           </div>`;
+        case "weather":
+          return `<div data-weather="${w.size === "small" ? "small" : "medium"}" class="h-full">${weatherInner(w.size === "small" ? "small" : "medium")}</div>`;
         case "search":
           return `${wTitle("search", t("widgets.types.search"))}
             <input data-widget-search type="search" placeholder="${esc(t("home.searchPlaceholder"))}" class="${cls.input} no-drag rounded-xl bg-white/80 dark:bg-slate-800/80">
@@ -585,8 +592,50 @@ window.GWHome = (function () {
     const folderKids = (fid) => sItems.filter((x) => x.parent_id === fid && modules.has(x.module_id) && shownFor(x.group_id, x.module_id)).sort(bySort);
 
     const TILE_H = "h-[6.25rem]";
-    const sTile = (it) => {
-      const base = `data-key="${it.id}" class="gw-item ${TILE_H} w-24 shrink-0`;
+    const ROW_PX = 100;
+    // ---- 区块的大小：宽度（占一整行的比例）和展开时的高度，记在 Notice Board 小工具的 config.layout
+    const secLayout = (key) => ({ w: 1, h: null, ...((board() && board().config && board().config.layout && board().config.layout[key]) || {}) });
+    async function saveLayout(key, patch) {
+      const bw = board();
+      if (!bw) return;
+      const layout = { ...((bw.config && bw.config.layout) || {}), [key]: { ...secLayout(key), ...patch } };
+      bw.config = { ...(bw.config || {}), layout };
+      const { error } = await sb.from("gw_user_widgets").update({ config: bw.config }).eq("id", bw.id);
+      if (error) toast(t("home.saveFailed"));
+    }
+    const boxCols = (key) => Math.max(2, Math.min(12, Math.floor(((root.clientWidth || 1000) * secLayout(key).w - 72) / 104)));
+    const widthOf = (it, n) => (it.kind === "note" ? Math.min(2, n) : 1);
+
+    /* 区块里每个东西的位置记的是「第几行第几栏」（行 × 100 + 栏）：放哪就在哪，中间可以空着，不会自己挤在一起。
+       重叠的（例如区块被拉窄了）往后找空位，只影响显示、不改资料；还没记位置的 App 补在最前面的空位。 */
+    function boxPositions(gid, skipId) {
+      const n = boxCols(gid);
+      const all = boxItems(gid).filter((x) => x.id !== skipId);
+      const taken = new Set();
+      const pos = new Map();
+      const free = (c, r, w) => {
+        for (let x = c; x < c + w; x++) if (taken.has(r * 100 + x)) return false;
+        return true;
+      };
+      const put = (it, c, r) => {
+        const w = widthOf(it, n);
+        if (c + w > n) c = Math.max(0, n - w);
+        while (!free(c, r, w)) {
+          c += 1;
+          if (c + w > n) ((c = 0), (r += 1));
+        }
+        for (let x = c; x < c + w; x++) taken.add(r * 100 + x);
+        pos.set(it.id, { c, r, w, slot: r * 100 + c });
+      };
+      all.filter((x) => !x.virtual).forEach((it) => put(it, (it.sort_order || 0) % 100, Math.floor((it.sort_order || 0) / 100)));
+      all.filter((x) => x.virtual).forEach((it) => put(it, 0, 0));
+      const rows = Math.max(1, ...[...pos.values()].map((p) => p.r + 1));
+      return { pos, n, rows, items: all };
+    }
+
+    const placeStyle = (p) => `style="grid-column:${p.c + 1} / span ${p.w};grid-row:${p.r + 1}"`;
+    const sTile = (it, p) => {
+      const base = `data-key="${it.id}" ${placeStyle(p)} class="gw-item ${TILE_H}`;
       if (it.kind === "module") {
         const m = modules.get(it.module_id);
         return `<div ${base} relative flex flex-col items-center gap-1.5 pt-1" data-kind="module">
@@ -605,7 +654,7 @@ window.GWHome = (function () {
           </button></div>`;
       }
       // 便条
-      return `<div data-key="${it.id}" data-kind="note" class="gw-item ${TILE_H} w-52 shrink-0 pt-1">
+      return `<div ${base} pt-1" data-kind="note">
         <button type="button" data-open-note="${it.id}" class="flex h-[5.75rem] w-full flex-col items-start overflow-hidden gw-icon rounded-2xl border border-white/50 bg-amber-200/60 p-3 text-left text-amber-950 backdrop-blur-xl dark:bg-amber-200/70">
           <span class="flex w-full items-center gap-1.5 text-xs font-semibold">${icon("sticky-note", "size-3.5")}<span class="truncate">${esc(it.name || t("home.noteDefault"))}</span></span>
           <span class="mt-1 line-clamp-3 w-full text-xs whitespace-pre-line break-words">${esc(it.body || "")}</span>
@@ -617,16 +666,23 @@ window.GWHome = (function () {
       const w = board();
       return w && w.config && Array.isArray(w.config.order) ? w.config.order : [];
     };
-    function boxShell({ key, title, open, tiles, menu, extraHeader }) {
-      if (!tiles) tiles = `<p class="px-1 py-3 text-sm text-slate-500">${esc(t("home.noAppsForCompany"))}</p>`;
-      return `<section data-box="${key}" data-sec-key="${key}" class="${glass} h-auto! overflow-visible! pb-3 ${menuGid === key || companyMenuGid === key ? "z-30" : ""}">
-        <div class="mb-2 flex items-center justify-between gap-2">
-          <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2>${key !== "home" ? companyPicker(key) : ""}</div>
-          <div class="relative flex items-center gap-1">${extraHeader || ""}${menu || ""}</div>
-        </div>
-        <div data-list="${key}" class="flex flex-wrap content-start gap-x-1 gap-y-1 ${open ? "" : "max-h-[6.25rem] overflow-hidden"}">${tiles}</div>
-        <button type="button" data-expand="${key}" aria-label="${esc(t(open ? "home.collapse" : "home.expand"))}" title="${esc(t(open ? "home.collapse" : "home.expand"))}" class="hidden absolute right-3 bottom-2 z-10 items-center justify-center rounded-full bg-slate-700/90 p-1 text-white shadow ring-2 ring-white dark:ring-slate-900">${icon(open ? "chevrons-up" : "chevrons-down", "size-4")}</button>
-      </section>`;
+    // 右下角：拖拉调整区块大小
+    const resizeGrip = (key) => `<span data-sec-resize="${key}" title="${esc(t("home.resizeSection"))}" aria-label="${esc(t("home.resizeSection"))}" class="absolute right-1.5 bottom-1.5 z-20 flex size-5 cursor-nwse-resize touch-none items-end justify-end text-slate-400 hover:text-slate-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1 1 11M11 6 6 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>`;
+
+    // 一个 Business 的区块：默认收起（只显示第一行），右上角按钮展开；里面的 App 一定会显示（这个 Business 有的模块）
+    function boxShell({ key, title, open, tiles, n, rows, widgetsHtml }) {
+      const lay = secLayout(key);
+      const R = open ? rows + 1 : rows;
+      const body = tiles || `<p class="col-span-full row-start-1 px-1 py-3 text-sm text-slate-500">${esc(t("home.noAppsForCompany"))}</p>`;
+      return `<div data-sec-wrap data-sec-key="${key}" class="p-2" style="width:${Math.round(lay.w * 100)}%">
+        <section data-box="${key}" class="${glass} h-auto! overflow-visible! pb-6 ${companyMenuGid === key ? "z-30" : ""}">
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(title)}</h2>${companyPicker(key)}</div>
+            <button type="button" data-expand="${key}" aria-label="${esc(t(open ? "home.collapse" : "home.expand"))}" title="${esc(t(open ? "home.collapse" : "home.expand"))}" class="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-white/60 dark:hover:bg-white/10">${icon(open ? "chevrons-up" : "chevrons-down", "size-4")}</button>
+          </div>
+          <div data-list="${key}" data-fw-host="${key}" data-cols="${n}" class="relative grid gap-x-1 overflow-hidden ${open ? "" : "max-h-[6.25rem]"}" style="grid-template-columns:repeat(${n},minmax(0,1fr));grid-template-rows:repeat(${R},${ROW_PX}px);${open && lay.h ? `min-height:${lay.h}px;` : ""}">${body}<div data-box-hint class="pointer-events-none hidden rounded-2xl border-2 border-dashed"></div>${widgetsHtml || ""}</div>
+          ${resizeGrip(key)}
+        </section></div>`;
     }
     // 区块标题旁边的 Company 选择
     const companyPicker = (gid) => {
@@ -643,35 +699,208 @@ window.GWHome = (function () {
         ${companyMenuGid === gid ? `<div class="absolute top-full left-0 z-30 mt-1 max-h-64 w-60 overflow-y-auto rounded-xl border border-white/60 bg-white/90 p-1.5 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90">${row("all", t("home.allCompanies"))}${list.map((c) => row(c.id, c.name)).join("")}</div>` : ""}
       </div>`;
     };
-    const addMenu = (gid) => `<button type="button" data-sec-menu="${gid}" aria-label="${esc(t("home.addToBox"))}" title="${esc(t("home.addToBox"))}" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">${icon("plus", "size-4")}</button>
-      ${
-        menuGid === gid
-          ? `<div class="absolute top-full right-0 z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-1.5 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
-              <button type="button" data-sec-add="folder" data-gid="${gid}" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">${icon("folder-plus", "size-4")}${esc(t("home.newFolder"))}</button>
-              <button type="button" data-sec-add="note" data-gid="${gid}" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">${icon("sticky-note", "size-4")}${esc(t("home.newNote"))}</button>
-              <button type="button" data-sec-colors class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">${icon("palette", "size-4")}${esc(t("fab.iconColors"))}</button>
-              <p class="mt-1 border-t border-slate-100 px-2.5 py-2 text-xs text-slate-400 dark:border-slate-800">${esc(t("home.moreWidgets"))}</p>
-            </div>`
-          : ""
-      }`;
 
-    // 画完之后：算哪些区块要显示展开按钮，并让区块里的东西可以拖拉排序
+    // 区块里的 App 记下新位置（还没记过的先建一笔；先改画面再存，不会闪回去）
+    function placeInBox(gid, id, slot, parentId) {
+      let it = sItems.find((x) => x.id === id);
+      if (it) {
+        it.sort_order = slot;
+        if (parentId !== undefined) it.parent_id = parentId;
+        return sb.from("gw_user_section_items").update(parentId !== undefined ? { sort_order: slot, parent_id: parentId } : { sort_order: slot }).eq("id", id).then(({ error }) => error && toast(t("home.saveFailed")));
+      }
+      const moduleId = id.slice(4);
+      it = { id: "tmp:" + moduleId, user_id: data.profile.id, group_id: gid, kind: "module", module_id: moduleId, parent_id: parentId || null, sort_order: slot };
+      sItems.push(it);
+      return sb
+        .from("gw_user_section_items")
+        .insert({ user_id: data.profile.id, group_id: gid, kind: "module", module_id: moduleId, parent_id: parentId || null, sort_order: slot })
+        .select()
+        .single()
+        .then(({ data: created, error }) => {
+          if (error) return toast(t("home.saveFailed"));
+          it.id = created.id;
+        });
+    }
+
+    // ------------------------------------------------------------ 区块里拖 App：放到哪个空格就留在哪（长按 / 拖动开始）
+    let bdrag = null;
+    let bpress = null;
+    function boxCell(list, x, y) {
+      const rect = list.getBoundingClientRect();
+      const n = Number(list.dataset.cols);
+      const gx = parseFloat(getComputedStyle(list).columnGap) || 0;
+      const cellW = (rect.width - gx * (n - 1)) / n;
+      return { c: Math.max(0, Math.min(n - 1, Math.floor((x - rect.left) / (cellW + gx)))), r: Math.max(0, Math.floor((y - rect.top) / ROW_PX)), n, cellW, gx };
+    }
+    function boxTarget(e) {
+      const { list, gid, id, w } = bdrag;
+      const g = boxCell(list, e.clientX, e.clientY);
+      const P = boxPositions(gid, id);
+      const maxR = expanded.get(gid) ? P.rows : 0; // 收起时只看得到第一行
+      const c = Math.max(0, Math.min(g.n - w, g.c - bdrag.offC));
+      const r = Math.min(g.r, maxR);
+      const hits = new Set();
+      P.pos.forEach((p, key) => {
+        if (r === p.r && c < p.c + p.w && c + w > p.c) hits.add(key);
+      });
+      let action = null;
+      if (!hits.size) action = { type: "place", c, r };
+      else if (hits.size === 1) {
+        const key = [...hits][0];
+        const it = P.items.find((x) => x.id === key);
+        const p = P.pos.get(key);
+        if (it.kind === "folder" && bdrag.kind === "module") action = { type: "folder", fid: key };
+        else if (w === 1 && p.w === 1) action = { type: "swap", key, theirs: p.slot };
+      }
+      return { c, r, action };
+    }
+    function startBoxDrag(e, el) {
+      const list = el.parentElement;
+      const gid = list.dataset.list;
+      const id = el.dataset.key;
+      const p = boxPositions(gid).pos.get(id);
+      const rect = el.getBoundingClientRect();
+      const g = boxCell(list, rect.left, rect.top);
+      const w = p ? p.w : 1;
+      bdrag = { el, list, gid, id, kind: el.dataset.kind, w, slot: p ? p.slot : 0, offC: Math.min(w - 1, Math.floor((e.clientX - rect.left) / (g.cellW + g.gx))), dx: e.clientX - rect.left, dy: e.clientY - rect.top, target: null };
+      const ghost = el.cloneNode(true);
+      ghost.removeAttribute("data-key");
+      ghost.style.cssText = `position:fixed;left:0;top:0;width:${rect.width}px;height:${rect.height}px;z-index:60;pointer-events:none;transform:translate(${rect.left}px,${rect.top}px) scale(1.08);opacity:.95;transition:none;margin:0`;
+      ghost.className = ghost.className.replace("gw-item", "gw-ghost");
+      document.body.appendChild(ghost);
+      bdrag.ghost = ghost;
+      el.classList.add("opacity-30");
+      document.body.classList.add("gw-dragging");
+    }
+    function moveBoxDrag(e) {
+      bdrag.ghost.style.transform = `translate(${e.clientX - bdrag.dx}px,${e.clientY - bdrag.dy}px) scale(1.08)`;
+      if (e.clientY < 90) scrollBy(0, -14);
+      else if (e.clientY > innerHeight - 90) scrollBy(0, 14);
+      bdrag.target = boxTarget(e);
+      const hint = $("[data-box-hint]", bdrag.list);
+      if (!hint) return;
+      const tg = bdrag.target;
+      hint.classList.remove("hidden");
+      hint.className = `pointer-events-none rounded-2xl border-2 border-dashed ${tg.action ? "border-brand-500/70 bg-brand-500/10" : "border-rose-400/70 bg-rose-400/10"}`;
+      hint.style.gridColumn = `${tg.c + 1} / span ${bdrag.w}`;
+      hint.style.gridRow = `${tg.r + 1}`;
+    }
+    async function endBoxDrag(cancelled) {
+      const d = bdrag;
+      bdrag = null;
+      d.ghost.remove();
+      d.el.classList.remove("opacity-30");
+      document.body.classList.remove("gw-dragging");
+      lastDragEnd = Date.now();
+      const a = !cancelled && d.target && d.target.action;
+      if (!a) return draw();
+      // 其他还没记过位置的 App 先照现在的位置记下来，才不会因为这一个移走就往前挤
+      const keep = [];
+      boxPositions(d.gid).pos.forEach((pp, key) => {
+        if (key.startsWith("new:") && key !== d.id && !(a.type === "swap" && key === a.key)) keep.push(placeInBox(d.gid, key, pp.slot));
+      });
+      if (a.type === "place") {
+        const saving = Promise.all([...keep, placeInBox(d.gid, d.id, a.r * 100 + a.c)]);
+        draw();
+        return saving;
+      }
+      if (a.type === "folder") {
+        const saving = Promise.all([...keep, placeInBox(d.gid, d.id, 0, a.fid)]);
+        draw();
+        return saving;
+      }
+      if (a.type === "swap") {
+        const saving = Promise.all([...keep, placeInBox(d.gid, d.id, a.theirs), placeInBox(d.gid, a.key, d.slot)]);
+        draw();
+        return saving;
+      }
+      draw();
+    }
+    root.addEventListener("pointerdown", (e) => {
+      if (!sectionsOn || bdrag || e.button !== 0) return;
+      const el = e.target.closest("[data-list] > .gw-item[data-key]");
+      if (!el || e.target.closest(".no-drag")) return;
+      const touch = e.pointerType !== "mouse";
+      bpress = { el, x: e.clientX, y: e.clientY, id: e.pointerId, touch };
+      if (touch) bpress.timer = setTimeout(() => bpress && ((bpress.hold = true), startBoxDrag(e, el), moveBoxDrag(e)), 280);
+    });
+    root.addEventListener("pointermove", (e) => {
+      if (bdrag) return moveBoxDrag(e);
+      if (!bpress || e.pointerId !== bpress.id) return;
+      const far = Math.hypot(e.clientX - bpress.x, e.clientY - bpress.y) > 8;
+      if (bpress.touch && far && !bdrag) (clearTimeout(bpress.timer), (bpress = null));
+      else if (!bpress.touch && far) (startBoxDrag(e, bpress.el), moveBoxDrag(e), (bpress = null));
+    });
+    const boxUp = (e) => {
+      if (bpress) (clearTimeout(bpress.timer), (bpress = null));
+      if (bdrag) endBoxDrag(e.type === "pointercancel");
+    };
+    root.addEventListener("pointerup", boxUp);
+    root.addEventListener("pointercancel", boxUp);
+    addEventListener("pointerup", (e) => bdrag && boxUp(e));
+    document.addEventListener("touchmove", (e) => bdrag && e.preventDefault(), { passive: false });
+
+    // ------------------------------------------------------------ 区块右下角：拖拉调整大小（宽度 = 占一整行的比例，高度 = 展开时的高度）
+    root.addEventListener("pointerdown", (e) => {
+      const grab = e.target.closest("[data-sec-resize]");
+      if (!grab || e.button !== 0) return;
+      e.preventDefault();
+      const key = grab.dataset.secResize;
+      const wrap = grab.closest("[data-sec-wrap]");
+      const host = wrap.querySelector("[data-fw-host]");
+      const rootW = root.getBoundingClientRect().width;
+      const startW = wrap.getBoundingClientRect().width;
+      const startH = host.getBoundingClientRect().height;
+      const sx = e.clientX;
+      const sy = e.clientY;
+      let frac = secLayout(key).w;
+      let h = startH;
+      document.body.classList.add("gw-dragging");
+      const move = (ev) => {
+        frac = Math.max(0.2, Math.min(1, Math.round(((startW + ev.clientX - sx) / rootW) * 20) / 20));
+        wrap.style.width = Math.round(frac * 100) + "%";
+        h = Math.max(ROW_PX, startH + ev.clientY - sy);
+        host.style.maxHeight = "none";
+        host.style.minHeight = h + "px";
+      };
+      const up = async () => {
+        removeEventListener("pointermove", move);
+        removeEventListener("pointerup", up);
+        removeEventListener("pointercancel", up);
+        document.body.classList.remove("gw-dragging");
+        lastDragEnd = Date.now();
+        const grew = h > ROW_PX + 24;
+        const patch = { w: frac, h: grew ? Math.round(h) : null };
+        if (key !== "home" && grew && !expanded.get(key)) {
+          expanded.set(key, true);
+          sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: key, expanded: true });
+        }
+        if (key !== "home" && !grew) patch.h = null;
+        const saving = saveLayout(key, patch);
+        draw();
+        await saving;
+      };
+      addEventListener("pointermove", move);
+      addEventListener("pointerup", up);
+      addEventListener("pointercancel", up);
+    });
+
+    // 画完之后：让区块可以拖拉调整先后顺序
     function afterSections() {
       sortables.forEach((x) => x.destroy());
       sortables = [];
-      measureBoxes();
       const stack = $("#gw-stack", root);
       if (stack)
         sortables.push(
           window.Sortable.create(stack, {
             animation: 180,
             handle: ".sec-grip",
-            draggable: "[data-sec-key]",
+            draggable: "[data-sec-wrap]",
             delay: 120,
             delayOnTouchOnly: true,
             onEnd: async () => {
               lastDragEnd = Date.now();
-              const order = $$("[data-sec-key]", stack).map((el) => el.dataset.secKey);
+              const order = $$("[data-sec-wrap]", stack).map((el) => el.dataset.secKey);
               const w = board();
               if (!w) return;
               w.config = { ...(w.config || {}), order };
@@ -680,56 +909,204 @@ window.GWHome = (function () {
             },
           }),
         );
-      $$("[data-list]", root).forEach((list) => {
-        const key = list.dataset.list;
-        sortables.push(
-          window.Sortable.create(list, {
-            animation: 150,
-            delay: 180,
-            delayOnTouchOnly: true,
-            draggable: ".gw-item",
-            onEnd: () => {
-              lastDragEnd = Date.now();
-              saveBoxOrder(key, $$(".gw-item[data-key]", list).map((el) => el.dataset.key));
-            },
-          }),
-        );
-      });
     }
     const drawSections = () => draw();
-    // 只有内容超过一行才显示展开按钮（展开着的一定显示，才能收起）
-    function measureBoxes() {
-      $$("[data-box]", root).forEach((box) => {
-        const list = $("[data-list]", box);
-        const btn = $("[data-expand]", box);
-        const open = !list.classList.contains("max-h-[6.25rem]");
-        const need = open || list.scrollHeight > list.clientHeight + 4;
-        btn.classList.toggle("hidden", !need);
-        btn.classList.toggle("flex", need);
-      });
-    }
-    addEventListener("resize", () => sectionsOn && measureBoxes());
+    // 窗口宽度变了、区块的栏数跟着变时重画
+    let lastBoxCols = "";
+    const boxColsSig = () => (sectionsOn ? S.groups.map((g) => boxCols(g.id)).join(",") : "");
+    addEventListener("resize", () => {
+      if (!sectionsOn) return;
+      const sig = boxColsSig();
+      if (sig !== lastBoxCols) ((lastBoxCols = sig), draw());
+    });
 
-    async function saveBoxOrder(gid, keys, parentId) {
-      const rows = [];
-      const updates = [];
-      keys.forEach((key, i) => {
-        if (key.startsWith("new:")) rows.push({ user_id: data.profile.id, group_id: gid, kind: "module", module_id: key.slice(4), parent_id: parentId || null, sort_order: i });
-        else {
-          const it = sItems.find((x) => x.id === key);
-          if (it && it.sort_order !== i) {
-            it.sort_order = i;
-            updates.push([key, i]);
+    // ------------------------------------------------------------ 浮动小工具：新增的小工具浮在所有区块上面，可以放在任何位置；拖进某个区块就留在那个区块里
+    const FW_MIN = [150, 110];
+    const SIZE_PX = { small: [190, 190], medium: [340, 190], large: [340, 340] };
+    const isFloating = (w) => !!(w && w.config && w.config.pos);
+    function floatWidget(w) {
+      const p = w.config.pos;
+      return `<div data-fw="${w.id}" class="gw-fw group absolute z-40 touch-none" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px">
+        <div class="${glass.replace("bg-white/45", "bg-white/80").replace("dark:bg-slate-900/45", "dark:bg-slate-900/80")} cursor-grab p-3!">${widgetBody({ ...w, size: p.w < 240 ? "small" : p.h > 260 ? "large" : "medium" })}</div>
+        <button type="button" data-remove-fw="${w.id}" aria-label="${esc(t("home.removeFromHome"))}" class="no-drag absolute -top-2 -right-2 z-10 flex size-6 items-center justify-center rounded-full bg-slate-700/90 text-white opacity-0 shadow ring-2 ring-white transition-opacity group-hover:opacity-100 dark:ring-slate-900 [@media(hover:none)]:opacity-100">${icon("x", "size-3.5")}</button>
+        <span data-fw-resize class="no-drag absolute right-1.5 bottom-1.5 z-10 flex size-5 cursor-nwse-resize touch-none items-end justify-end text-slate-400 hover:text-slate-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1 1 11M11 6 6 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+      </div>`;
+    }
+    const floatsIn = (host) => widgets.filter((w) => isFloating(w) && (w.config.pos.box || null) === host).map(floatWidget).join("");
+    // 按住小工具拖到任何位置；放在某个区块上面就变成那个区块里的小工具
+    root.addEventListener("pointerdown", (e) => {
+      const fw = e.target.closest("[data-fw]");
+      if (!fw || e.button !== 0 || readOnly) return;
+      const resizing = !!e.target.closest("[data-fw-resize]");
+      if (!resizing && e.target.closest(".no-drag, button, input, textarea, select, a")) return;
+      const w = widgets.find((x) => x.id === fw.dataset.fw);
+      if (!w) return;
+      e.preventDefault();
+      const rect = fw.getBoundingClientRect();
+      const sx = e.clientX;
+      const sy = e.clientY;
+      let moved = false;
+      const p = { ...w.config.pos };
+      const finish = async (box, x, y, nw, nh) => {
+        w.config = { ...w.config, pos: { box, x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), w: Math.round(nw), h: Math.round(nh) } };
+        draw();
+        const { error } = await sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id);
+        if (error) toast(t("home.saveFailed"));
+      };
+      if (resizing) {
+        document.body.classList.add("gw-dragging");
+        const move = (ev) => {
+          fw.style.width = Math.max(FW_MIN[0], p.w + ev.clientX - sx) + "px";
+          fw.style.height = Math.max(FW_MIN[1], p.h + ev.clientY - sy) + "px";
+        };
+        const up = () => {
+          removeEventListener("pointermove", move);
+          removeEventListener("pointerup", up);
+          removeEventListener("pointercancel", up);
+          document.body.classList.remove("gw-dragging");
+          lastDragEnd = Date.now();
+          finish(p.box || null, p.x, p.y, parseFloat(fw.style.width), parseFloat(fw.style.height));
+        };
+        addEventListener("pointermove", move);
+        addEventListener("pointerup", up);
+        addEventListener("pointercancel", up);
+        return;
+      }
+      const move = (ev) => {
+        if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return;
+        if (!moved) {
+          moved = true;
+          // 拖的时候搬到 body 底下（区块有毛玻璃，里面的 fixed 位置会跑掉）
+          fw.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;z-index:70`;
+          document.body.appendChild(fw);
+          document.body.classList.add("gw-dragging");
+        }
+        fw.style.left = rect.left + ev.clientX - sx + "px";
+        fw.style.top = rect.top + ev.clientY - sy + "px";
+        if (ev.clientY < 90) scrollBy(0, -14);
+        else if (ev.clientY > innerHeight - 90) scrollBy(0, 14);
+      };
+      const up = (ev) => {
+        removeEventListener("pointermove", move);
+        removeEventListener("pointerup", up);
+        removeEventListener("pointercancel", up);
+        document.body.classList.remove("gw-dragging");
+        lastDragEnd = Date.now();
+        if (!moved) return;
+        const r = fw.getBoundingClientRect();
+        fw.remove();
+        // 放在哪个区块上面：那个区块；都不是 = 页面上任何位置
+        let host = null;
+        let hostEl = root;
+        for (const sec of $$("[data-box], [data-sec-key=home] > section", root)) {
+          const b = sec.getBoundingClientRect();
+          if (ev.clientX >= b.left && ev.clientX <= b.right && ev.clientY >= b.top && ev.clientY <= b.bottom) {
+            host = sec.dataset.box || "home";
+            hostEl = sec.querySelector("[data-fw-host]") || sec;
+            break;
           }
         }
-      });
-      if (rows.length) {
-        const { data: created, error } = await sb.from("gw_user_section_items").insert(rows).select();
-        if (error) toast(t("home.saveFailed"));
-        else sItems.push(...created);
-      }
-      await Promise.all(updates.map(([id, i]) => sb.from("gw_user_section_items").update({ sort_order: i }).eq("id", id)));
+        const hr = hostEl.getBoundingClientRect();
+        let x = r.left - hr.left;
+        let y = r.top - hr.top;
+        if (host) {
+          x = Math.min(x, Math.max(0, hr.width - 60));
+          if (host !== "home" && !expanded.get(host)) {
+            expanded.set(host, true); // 放进收起的区块：先展开，才看得到
+            sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: host, expanded: true });
+          }
+          if (y + r.height + 16 > (secLayout(host).h || 0)) saveLayout(host, { h: Math.round(Math.max(y, 0) + r.height + 16) });
+        } else x = Math.min(x, Math.max(0, hr.width - r.width));
+        finish(host, x, y, r.width, r.height);
+      };
+      addEventListener("pointermove", move);
+      addEventListener("pointerup", up);
+      addEventListener("pointercancel", up);
+    });
+
+    // ------------------------------------------------------------ 天气：用浏览器的位置，Open-Meteo（免费，不用 key）
+    let weather = null; // { at, temp, code, hi, lo, rain, wind, place } 或 { error }
+    let weatherBusy = false;
+    const WCODE = (c) => (c === 0 ? ["sun", "clear"] : c <= 2 ? ["cloud-sun", "partly"] : c === 3 ? ["cloud", "cloudy"] : c <= 48 ? ["cloud-fog", "fog"] : c <= 57 ? ["cloud-drizzle", "drizzle"] : c <= 67 ? ["cloud-rain", "rain"] : c <= 77 ? ["snowflake", "snow"] : c <= 82 ? ["cloud-rain", "rain"] : c <= 86 ? ["snowflake", "snow"] : ["cloud-lightning", "storm"]);
+    function weatherInner(size) {
+      const tw = (k, v) => t("widgets.weather." + k, v);
+      if (!weather) return `<div class="flex h-full items-center justify-center text-sm text-slate-500">${esc(tw("loading"))}</div>`;
+      if (weather.error)
+        return `<div class="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-slate-500">${icon("map-pin-off", "size-6")}<span>${esc(tw(weather.error))}</span><button type="button" data-weather-retry class="no-drag rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">${esc(tw("retry"))}</button></div>`;
+      const [ic, key] = WCODE(weather.code);
+      return `<div class="flex h-full flex-col justify-between">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0"><div class="flex items-center gap-1 truncate text-xs font-semibold text-slate-500 uppercase">${icon("map-pin", "size-3.5 shrink-0")}<span class="truncate">${esc(weather.place || tw("yourLocation"))}</span></div>
+            <div class="mt-1 text-4xl font-bold tabular-nums">${Math.round(weather.temp)}°</div></div>
+          ${icon(ic, size === "small" ? "size-10 text-sky-500" : "size-14 text-sky-500")}
+        </div>
+        <div>
+          <div class="text-sm font-medium">${esc(tw(key))}</div>
+          <div class="mt-0.5 text-xs text-slate-500">${esc(tw("high"))} ${Math.round(weather.hi)}° · ${esc(tw("low"))} ${Math.round(weather.lo)}°${size === "small" ? "" : ` · ${esc(tw("rainChance"))} ${weather.rain ?? 0}%`}</div>
+        </div>
+      </div>`;
     }
+    async function loadWeather(force) {
+      if (weatherBusy || (weather && !weather.error && !force && Date.now() - weather.at < 30 * 60e3)) return;
+      weatherBusy = true;
+      try {
+        let geo = null;
+        try {
+          const saved = JSON.parse(localStorage.getItem("gw_geo") || "null");
+          if (saved && !force && Date.now() - saved.at < 6 * 3600e3) geo = saved;
+        } catch (e) {
+          /* 忽略 */
+        }
+        if (!geo) {
+          geo = await new Promise((resolve) => {
+            if (!navigator.geolocation) return resolve(null);
+            navigator.geolocation.getCurrentPosition((p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, at: Date.now() }), () => resolve(null), { timeout: 10000, maximumAge: 3600e3 });
+          });
+          if (geo)
+            try {
+              localStorage.setItem("gw_geo", JSON.stringify(geo));
+            } catch (e) {
+              /* 忽略 */
+            }
+        }
+        if (!geo) weather = { error: "needLocation" };
+        else {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=1`;
+          const j = await (await fetch(url)).json();
+          let place = "";
+          try {
+            const g = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${geo.lat}&longitude=${geo.lon}&localityLanguage=en`)).json();
+            place = g.locality || g.city || g.principalSubdivision || "";
+          } catch (e) {
+            /* 名字取不到就算了 */
+          }
+          weather = { at: Date.now(), temp: j.current.temperature_2m, code: j.current.weather_code, wind: j.current.wind_speed_10m, hi: j.daily.temperature_2m_max[0], lo: j.daily.temperature_2m_min[0], rain: j.daily.precipitation_probability_max[0], place };
+        }
+      } catch (e) {
+        weather = { error: "failed" };
+      }
+      weatherBusy = false;
+      $$("[data-weather]", root).forEach((el) => (el.innerHTML = weatherInner(el.dataset.weather)));
+      refreshIcons();
+    }
+
+    // Notice Board 的高度不能小过里面的内容
+    function boardMinHeight() {
+      const el = $(".gw-pinned", root);
+      const ul = el && $("ul", el);
+      if (!ul) return 150;
+      const kids = [...ul.children];
+      const content = kids.reduce((a, k) => a + k.offsetHeight, 0) + Math.max(0, kids.length - 1) * 8;
+      return Math.max(150, Math.ceil(content + 72));
+    }
+    function fitBoard() {
+      const w = board();
+      const el = $(".gw-pinned", root);
+      if (!el || !(w && w.config && Number(w.config.height) > 0)) return;
+      const min = boardMinHeight();
+      if (el.getBoundingClientRect().height < min - 1) el.style.height = min + "px";
+    }
+
     async function toggleBox(key) {
       const open = !expanded.get(key);
       expanded.set(key, open);
@@ -737,14 +1114,6 @@ window.GWHome = (function () {
       await sb.from("gw_user_sections").upsert({ user_id: data.profile.id, group_id: key, expanded: open });
     }
 
-    // 区块里新增文件夹 / 便条（放在最后面）
-    async function addBoxItem(gid, kind) {
-      const keys = boxItems(gid).map((x) => x.id);
-      await saveBoxOrder(gid, keys); // 先把现有顺序记下来，新的才会排在最后
-      const last = Math.max(-1, ...sItems.filter((x) => x.group_id === gid && !x.parent_id).map((x) => x.sort_order));
-      if (kind === "folder") return itemDialog(null, gid, "folder", last + 1);
-      return itemDialog(null, gid, "note", last + 1);
-    }
     // 文件夹名称 / 便条内容
     function itemDialog(item, gid, kind, order) {
       const isNote = kind === "note";
@@ -925,14 +1294,22 @@ window.GWHome = (function () {
         const parts = [];
         S.groups.forEach((g) => {
           const mods = modsOfGroup(g.id);
-          if (mods.length || sItems.some((x) => x.group_id === g.id)) parts.push([g.id, boxShell({ key: g.id, title: g.name, open: !!expanded.get(g.id), tiles: boxItems(g.id).map(sTile).join(""), menu: addMenu(g.id) })]);
+          if (!(mods.length || sItems.some((x) => x.group_id === g.id))) return;
+          const P = boxPositions(g.id);
+          const tiles = P.items.map((it) => sTile(it, P.pos.get(it.id))).join("");
+          parts.push([g.id, boxShell({ key: g.id, title: g.name, open: !!expanded.get(g.id), tiles, n: P.n, rows: P.rows, widgetsHtml: floatsIn(g.id) })]);
         });
-        if (showGrid)
-          parts.push(["home", `<section data-sec-key="home" class="${glass} h-auto! overflow-visible!"><div class="mb-3 flex items-center gap-1.5">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(t("home.myHome"))}</h2></div>${gridHtml}</section>`]);
+        if (showGrid) {
+          const lay = secLayout("home");
+          parts.push([
+            "home",
+            `<div data-sec-wrap data-sec-key="home" class="p-2" style="width:${Math.round(lay.w * 100)}%"><section class="${glass} h-auto! overflow-visible! pb-6"><div class="mb-3 flex items-center gap-1.5">${secGrip()}<h2 class="truncate text-base font-bold text-slate-800 dark:text-slate-100">${esc(t("home.myHome"))}</h2></div><div data-fw-host="home" class="relative" style="${lay.h ? `min-height:${lay.h}px` : ""}">${gridHtml}${floatsIn("home")}</div>${resizeGrip("home")}</section></div>`,
+          ]);
+        }
         const order = sectionOrder();
         const rank = (k) => (order.indexOf(k) === -1 ? 999 : order.indexOf(k));
         parts.sort((a, b) => rank(a[0]) - rank(b[0]));
-        stackHtml = `<div id="gw-stack" class="mb-6 space-y-4">${parts.map((x) => x[1]).join("")}</div>`;
+        stackHtml = `<div id="gw-stack" class="-mx-2 mb-6 flex flex-wrap items-start">${parts.map((x) => x[1]).join("")}</div><div id="gw-float" class="pointer-events-none absolute inset-0 z-40 [&>*]:pointer-events-auto">${floatsIn(null)}</div>`;
       }
       root.innerHTML = `
         ${uninitialized ? `<div class="mb-4 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">${esc(t("home.previewUninitialized"))}</div>` : ""}
@@ -948,12 +1325,18 @@ window.GWHome = (function () {
         }
         ${fabHtml()}`;
       refreshIcons();
-      if (sectionsOn) afterSections();
+      if (sectionsOn) {
+        root.classList.add("relative");
+        lastBoxCols = boxColsSig();
+        afterSections();
+        fitBoard();
+      }
+      if ($("[data-weather]", root)) loadWeather();
       if ($("[data-clock]", root)) {
         clockTimer = setInterval(() => {
-          const now = new Intl.DateTimeFormat(GW.LOCALE, { timeZone: GW_CONFIG.timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+          const now = new Intl.DateTimeFormat(GW.LOCALE, { timeZone: GW_CONFIG.timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date());
           $$("[data-clock]", root).forEach((el) => (el.textContent = now));
-        }, 15000);
+        }, 1000);
       }
     }
     // 栏数随视窗宽度变（手机 4、平板 6、电脑 8）
@@ -1093,7 +1476,7 @@ window.GWHome = (function () {
       e.preventDefault();
       document.body.classList.add("gw-dragging");
       const move = (ev) => {
-        h = Math.max(150, Math.min(720, startH + ev.clientY - startY));
+        h = Math.max(boardMinHeight(), Math.min(Math.max(720, boardMinHeight()), startH + ev.clientY - startY));
         el.style.height = h + "px";
         el.classList.remove("h-[13rem]", "h-[22rem]");
       };
@@ -1491,14 +1874,14 @@ window.GWHome = (function () {
       if (Date.now() - lastDragEnd < 400) return; // 刚拖完，不算点击
       const b = e.target.closest("button");
       if (!b || !root.contains(b)) {
-        if (sectionsOn && (menuGid || companyMenuGid)) return ((menuGid = null), (companyMenuGid = null), drawSections());
+        if (sectionsOn && companyMenuGid) return ((companyMenuGid = null), draw());
         if (fabOpen && !e.target.closest("[data-fab-toggle]")) ((fabOpen = false), draw());
         return;
       }
       const d = b.dataset;
       if (sectionsOn) {
         if (companyMenuGid && !("companyMenu" in d) && !("companyPick" in d)) companyMenuGid = null;
-        if ("companyMenu" in d) return ((companyMenuGid = companyMenuGid === d.companyMenu ? null : d.companyMenu), (menuGid = null), draw());
+        if ("companyMenu" in d) return ((companyMenuGid = companyMenuGid === d.companyMenu ? null : d.companyMenu), draw());
         if ("companyPick" in d) {
           companyMenuGid = null;
           companySel.set(d.gid, d.companyPick);
@@ -1508,13 +1891,11 @@ window.GWHome = (function () {
           w.config = { ...(w.config || {}), companies: Object.fromEntries(companySel) };
           return sb.from("gw_user_widgets").update({ config: w.config }).eq("id", w.id).then(({ error }) => error && toast(t("home.saveFailed")));
         }
-        if (menuGid && !("secMenu" in d)) menuGid = null;
-        if ("secMenu" in d) return ((menuGid = menuGid === d.secMenu ? null : d.secMenu), drawSections());
-        if (d.secAdd) return ((menuGid = null), drawSections(), addBoxItem(d.gid, d.secAdd));
-        if ("secColors" in d) return ((menuGid = null), draw(), iconColorsDialog());
         if (d.expand) return toggleBox(d.expand);
         if (d.openFolder) return openBoxFolder(d.openFolder);
         if (d.openNote) return itemDialog(sItems.find((x) => x.id === d.openNote), null, "note");
+        if (d.removeFw) return removeWidget(d.removeFw);
+        if ("weatherRetry" in d) return ((weather = null), $$("[data-weather]", root).forEach((el) => (el.innerHTML = weatherInner(el.dataset.weather))), loadWeather(true));
       }
       if (d.open) return open(d.open);
       if (d.openLink) {

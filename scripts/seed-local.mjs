@@ -40,7 +40,8 @@ const people = [
   const { data: all } = await db.auth.admin.listUsers({ perPage: 1000 });
   for (const u of all?.users || []) if (!people.some((p) => p.email === u.email)) await db.auth.admin.deleteUser(u.id);
 }
-for (const t of ["gw_user_widgets", "gw_user_layout", "gw_user_folders", "gw_user_links"]) await db.from(t).delete().not("user_id", "is", null);
+for (const t of ["gw_user_section_items", "gw_user_sections", "gw_user_widgets", "gw_user_layout", "gw_user_folders", "gw_user_links"]) await db.from(t).delete().not("user_id", "is", null);
+await db.from("gw_login_attempts").delete().not("email", "is", null); // 登录失败锁定记录清掉
 const ids = {};
 for (const p of people) {
   const { data: created, error } = await db.auth.admin.createUser({ email: p.email, password: PASSWORD, email_confirm: true });
