@@ -466,7 +466,6 @@ window.GW_LANG["en"] = {
     },
     "title": "Admin",
     "pageTitle": "Admin Console",
-    "pageTitleSuper": "Super Admin Console",
     "backToPortal": "Back to Portal",
     "tabs": {
       "users": "All users",

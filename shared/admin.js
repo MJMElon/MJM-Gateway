@@ -37,7 +37,7 @@
   main.innerHTML = `<div class="space-y-5">
     <div class="relative flex min-h-10 flex-col items-center gap-2 sm:flex-row sm:justify-center">
       <a href="index.html" class="inline-flex self-start sm:absolute sm:left-0 sm:self-auto items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">${icon("arrow-left")} ${esc(t("admin.backToPortal"))}</a>
-      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t(isSuper ? "admin.pageTitleSuper" : "admin.pageTitle"))}</h1>
+      <h1 class="text-xl font-semibold sm:text-2xl">${esc(t("admin.pageTitle"))}</h1>
     </div>
     <div id="sections" class="mx-auto w-full max-w-3xl"></div>
     <div id="panel" class="hidden rounded-3xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -2474,48 +2474,29 @@
   // ================================================================ 以此人身份预览（只读）
   // ---------------------------------------------------------------- 分页切换（#users、#groups …）
   const HANDLERS = { users: usersScreen, roles: rolesTab, business: businessTab, company: companyTab, sectors: sectorsTab, modules: modulesTab, connector: connectorTab, audit: auditTab };
-  /* 上面的大按钮（User & Group Manage / Master Manage / Audit Log），永远一排：
-       还没点任何一个 → 三个一样大、置中，下面什么都不显示
-       点了 → 点的那个放中间、放大；其他的缩成小药丸排在左边 */
+  /* 上面的大按钮（User & Group Manage / Master Manage / Audit Log）：永远一排、位置固定不换。
+       当前的大而深色，其他的小而淡；点别的就互换样式（CSS 过渡）。手机上小的只显示图示。 */
   function paintSections(activeKey) {
     const box = $("#sections");
     if (SECTIONS.length < 2) return (box.innerHTML = "");
-    const base = "flex items-center justify-center gap-1.5 whitespace-nowrap font-semibold transition-all duration-300 ease-out";
-    const big = `${base} rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white shadow-md sm:px-7 sm:py-3.5 sm:text-base dark:bg-white dark:text-slate-900`;
-    const pill = `${base} rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800`;
-    const mid = `${base} rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700 hover:bg-slate-50 sm:px-5 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800`;
-    // 小药丸在手机上只显示图示（文字放不下）
-    const link = ([k, ic, tabs], cls) => `<a data-sec="${k}" href="#${tabs[0]}" aria-current="${k === activeKey ? "page" : "false"}" title="${esc(t("admin.sections." + k))}" class="${cls}">${icon(ic, cls === pill ? "size-4 shrink-0" : "size-5 shrink-0")}<span class="${cls === pill ? "hidden sm:inline" : ""}">${esc(t("admin.sections." + k))}</span></a>`;
-    if (!activeKey) {
-      box.innerHTML = `<div class="flex flex-nowrap items-center justify-center gap-2">${SECTIONS.map((x) => link(x, mid)).join("")}</div>`;
-    } else {
-      const act = SECTIONS.find(([k]) => k === activeKey);
-      // 手机：药丸靠左、大按钮占剩下的宽；sm 以上：三栏，大按钮正中间
-      box.innerHTML = `<div class="grid grid-cols-[auto_1fr] items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
-        <div class="flex shrink-0 flex-nowrap items-center justify-start gap-1.5">${SECTIONS.filter((x) => x !== act).map((x) => link(x, pill)).join("")}</div>
-        ${link(act, big + " min-w-0 sm:justify-self-center")}
-        <div class="hidden sm:block"></div>
-      </div>`;
-    }
+    const base = "flex w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl font-semibold transition-all duration-300 ease-out";
+    const big = `${base} bg-slate-900 px-3 py-2.5 text-sm text-white shadow-md sm:px-4 sm:py-3.5 sm:text-base dark:bg-white dark:text-slate-900`;
+    const small = `${base} border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 sm:px-4 sm:py-2.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200`;
+    box.innerHTML = `<div class="mx-auto grid max-w-3xl grid-cols-3 items-center gap-2">${SECTIONS.map(([k, ic, tabs]) => {
+      const on = k === activeKey;
+      return `<a data-sec="${k}" href="#${tabs[0]}" aria-current="${on ? "page" : "false"}" title="${esc(t("admin.sections." + k))}" class="${on ? big : small}">${icon(ic, on ? "size-5 shrink-0" : "size-4 shrink-0")}<span class="${on ? "line-clamp-2 text-left text-xs leading-tight whitespace-normal sm:truncate sm:text-center sm:text-base sm:whitespace-nowrap" : "hidden truncate sm:inline"}">${esc(t("admin.sections." + k))}</span></a>`;
+    }).join("")}</div>`;
     refreshIcons();
   }
   let activeSection = null;
   async function route() {
-    const hash = location.hash.slice(1);
+    const hash = location.hash.slice(1) || TABS[0];
     routeSeq++;
     view.onclick = null;
     view.onsubmit = null;
     view.onchange = null;
     view.oninput = null;
     setMsg("");
-    // 还没选区块：只显示上面的按钮
-    if (!hash) {
-      activeSection = null;
-      paintSections(null);
-      $("#panel").classList.add("hidden");
-      view.innerHTML = "";
-      return;
-    }
     const name0 = hash.split("=")[0];
     // #groups / #access 是 Users 画面里的切换
     const name = VIEW_OF_HASH[name0] ? "users" : name0;

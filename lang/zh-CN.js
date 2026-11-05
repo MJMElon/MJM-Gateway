@@ -466,7 +466,6 @@ window.GW_LANG["zh-CN"] = {
     },
     "title": "权限后台",
     "pageTitle": "管理控制台",
-    "pageTitleSuper": "超级管理员控制台",
     "backToPortal": "返回 Portal",
     "tabs": {
       "users": "全部用户",
