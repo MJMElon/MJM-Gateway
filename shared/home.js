@@ -754,7 +754,7 @@ window.GWHome = (function () {
     // 右下角：拖拉调整区块大小（编辑时才有）
     const resizeGrip = (key) => `<span data-sec-resize="${key}" title="${esc(t("home.resizeSection"))}" aria-label="${esc(t("home.resizeSection"))}" class="absolute right-1.5 bottom-1.5 z-20 flex size-6 cursor-nwse-resize touch-none items-end justify-end p-1 text-slate-400 hover:text-slate-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1 1 11M11 6 6 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>`;
 
-    // 区块标题列：标题的左边对准第一个图示，右边是（编辑时的）拖拉握把和大小按钮
+    // 区块标题列：标题的左边对准第一个图示，右边是拖拉握把（一直显示，按住就能拖，不用先进编辑）和大小按钮
     function boxHead(key, title, B, mode) {
       const { g, n } = B;
       const wrapW = B.fill ? g.width : (2 * n + 1) * g.hw;
@@ -764,7 +764,7 @@ window.GWHome = (function () {
       const steps = key === "home" ? "" : step("less", "chevron-up", t("home.collapse"), mode === "title") + step("more", "chevron-down", t("home.expand"), mode === "full");
       return `<div class="flex min-w-0 items-center gap-2" style="height:${g.th}px;${mode === "title" ? "" : `margin-bottom:${g.tg}px;`}padding:0 ${Math.max(0, side - 6)}px 0 ${side}px">
         <h2 class="min-w-0 truncate text-[15px] leading-6 font-semibold tracking-tight text-slate-800 dark:text-slate-100">${esc(title)}</h2>${key === "home" ? "" : companyPicker(key)}
-        <div class="ml-auto flex shrink-0 items-center">${editing ? secGrip() : ""}${steps}</div></div>`;
+        <div class="ml-auto flex shrink-0 items-center">${sectionsOn ? secGrip() : ""}${steps}</div></div>`;
     }
     // 一个区块（My Home 也一样）：外框宽 = 整数格 + 半格，高 = 整数格
     function boxShell(key, title, B, tiles) {
@@ -876,7 +876,7 @@ window.GWHome = (function () {
     root.addEventListener("pointerdown", (e) => {
       if (!sectionsOn || editing || e.button !== 0) return;
       const el = e.target.closest(".gw-item, [data-fw], [data-box]");
-      if (!el || e.target.closest("input, textarea, select, a, [data-company-menu], [data-mode], .gw-sheet")) return;
+      if (!el || e.target.closest("input, textarea, select, a, [data-company-menu], [data-mode], .gw-sheet, .sec-grip")) return; // 握把直接拖区块，不算长按
       lp = { x: e.clientX, y: e.clientY, id: e.pointerId };
       lp.timer = setTimeout(() => {
         lp.fired = true;
@@ -1069,11 +1069,11 @@ window.GWHome = (function () {
       addEventListener("pointercancel", up);
     });
 
-    // 区块（My Home 和各 Business）用握把拖着换位置（编辑时）：上下左右都可以。
+    // 区块（My Home 和各 Business）用握把拖着换位置（不用进编辑，按住握把马上可以拖）：上下左右都可以。
     // 放开前一直照鼠标位置找最近的区块：压在哪个区块上就排在它前面或后面（窄的区块看左右，整行宽的看上下），空白处找最近的。
     root.addEventListener("pointerdown", (e) => {
       const grip = e.target.closest(".sec-grip");
-      if (!grip || e.button !== 0 || readOnly || !editing) return;
+      if (!grip || e.button !== 0 || readOnly || !sectionsOn) return;
       const stack = $("#gw-stack", root);
       const wrap = grip.closest("[data-sec-wrap]");
       if (!stack || !wrap) return;
@@ -1102,6 +1102,11 @@ window.GWHome = (function () {
           if (target.previousElementSibling !== wrap) stack.insertBefore(wrap, target);
         } else if (target.nextElementSibling !== wrap) stack.insertBefore(wrap, target.nextElementSibling);
       };
+      if (lp) (clearTimeout(lp.timer), (lp = null));
+      lastDragEnd = Date.now(); // 按握把放开的那一下不算点击（不会打开 App、不会离开编辑）
+      // 手指拖握把时不要捲动页面
+      const noScroll = (ev) => ev.cancelable && ev.preventDefault();
+      document.addEventListener("touchmove", noScroll, { passive: false });
       const move = (ev) => {
         if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return;
         if (!moved) {
@@ -1124,6 +1129,7 @@ window.GWHome = (function () {
         removeEventListener("pointermove", move);
         removeEventListener("pointerup", up);
         removeEventListener("pointercancel", up);
+        document.removeEventListener("touchmove", noScroll);
         document.body.classList.remove("gw-dragging");
         lastDragEnd = Date.now();
         if (!moved) return;
@@ -1474,6 +1480,12 @@ window.GWHome = (function () {
         addEventListener("pointercancel", up);
         return;
       }
+      e.stopPropagation();
+      if (lp) (clearTimeout(lp.timer), (lp = null));
+      lastDragEnd = Date.now(); // 按握把放开的那一下不算点击（不会打开 App、不会离开编辑）
+      // 手指拖握把时不要捲动页面
+      const noScroll = (ev) => ev.cancelable && ev.preventDefault();
+      document.addEventListener("touchmove", noScroll, { passive: false });
       const move = (ev) => {
         if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return;
         if (!moved) {

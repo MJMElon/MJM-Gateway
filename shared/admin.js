@@ -92,15 +92,15 @@
       sb.from("gw_groups").select("id, name").order("sort_order").order("name"),
       sb.from("gw_group_members").select("group_id, user_id"),
       sb.from("gw_group_modules").select("group_id, module_id"),
-      sb.from("gw_modules").select("id, code, name, icon, is_active").order("sort_order").order("name"),
+      sb.from("gw_modules").select("id, code, name, icon, image_url, is_active").order("sort_order").order("name"),
       sb.from("gw_module_members").select("user_id, module_id, is_admin"),
       Promise.resolve({ data: [] }),
-      sb.from("gw_profiles").select("id, full_name, email, role, status").order("full_name"),
+      sb.from("gw_profiles").select("id, full_name, email, role, status, user_code").order("full_name"),
       sb.from("gw_module_companies").select("module_id, company_id"),
-      sb.from("gw_companies").select("id, code, name"),
+      sb.from("gw_companies").select("id, code, name, short_name"),
     ]).then((r) => r.map((x) => x.data || []));
     const coName = new Map(companies.map((c) => [c.id, c.code || c.name]));
-    const ctx = { groups, members, gm, mods, users, mine, rows: new Map(rows.map((r) => [r.user_id + ":" + r.module_id, r])) };
+    const ctx = { groups, members, gm, mods, users, mine, coTags, companies, rows: new Map(rows.map((r) => [r.user_id + ":" + r.module_id, r])) };
     const inGroup = (uid, gid) => members.some((m) => m.user_id === uid && m.group_id === gid);
     const groupHas = (gid, mid) => gm.some((x) => x.group_id === gid && x.module_id === mid);
     const myAdmin = (mid) => !!(ctx.rows.get(me.id + ":" + mid) || {}).is_admin;
@@ -234,82 +234,247 @@
     </div>`;
   }
 
-  // ================================================================ 模块权限（每个模块：谁是 Admin、谁有 Access）
+  // ================================================================ 模块权限（By Module）
+  /* 列表：每个模块一行，只显示模块名称（和图示）＋ 它标到的 Company 简称（没有 Company 就显示 Business 名称）。
+     点模块 → 详细画面：
+       上面下拉选「Business · Company」（模块标到的 Business × 这个 Business 里模块标到的 Company；没有就是「全部 Company」）
+       第一区：在这个 Business ＋ Company 里、已经有这个模块的人（Access / Admin 两个勾，规则跟用户资料窗一样）
+       第二区：在这个 Business ＋ Company 里、还没有这个模块的人（按钮开 Access）；
+               搜寻框也会找不在这里的人（Other users），确认后依序：加进 Business → 加进 Company → 开 Access。 */
   async function accessTab() {
     const seq = routeSeq;
     const ta = (k, v) => t("admin.access." + k, v);
-    const ctx = await loadAccess();
+    const [ctx, extra] = await Promise.all([
+      loadAccess(),
+      Promise.all([
+        sb.from("gw_business_companies").select("group_id, company_id"),
+        sb.from("gw_member_companies").select("group_id, user_id, company_id"),
+      ]).then((r) => r.map((x) => x.data || [])),
+    ]);
     if (stale(seq)) return;
-    const userById = new Map(ctx.users.map((u) => [u.id, u]));
-    let query = "";
-    // 模块 → 我管得到的 Business
+    const [bizCos, memberCos] = extra;
+    const coById = new Map(ctx.companies.map((c) => [c.id, c]));
+    const short = (c) => c.short_name || c.code || c.name;
+    const inCompany = (uid, gid, cid) => memberCos.some((x) => x.user_id === uid && x.group_id === gid && x.company_id === cid);
+    const locked = (u) => u.id === me.id || u.role === "super_admin";
+    // 模块 → 我管得到的 Business（不是 super_admin 只看到自己管得到的模块）
     const byModule = ctx.mods
       .map((mod) => [mod, ctx.groups.filter((g) => ctx.managedPairs.some((p) => p.group_id === g.id && p.module_id === mod.id))])
       .filter(([, gs]) => gs.length);
-
-    function draw() {
-      const q = query.trim().toLowerCase();
-      view.innerHTML = `<div class="space-y-4">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div class="flex-1"></div>
-          <input id="acc-q" type="search" value="${esc(query)}" placeholder="${esc(t("admin.users.search"))}" class="${cls.input} h-9 sm:w-64">
-        </div>
-        ${
-          byModule.length
-            ? byModule
-                .map(
-                  ([mod, gs]) => `<div class="${cls.card} p-4">
-                    <div class="mb-3 flex items-center gap-2">
-                      <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-700/20 dark:text-brand-100">${moduleIcon(mod.icon, "size-4")}</span>
-                      <span class="font-semibold">${esc(mod.name)}</span>
-                      ${ctx.companyTags(mod.id).map((c) => badge(c)).join("")}
-                      <span class="text-xs text-slate-400">${esc(ta("counts", { access: ctx.users.filter((u) => ctx.rows.has(u.id + ":" + mod.id)).length, admins: ctx.users.filter((u) => (ctx.rows.get(u.id + ":" + mod.id) || {}).is_admin).length }))}</span>
-                    </div>
-                    <div class="space-y-3">${gs
-                      .map((g) => {
-                        const people = ctx.members
-                          .filter((x) => x.group_id === g.id && ctx.rows.has(x.user_id + ":" + mod.id))
-                          .map((x) => userById.get(x.user_id))
-                          .filter((u) => u && (!q || (u.full_name + " " + u.email).toLowerCase().includes(q)));
-                        return `<div>
-                          <p class="mb-1 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(g.name)}</p>
-                          ${
-                            people.length
-                              ? `<div class="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">${people
-                                  .map((u) => {
-                                    const row = ctx.rows.get(u.id + ":" + mod.id);
-                                    return `<div class="flex items-center gap-2 px-3 py-2">
-                                      <button data-person="${u.id}" class="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline">${esc(u.full_name)}</button>
-                                      ${row && row.is_admin ? badge("Admin", "amber") : ""}
-                                    </div>`;
-                                  })
-                                  .join("")}</div>`
-                              : `<p class="rounded-xl border border-dashed border-slate-200 py-3 text-center text-xs text-slate-400 dark:border-slate-700">${esc(ta(q ? "noMatch" : "noPeople"))}</p>`
-                          }
-                        </div>`;
-                      })
-                      .join("")}</div>
-                  </div>`,
-                )
-                .join("")
-            : empty(ta("empty"))
-        }
-      </div>`;
-      refreshIcons();
-      $("#acc-q").addEventListener("input", (e) => {
-        query = e.target.value;
-        const pos = e.target.selectionStart;
-        draw();
-        const input = $("#acc-q");
-        input.focus();
-        input.setSelectionRange(pos, pos);
+    // 模块标到的 Company（简称）
+    const modCompanies = (mid) => ctx.coTags.filter((x) => x.module_id === mid).map((x) => coById.get(x.company_id)).filter(Boolean);
+    // 详细画面的下拉选项：Business × 这个 Business 里模块标到的 Company
+    const linesOf = (mod, gs) =>
+      gs.flatMap((g) => {
+        const cs = modCompanies(mod.id).filter((c) => bizCos.some((x) => x.group_id === g.id && x.company_id === c.id));
+        return cs.length ? cs.map((c) => ({ g, c })) : [{ g, c: null }];
       });
-    }
-    view.onclick = (e) => {
-      const b = e.target.closest("[data-person]");
-      if (b) userWindow(b.dataset.person, () => accessTab());
+    const lineLabel = (l) => l.g.name + " · " + (l.c ? short(l.c) + (short(l.c) !== l.c.name ? ` (${l.c.name})` : "") : ta("allCompanies"));
+    const inLine = (u, l) => ctx.inGroup(u.id, l.g.id) && (!l.c || inCompany(u.id, l.g.id, l.c.id));
+    const match = (u, q) => !q || [u.full_name, u.email, u.user_code].filter(Boolean).join(" ").toLowerCase().includes(q);
+    const byName = (a, b) => (a.full_name || "").localeCompare(b.full_name || "");
+
+    let openMid = null;
+    let lineIdx = 0;
+    let query = "";
+    const cur = () => {
+      const [mod, gs] = byModule.find(([m]) => m.id === openMid) || [];
+      if (!mod) return null;
+      const lines = linesOf(mod, gs);
+      if (lineIdx >= lines.length) lineIdx = 0;
+      return { mod, lines, line: lines[lineIdx] };
     };
-    draw();
+
+    const person = (u) => `<div class="min-w-0 flex-1">
+        <p class="truncate text-sm font-medium">${esc(u.full_name)}${u.status === "disabled" ? ` ${badge(ta("disabled"), "red")}` : ""}</p>
+        <p class="truncate text-xs text-slate-500">${esc(u.email)}${u.user_code ? ` · <span class="font-mono">${esc(u.user_code)}</span>` : ""}</p>
+      </div>`;
+    const avatar = (u) => `<span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold dark:bg-slate-700">${esc((u.full_name || "?").slice(0, 1))}</span>`;
+    const listBox = (inner, attrs) => `<div ${attrs || ""} class="max-h-72 divide-y divide-slate-100 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">${inner}</div>`;
+    const none = (text) => `<p class="px-3 py-6 text-center text-xs text-slate-400">${esc(text)}</p>`;
+    const head = (title, n) => `<p class="mb-1.5 flex items-center gap-2 text-xs font-bold tracking-wider text-slate-500 uppercase">${esc(title)}<span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 normal-case dark:bg-slate-800">${n}</span></p>`;
+
+    // ---------------- 列表
+    function drawList() {
+      view.innerHTML = byModule.length
+        ? `<div class="mx-auto max-w-3xl ${cls.card} divide-y divide-slate-100 overflow-hidden dark:divide-slate-800">${byModule
+            .map(([mod, gs]) => {
+              const cs = modCompanies(mod.id).map(short);
+              const tags = cs.length ? cs : gs.map((g) => g.name);
+              return `<button data-open-mod="${mod.id}" class="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 ${mod.is_active ? "" : "opacity-50"}">
+                ${modLogo(mod, "size-9")}
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate font-semibold">${esc(mod.name)}</span>
+                  <span class="mt-1 flex flex-wrap gap-1">${tags.length ? tags.map((x) => badge(x, cs.length ? "slate" : "blue")).join("") : `<span class="text-xs text-slate-400">—</span>`}</span>
+                </span>
+                <span class="shrink-0 text-slate-400">${icon("chevron-right", "size-4")}</span>
+              </button>`;
+            })
+            .join("")}</div>`
+        : empty(ta("empty"));
+      refreshIcons();
+    }
+
+    // ---------------- 详细画面
+    function drawDetail() {
+      const c = cur();
+      if (!c) return ((openMid = null), drawList());
+      const { mod, lines } = c;
+      view.innerHTML = `<div class="mx-auto max-w-3xl space-y-4">
+        <div class="${cls.card} space-y-3 p-4">
+          <div class="flex items-center gap-3">
+            <button data-back class="${btn("ghost", "sm")} -ml-1 shrink-0" aria-label="${esc(ta("back"))}">${icon("arrow-left", "size-4")}<span class="hidden sm:inline">${esc(ta("back"))}</span></button>
+            ${modLogo(mod, "size-9")}
+            <h3 class="min-w-0 flex-1 truncate text-base font-bold">${esc(mod.name)}</h3>
+          </div>
+          <label class="block space-y-1.5"><span class="${cls.label}">${esc(ta("line"))}</span>
+            <select id="bm-line" class="${cls.input}">${lines.map((l, i) => `<option value="${i}" ${i === lineIdx ? "selected" : ""}>${esc(lineLabel(l))}</option>`).join("")}</select>
+          </label>
+        </div>
+        <div id="bm-s1" class="${cls.card} p-4"></div>
+        <div class="${cls.card} space-y-3 p-4">
+          <div id="bm-s2-head"></div>
+          <div class="relative">
+            <span class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400">${icon("search")}</span>
+            <input id="bm-q" type="search" value="${esc(query)}" placeholder="${esc(ta("searchPlaceholder"))}" class="${cls.input} pl-9">
+          </div>
+          <div id="bm-s2"></div>
+        </div>
+      </div>`;
+      drawSections();
+    }
+
+    function drawSections() {
+      const { mod, line } = cur();
+      const mid = mod.id;
+      const gid = line.g.id;
+      const q = query.trim().toLowerCase();
+      const here = ctx.users.filter((u) => inLine(u, line)).sort(byName);
+      const has = here.filter((u) => ctx.rows.has(u.id + ":" + mid));
+      const not = here.filter((u) => !ctx.rows.has(u.id + ":" + mid));
+      // 第一区：Access / Admin 两个勾（跟用户资料窗同一套规则）
+      $("#bm-s1").innerHTML = head(ta("hasAccess"), has.length) +
+        listBox(
+          has
+            .map((u) => {
+              const row = ctx.rows.get(u.id + ":" + mid);
+              const canAdm = ctx.canAdmin(u, gid, mid);
+              const canAcc = ctx.canAccess(u, gid, mid) && !(row.is_admin && !canAdm);
+              return `<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 ${u.status === "disabled" ? "opacity-60" : ""}">
+                ${avatar(u)}${person(u)}
+                <span class="flex shrink-0 gap-4">${tick(`data-acc="${u.id}:${mid}:admin"`, row.is_admin, canAdm, ta("admin"))}${tick(`data-acc="${u.id}:${mid}:access"`, true, canAcc, ta("access"))}</span>
+              </div>`;
+            })
+            .join("") || none(ta("nobodyHas")),
+          "data-list-has",
+        );
+      // 第二区：在这里但没有这个模块
+      const notShown = not.filter((u) => match(u, q));
+      $("#bm-s2-head").innerHTML = head(ta("noAccess"), not.length);
+      let html = listBox(
+        notShown
+          .map((u) => {
+            const can = ctx.canGrant(u, gid, mid);
+            return `<div class="flex items-center gap-3 px-3 py-2 ${u.status === "disabled" ? "opacity-60" : ""}">
+              ${avatar(u)}${person(u)}
+              <button data-grant="${u.id}" ${can ? "" : `disabled title="${esc(locked(u) ? ta("lockedReason") : ta("noGrantReason"))}"`} class="${btn("secondary", "sm")} shrink-0">${icon("plus", "size-4")}${esc(ta("giveAccess"))}</button>
+            </div>`;
+          })
+          .join("") || none(ta(q ? "noMatch" : "nobodyWithout")),
+        "data-list-not",
+      );
+      // 搜寻时：也找不在这个 Business / Company 的人（只找启用中的帐号）
+      if (q) {
+        const others = ctx.users.filter((u) => u.status === "active" && !inLine(u, line) && match(u, q)).sort(byName);
+        const canAddBiz = me.bizCan(gid, "can_add_business_user");
+        html += `<div class="pt-1">${head(ta("otherUsers"), others.length)}<p class="mb-1.5 text-xs text-slate-400">${esc(ta("otherHint"))}</p>${listBox(
+          others
+            .map((u) => {
+              const why = locked(u) ? ta("lockedReason") : !canAddBiz ? ta("noBusinessReason") : !ctx.canGrant(u, gid, mid) ? ta("noGrantReason") : "";
+              return `<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                ${avatar(u)}${person(u)}
+                <button data-outsider="${u.id}" ${why ? "disabled" : ""} class="${btn("secondary", "sm")} shrink-0">${icon("user-plus", "size-4")}${esc(ta("addOutsider"))}</button>
+                ${why ? `<p class="w-full pl-11 text-xs text-amber-600 dark:text-amber-400">${esc(why)}</p>` : ""}
+              </div>`;
+            })
+            .join("") || none(ta("noOthers")),
+          "data-list-other",
+        )}</div>`;
+      }
+      $("#bm-s2").innerHTML = html;
+      refreshIcons();
+    }
+
+    // 加不在这个 Business / Company 的人：先确认，再依序 Business → Company → 模块 Access
+    async function addOutsider(uid) {
+      const { mod, line } = cur();
+      const u = ctx.users.find((x) => x.id === uid);
+      const g = line.g, c = line.c;
+      const row = (k, v) => `<div class="flex gap-3 py-1.5"><dt class="w-24 shrink-0 text-slate-500">${esc(k)}</dt><dd class="min-w-0 flex-1 font-medium break-words">${v}</dd></div>`;
+      const ok = await new Promise((resolve) => {
+        let answered = false;
+        const m = modal(
+          ta("confirmTitle"),
+          `<p class="mb-3 text-sm text-slate-600 dark:text-slate-300">${esc(ta("confirmBody"))}</p>
+           <dl class="mb-5 divide-y divide-slate-100 rounded-xl border border-slate-200 px-3 text-sm dark:divide-slate-800 dark:border-slate-800">
+             ${row(ta("user"), `${esc(u.full_name)}<span class="block text-xs font-normal text-slate-500">${esc(u.email)}</span>`)}
+             ${row(ta("business"), esc(g.name))}
+             ${row(ta("company"), esc(c ? c.name : ta("allCompanies")))}
+             ${row(ta("module"), esc(mod.name))}
+           </dl>
+           <div class="flex justify-end gap-2">
+             <button data-no class="${btn("secondary")}">${esc(ta("cancel"))}</button>
+             <button data-yes class="${btn("primary")}">${esc(ta("confirmAdd"))}</button>
+           </div>`,
+          { onClose: () => !answered && resolve(false) },
+        );
+        m.el.querySelector("[data-no]").onclick = () => m.close();
+        m.el.querySelector("[data-yes]").onclick = () => ((answered = true), m.close(), resolve(true));
+      });
+      if (!ok) return;
+      // 1. 加进 Business（跟 Group Manage 拖拉同一个写法）
+      if (!ctx.inGroup(uid, g.id)) {
+        const { error } = await sb.from("gw_group_members").insert({ group_id: g.id, user_id: uid });
+        if (error) return (toast(ta("addBusinessFailed")), drawSections());
+        ctx.members.push({ group_id: g.id, user_id: uid });
+      }
+      // 2. 加进这个 Business 里的 Company
+      if (c && !inCompany(uid, g.id, c.id)) {
+        const { error } = await sb.from("gw_member_companies").insert({ group_id: g.id, user_id: uid, company_id: c.id });
+        if (error) return (toast(ta("addCompanyFailed", { biz: g.name })), drawSections());
+        memberCos.push({ group_id: g.id, user_id: uid, company_id: c.id });
+      }
+      // 3. 开模块 Access
+      if (!ctx.rows.has(uid + ":" + mod.id) && !(await saveAccess(ctx, uid, mod.id, true, false))) {
+        toast(ta("grantAfterAddFailed", { place: c ? g.name + " · " + c.name : g.name }));
+        return drawSections();
+      }
+      toast(ta("outsiderAdded", { name: u.full_name, module: mod.name }));
+      drawSections();
+    }
+
+    view.onclick = async (e) => {
+      const b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      if (b.dataset.openMod) return ((openMid = b.dataset.openMod), (lineIdx = 0), (query = ""), drawDetail(), scrollTo(0, 0));
+      if ("back" in b.dataset) return ((openMid = null), drawList());
+      if (b.dataset.grant) {
+        b.disabled = true;
+        await saveAccess(ctx, b.dataset.grant, openMid, true, false);
+        return drawSections();
+      }
+      if (b.dataset.outsider) return addOutsider(b.dataset.outsider);
+    };
+    view.onchange = async (e) => {
+      if (e.target.id === "bm-line") return ((lineIdx = Number(e.target.value) || 0), drawSections());
+      await onTick(ctx, e, drawSections);
+    };
+    view.oninput = (e) => {
+      if (e.target.id !== "bm-q") return;
+      query = e.target.value;
+      drawSections();
+    };
+    drawList();
   }
 
   // ---------------------------------------------------------------- 模块小图示、用户资料窗（用户名单、群组管理共用）
@@ -2201,6 +2366,7 @@
     view.onclick = null;
     view.onsubmit = null;
     view.onchange = null;
+    view.oninput = null;
     view.innerHTML = GW.spinner();
     await HANDLERS[active]();
   }
