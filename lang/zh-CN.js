@@ -453,7 +453,11 @@ window.GW_LANG["zh-CN"] = {
       "pendingCompany": "待分配 Company",
       "removeFromCompany": "从这个 Company 拿掉",
       "pendingToggle": "待分配 Company（{count}）",
-      "memberCount": "{count} 人"
+      "memberCount": "{count} 人",
+      "alreadyHasAccess": "已经有 {module} 的权限",
+      "accessGiven": "{name} → {module}",
+      "dragHint": "把模块拖到人名上，或把人拖到模块上，就能开放权限。",
+      "noModulesHere": "这个 Business / Company 还没有模块。"
     },
     "title": "权限后台",
     "pageTitle": "管理控制台",
@@ -720,6 +724,8 @@ window.GW_LANG["zh-CN"] = {
       "back": "返回",
       "line": "Business · Company",
       "allCompanies": "全部 Company",
+      "userCount": "{count} 人有权限",
+      "noModulesHere": "这个 Business / Company 还没有模块。",
       "access": "Access",
       "admin": "Admin",
       "disabled": "已停用",

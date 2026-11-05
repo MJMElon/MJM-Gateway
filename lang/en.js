@@ -453,7 +453,11 @@ window.GW_LANG["en"] = {
       "pendingCompany": "Pending allocation to company",
       "removeFromCompany": "Remove from this company",
       "pendingToggle": "Pending allocation to company ({count})",
-      "memberCount": "{count} people"
+      "memberCount": "{count} people",
+      "alreadyHasAccess": "Already has access to {module}",
+      "accessGiven": "{name} → {module}",
+      "dragHint": "Drag a module onto a person, or a person onto a module, to give access.",
+      "noModulesHere": "No modules for this business / company yet."
     },
     "title": "Admin",
     "pageTitle": "Admin Console",
@@ -720,6 +724,8 @@ window.GW_LANG["en"] = {
       "back": "Back",
       "line": "Business · Company",
       "allCompanies": "All companies",
+      "userCount": "{count} with access",
+      "noModulesHere": "No modules for this business / company yet.",
       "access": "Access",
       "admin": "Admin",
       "disabled": "Disabled",
