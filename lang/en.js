@@ -821,7 +821,12 @@ window.GW_LANG["en"] = {
       "noModulesHere": "No modules for this business / company yet.",
       "clickModule": "Click a module to set its access.",
       "companies": "Companies in {business}",
-      "adminOf": "This user is an admin of this module"
+      "adminOf": "This user is an admin of this module",
+      "rolesBtn": "Roles & companies",
+      "rolesTitle": "Roles & companies of {name}",
+      "inBusiness": "In this business",
+      "notInCompany": "— Not in this company —",
+      "userNoRole": "User (no role)"
     },
     "connector": {
       "switchTitle": "AI Connector",

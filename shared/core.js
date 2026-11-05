@@ -64,14 +64,18 @@ window.GW = (function () {
     const session = data.session;
     if (!session) return { session: null, profile: null };
     // 一次请求拿到：个人资料 ＋ 角色 ＋ 角色的 Business 功能；模块管理员资料同时一起拿
-    const [{ data: profile }, { data: adm }] = await Promise.all([
+    // 按 Business ＋ Company 指派的角色（gw_member_companies.role_id）也一起拿：只算在那个 Business 的功能，全域功能照算
+    const [{ data: profile }, { data: adm }, { data: mcs }] = await Promise.all([
       sb.from("gw_profiles").select("*, gw_roles(*, gw_role_businesses(*))").eq("id", session.user.id).maybeSingle(),
       sb.from("gw_module_members").select("module_id").eq("user_id", session.user.id).eq("is_admin", true),
+      sb.from("gw_member_companies").select("group_id, company_id, role_id, gw_roles(*, gw_role_businesses(*))").eq("user_id", session.user.id),
     ]);
     if (profile) {
       const role = profile.gw_roles || null;
       const biz = role ? role.gw_role_businesses || [] : [];
       delete profile.gw_roles;
+      // 每个 Company 的角色：{ group_id, company_id, role_id, role }
+      profile.companyRoles = (mcs || []).map((x) => ({ group_id: x.group_id, company_id: x.company_id, role_id: x.role_id, role: x.gw_roles || null }));
       // 自订角色：管哪些 Business、能不能发公告（RLS 只给看自己的角色）
       profile.isSuper = profile.role === "super_admin";
       profile.roleName = null;
@@ -89,12 +93,23 @@ window.GW = (function () {
         profile.adminModuleIds = (adm || []).map((x) => x.module_id);
         profile.adminModules = profile.adminModuleIds.length;
       }
-      if (!profile.isSuper && role) {
-        profile.roleName = role.name;
-        GLOBAL.forEach((f) => (profile.can[f] = !!role[f]));
-        biz.forEach((b) => {
-          profile.perms[b.group_id] = Object.fromEntries(PER_BIZ.map((f) => [f, !!b[f]]));
-          PER_BIZ.forEach((f) => b[f] && (profile.can[f] = true)); // can.xxx = 在任何一个 Business 有
+      const perBizRoles = profile.isSuper ? [] : profile.companyRoles.filter((x) => x.role);
+      if (!profile.isSuper && (role || perBizRoles.length)) {
+        profile.roleName = role ? role.name : perBizRoles[0].role.name;
+        const addBiz = (b) => {
+          if (!profile.perms[b.group_id]) profile.perms[b.group_id] = Object.fromEntries(PER_BIZ.map((f) => [f, false]));
+          PER_BIZ.forEach((f) => {
+            if (b[f]) ((profile.perms[b.group_id][f] = true), (profile.can[f] = true)); // can.xxx = 在任何一个 Business 有
+          });
+        };
+        if (role) {
+          GLOBAL.forEach((f) => (profile.can[f] = !!role[f]));
+          biz.forEach(addBiz);
+        }
+        // 在 (Business, Company) 指派的角色：全域功能照算，Business 功能只算它被指派的那个 Business
+        perBizRoles.forEach((x) => {
+          GLOBAL.forEach((f) => x.role[f] && (profile.can[f] = true));
+          (x.role.gw_role_businesses || []).filter((b) => b.group_id === x.group_id).forEach(addBiz);
         });
         profile.businessIds = Object.keys(profile.perms);
         if (profile.businessIds.length) {

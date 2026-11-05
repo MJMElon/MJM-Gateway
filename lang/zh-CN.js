@@ -821,7 +821,12 @@ window.GW_LANG["zh-CN"] = {
       "noModulesHere": "这个 Business / Company 还没有模块。",
       "clickModule": "点模块就可以设定权限。",
       "companies": "{business} 的公司",
-      "adminOf": "此用户是这个模块的管理员"
+      "adminOf": "此用户是这个模块的管理员",
+      "rolesBtn": "角色与公司",
+      "rolesTitle": "{name} 的角色与公司",
+      "inBusiness": "在这个 Business",
+      "notInCompany": "— 不在这个 Company —",
+      "userNoRole": "一般用户（没有角色）"
     },
     "connector": {
       "switchTitle": "AI Connector",
