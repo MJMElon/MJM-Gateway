@@ -1,5 +1,7 @@
--- 把这整个文件贴到 Supabase SQL Editor 执行一次（只有 AI Connector 这一个新的数据库更新；之前的都已经执行过了）。
--- 只是新增东西，不会改动或删除现有资料。
+-- 贴到 Supabase SQL Editor 执行。里面有两段，各自独立：
+--   1) AI Connector（20261116）：只能执行一次（已执行过的请跳过这一段，否则会报 already exists）
+--   2) Super Admin 全模块（20261118）：可以重复执行
+-- 只是新增 / 覆盖函数，不会改动或删除现有资料。
 
 -- ============ 20261116100000_gw_mcp ============
 -- =====================================================================
@@ -134,3 +136,40 @@ end;
 $$;
 revoke execute on function public.gw_mcp_resolve(text) from public, anon, authenticated;
 grant execute on function public.gw_mcp_resolve(text) to service_role;
+
+-- ============ 20261118100000_gw_super_admin_all_modules ============
+-- =====================================================================
+-- Super Admin 永远拥有全部模块（包括以后新增的）
+--  gw__effective_module_ids 是所有「这个人能用哪些模块」判断的源头：
+--  首页 gw_get_home、模块 RLS、gw_user_can_access（发 token / 检查权限）都用它。
+--  现在：状态是 active 的 super_admin → 回传所有启用中的模块，不需要 gw_module_members，也不需要在任何 Business 里。
+--  其他人照旧：要被开权限（gw_module_members）＋ 所属 Business 有标这个模块（gw_group_modules）。
+-- 只改函数，不改动任何资料。
+-- =====================================================================
+create or replace function public.gw__effective_module_ids(p_user uuid)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.id
+  from public.gw_modules m
+  join public.gw_profiles p on p.id = p_user and p.status = 'active'
+  where m.is_active
+    and (
+      p.role = 'super_admin'
+      or (
+        exists (
+          select 1 from public.gw_module_members mm
+          where mm.user_id = p_user and mm.module_id = m.id
+        )
+        and exists (
+          select 1
+          from public.gw_group_members gm
+          join public.gw_group_modules gx on gx.group_id = gm.group_id
+          where gm.user_id = p_user and gx.module_id = m.id
+        )
+      )
+    )
+$$;
