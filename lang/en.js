@@ -461,6 +461,7 @@ window.GW_LANG["en"] = {
     },
     "title": "Admin",
     "pageTitle": "Admin Console",
+    "pageTitleSuper": "Super Admin Console",
     "backToPortal": "Back to Portal",
     "tabs": {
       "users": "Full User List",
@@ -560,6 +561,7 @@ window.GW_LANG["en"] = {
       "roleHint": "Roles are set up under Master Manage → Roles. A User has no management rights.",
       "allModules": "All modules",
       "details": "View",
+      "externalSource": "User accounts are managed by the HR system; new users will appear here automatically.",
       "becomeSuper": "Become super admin",
       "becomeSuperHint": "A super admin can open every module and can give any user access to modules."
     },
@@ -813,7 +815,9 @@ window.GW_LANG["en"] = {
       "loginEmail": "Login email",
       "userId": "User ID",
       "noModulesHere": "No modules for this business / company yet.",
-      "clickModule": "Click a module to set its access."
+      "clickModule": "Click a module to set its access.",
+      "companies": "Companies in {business}",
+      "adminOf": "This user is an admin of this module"
     },
     "connector": {
       "switchTitle": "AI Connector",

@@ -227,7 +227,7 @@ window.GW = (function () {
   // ---------------------------------------------------------------- 对话框 / 提示
   function modal(title, bodyHtml, opts) {
     const wrap = document.createElement("div");
-    wrap.className = "fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4";
+    wrap.className = "gw-modal fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4";
     wrap.innerHTML = `
       <div role="dialog" aria-modal="true" aria-label="${esc(title)}" class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl dark:bg-slate-900 ${
         opts && opts.wide ? "sm:max-w-2xl" : "sm:max-w-md"
@@ -243,7 +243,8 @@ window.GW = (function () {
       document.removeEventListener("keydown", onKey);
       if (opts && opts.onClose) opts.onClose();
     };
-    const onKey = (e) => e.key === "Escape" && close();
+    // Esc 只关最上面那一个（弹窗叠弹窗时，下面的留着）
+    const onKey = (e) => e.key === "Escape" && [...document.querySelectorAll(".gw-modal")].pop() === wrap && close();
     document.addEventListener("keydown", onKey);
     wrap.addEventListener("click", (e) => e.target === wrap && close());
     wrap.querySelector("[data-close]").addEventListener("click", close);
