@@ -8,7 +8,7 @@ window.GW_LANG["zh-CN"] = {
   "nav": {
     "home": "首页",
     "library": "模块库",
-    "admin": "管理设置",
+    "admin": "管理控制台",
     "settings": "设置",
     "logout": "登出"
   },
@@ -451,10 +451,12 @@ window.GW_LANG["zh-CN"] = {
       "appsCount": "{count} 个 App",
       "apps": "模块权限",
       "pendingCompany": "待分配 Company",
-      "removeFromCompany": "从这个 Company 拿掉"
+      "removeFromCompany": "从这个 Company 拿掉",
+      "pendingToggle": "待分配 Company（{count}）",
+      "memberCount": "{count} 人"
     },
     "title": "权限后台",
-    "pageTitle": "User Setting",
+    "pageTitle": "管理控制台",
     "backToPortal": "返回 Portal",
     "tabs": {
       "users": "全部用户",
@@ -553,7 +555,9 @@ window.GW_LANG["zh-CN"] = {
       "allRoles": "全部角色",
       "roleHint": "角色在 Master Manage → 角色 设定。一般用户没有管理权。",
       "allModules": "全部模块",
-      "details": "资料"
+      "details": "查看",
+      "becomeSuper": "设为超级管理员",
+      "becomeSuperHint": "超级管理员可以打开所有模块，并能为任何用户开放模块权限。"
     },
     "groups": {
       "description": "群组决定一群人能用哪些模块。",
@@ -799,7 +803,11 @@ window.GW_LANG["zh-CN"] = {
       "noCompany": "还没分到 Company",
       "selfNote": "这是你自己的帐号：可以看你的模块，但不能改自己的权限。",
       "superNote": "Super Admin 可以打开所有模块，所以这里不能改他的权限。",
-      "viewOnlyNote": "你可以看这个人的模块，但你的角色不能改他的权限。"
+      "viewOnlyNote": "你可以看这个人的模块，但你的角色不能改他的权限。",
+      "loginEmail": "登录 Email",
+      "userId": "用户编号",
+      "noModulesHere": "这个 Business / Company 还没有模块。",
+      "clickModule": "点模块就可以设定权限。"
     },
     "connector": {
       "switchTitle": "AI Connector",

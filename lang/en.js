@@ -8,7 +8,7 @@ window.GW_LANG["en"] = {
   "nav": {
     "home": "Home",
     "library": "Library",
-    "admin": "Admin settings",
+    "admin": "Admin Console",
     "settings": "Settings",
     "logout": "Sign out"
   },
@@ -451,10 +451,12 @@ window.GW_LANG["en"] = {
       "appsCount": "Apps: {count}",
       "apps": "Module access",
       "pendingCompany": "Pending allocation to company",
-      "removeFromCompany": "Remove from this company"
+      "removeFromCompany": "Remove from this company",
+      "pendingToggle": "Pending allocation to company ({count})",
+      "memberCount": "{count} people"
     },
     "title": "Admin",
-    "pageTitle": "User Setting",
+    "pageTitle": "Admin Console",
     "backToPortal": "Back to Portal",
     "tabs": {
       "users": "Full User List",
@@ -553,7 +555,9 @@ window.GW_LANG["en"] = {
       "allRoles": "All roles",
       "roleHint": "Roles are set up under Master Manage → Roles. A User has no management rights.",
       "allModules": "All modules",
-      "details": "Details"
+      "details": "View",
+      "becomeSuper": "Become super admin",
+      "becomeSuperHint": "A super admin can open every module and can give any user access to modules."
     },
     "groups": {
       "description": "Groups decide which modules a set of people can use.",
@@ -799,7 +803,11 @@ window.GW_LANG["en"] = {
       "noCompany": "No company yet",
       "selfNote": "This is your own account: you can see your modules but cannot change your own access.",
       "superNote": "Super Admin can open every module, so their access cannot be changed here.",
-      "viewOnlyNote": "You can see this person's modules but your role cannot change their access."
+      "viewOnlyNote": "You can see this person's modules but your role cannot change their access.",
+      "loginEmail": "Login email",
+      "userId": "User ID",
+      "noModulesHere": "No modules for this business / company yet.",
+      "clickModule": "Click a module to set its access."
     },
     "connector": {
       "switchTitle": "AI Connector",
