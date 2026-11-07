@@ -26,7 +26,7 @@ shared/home.js           主画面（首页与后台预览共用）；小工具�
 shared/admin.js          权限后台
 shared/diesel.js         Diesel Claims 模块
 lang/en.js lang/zh-CN.js  界面文字（英文 / 简体中文）
-supabase/migrations/     数据库 migration（只新增 gw_* 对象）
+supabase/migrations/     数据库 migration（只新增 gw_* 对象）；接入其他系统用 gw_register_system(...)，每个系统一个 *_system_*.sql（见 docs/integration.md）
 supabase/functions/      Edge Functions：gw-auth、gw-admin、gw-issue-token、gw-check-access、gw-jwks
 supabase/tests/          RLS 权限测试（pgTAP）
 scripts/                 产生签名金钥、本地测试资料
